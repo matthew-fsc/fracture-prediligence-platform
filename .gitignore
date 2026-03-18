@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python venv
+.venv/
+venv/
+env/
+
+# Raw data / uploads (never commit client data)
+backend/data/raw/
+backend/data/uploads/
+*.csv
+*.xlsx
+*.xls
+*.pdf
+
+# Reports output
+backend/data/reports/
+
+# Coverage
+htmlcov/
+.coverage

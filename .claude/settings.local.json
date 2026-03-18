@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pandoc \"C:\\\\Users\\\\Fracture Systems\\\\Downloads\\\\Blueprint I RawData to Ontology.docx\" -o /tmp/blueprint1.md)",
+      "Bash(pandoc \"C:\\\\Users\\\\Fracture Systems\\\\Downloads\\\\Blueprint II Ontology to Insight.docx\" -o /tmp/blueprint2.md)",
+      "Bash(python3 \"C:\\\\Users\\\\Fracture Systems\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\361c4891-f4c4-488d-8956-1730450329df\\\\8622a0a7-ceca-40b4-8635-b6bd3ffaf5c3\\\\skills\\\\docx\\\\scripts\\\\office\\\\unpack.py\" \"C:\\\\Users\\\\Fracture Systems\\\\Downloads\\\\Blueprint I RawData to Ontology.docx\" /tmp/bp1_unpacked/)",
+      "Bash(for f:*)",
+      "Bash(do)",
+      "Bash(touch \"$f\")",
+      "Bash(done)"
+    ]
+  }
+}
