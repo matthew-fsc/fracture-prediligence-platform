@@ -16,7 +16,13 @@
       "Bash(where gh:*)",
       "Bash(where git:*)",
       "Bash(python -m alembic init alembic)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(.venv/Scripts/python.exe scripts/generate_sandbox_data.py)",
+      "Bash(PYTHONUTF8=1 .venv/Scripts/python.exe scripts/generate_sandbox_data.py)",
+      "Bash(.venv/Scripts/python.exe -c \":*)",
+      "Bash(PYTHONUTF8=1 .venv/Scripts/python.exe scripts/ingest_sandbox_data.py)",
+      "Bash(PYTHONUTF8=1 .venv/Scripts/python.exe -c \":*)",
+      "Bash(curl -s http://127.0.0.1:8000/api/analytics/scores/1)"
     ]
   }
 }
