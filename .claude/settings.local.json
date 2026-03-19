@@ -7,7 +7,16 @@
       "Bash(for f:*)",
       "Bash(do)",
       "Bash(touch \"$f\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(npm install:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(where npm:*)",
+      "Bash(node -e \"console.log\\(require.resolve\\(''C:/Users/Fracture Systems/prediligence-platform/frontend/node_modules/vite/bin/vite.js''\\)\\)\")",
+      "Bash(gh repo:*)",
+      "Bash(where gh:*)",
+      "Bash(where git:*)",
+      "Bash(python -m alembic init alembic)",
+      "Bash(pip install:*)"
     ]
   }
 }
