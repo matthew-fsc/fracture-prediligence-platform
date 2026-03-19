@@ -4,33 +4,77 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { fmtM } from '../lib/utils'
-import { company, kpis as mockKpis, monthlyRevenue, customerConcentration, valueCreationLevers, marketBenchmarks } from '../lib/mockData'
+import { company, valueCreationLevers, marketBenchmarks } from '../lib/mockData'
+// Note: company (name/initials/founded/industry) still from mockData until company API exists
 import { ArrowRight, TrendingUp } from 'lucide-react'
 
 const COMPANY_ID = 1
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function buildChartData(monthly24m) {
+  if (!monthly24m) return []
+  return Object.entries(monthly24m)
+    .filter(([, v]) => v > 100)
+    .map(([k, v]) => {
+      const [yr, mo] = k.split('-')
+      return { month: MONTHS[parseInt(mo) - 1] + " '" + yr.slice(2), revenue: Math.round(v) }
+    })
+    .slice(-12)
+}
 
 export default function CompanyWorkspace() {
   const navigate = useNavigate()
   const [liveScores, setLiveScores] = useState(null)
+  const [metrics, setMetrics]       = useState(null)
+  const [bqData, setBqData]         = useState(null)
 
   useEffect(() => {
     fetch(`/api/analytics/scores/${COMPANY_ID}`)
       .then(r => r.ok ? r.json() : null)
-      .then(d => setLiveScores(d))
+      .then(setLiveScores)
+      .catch(() => {})
+    fetch(`/api/analytics/metrics/${COMPANY_ID}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setMetrics)
+      .catch(() => {})
+    fetch(`/api/analytics/buyer-questions/${COMPANY_ID}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setBqData)
       .catch(() => {})
   }, [])
 
+  const ev = liveScores?.enterprise_value ?? {}
   const kpis = {
-    ...mockKpis,
-    drs:         liveScores?.drs?.base                    ?? mockKpis.drs,
-    ebitda:      liveScores?.enterprise_value?.ebitda_base ?? mockKpis.ebitda,
-    currentEV:   liveScores?.enterprise_value?.midpoint    ?? mockKpis.currentEV,
-    potentialEV: liveScores?.enterprise_value?.ceiling     ?? mockKpis.potentialEV,
-    valueGap:    liveScores
-      ? Math.max(0, (liveScores.enterprise_value?.ceiling ?? 0) - (liveScores.enterprise_value?.midpoint ?? 0))
-      : mockKpis.valueGap,
-    ebitdaMultiple: liveScores?.enterprise_value?.multiple_used ?? mockKpis.ebitdaMultiple,
+    drs:            liveScores?.drs?.base ?? 0,
+    tier:           liveScores?.drs?.tier ?? '—',
+    ebitda:         ev.ebitda_base        ?? metrics?.ebitda_ttm ?? 0,
+    currentEV:      ev.midpoint           ?? 0,
+    potentialEV:    ev.ceiling            ?? 0,
+    valueGap:       Math.max(0, (ev.ceiling ?? 0) - (ev.midpoint ?? 0)),
+    ebitdaMultiple: ev.multiple_used      ?? '—',
+    ttmRevenue:     metrics?.total_revenue_ttm ?? 0,
+    drsPercentile:  liveScores?.drs?.base >= 85 ? 90 : liveScores?.drs?.base >= 70 ? 62 : 40,
   }
+
+  // Revenue chart from real monthly data
+  const chartData = buildChartData(metrics?.monthly_revenue_24m)
+
+  // YoY growth
+  const revByYear = metrics?.total_revenue_by_year ?? {}
+  const years = Object.keys(revByYear).sort()
+  const yoyGrowth = years.length >= 2
+    ? ((revByYear[years[years.length-1]] - revByYear[years[years.length-2]]) / revByYear[years[years.length-2]] * 100)
+    : null
+
+  // Diligence blockers from buyer-questions (top CRITICAL then HIGH)
+  const blockers = bqData?.questions
+    ?.filter(q => q.severity === 'CRITICAL' || q.severity === 'HIGH')
+    .slice(0, 3)
+    .map(q => ({
+      label:  q.question.length > 60 ? q.question.slice(0, 57) + '…' : q.question,
+      detail: q.data_required ?? q.category ?? '',
+      sev:    q.severity === 'CRITICAL' ? 'critical' : 'high',
+    })) ?? []
 
   const intelCards = [
     { label: 'EBITDA',           value: fmtM(kpis.ebitda),          sub: 'Defensible (base)',         color: 'blue'    },
@@ -96,11 +140,14 @@ export default function CompanyWorkspace() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="text-xs font-semibold text-card-foreground">Revenue vs Expenses T12M</p>
-              <p className="text-[11px] text-muted-foreground">{fmtM(kpis.ttmRevenue)} TTM · <span className="text-emerald-400">+{kpis.revenueGrowthYoY}% YoY</span></p>
+              <p className="text-[11px] text-muted-foreground">
+                {fmtM(kpis.ttmRevenue)} TTM
+                {yoyGrowth != null && <span className={yoyGrowth >= 0 ? ' text-emerald-400' : ' text-red-400'}> · {yoyGrowth >= 0 ? '+' : ''}{yoyGrowth.toFixed(1)}% YoY</span>}
+              </p>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={140}>
-            <AreaChart data={monthlyRevenue} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="cwRev" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(160,84%,39%)" stopOpacity={0.3} />
@@ -121,37 +168,48 @@ export default function CompanyWorkspace() {
           </ResponsiveContainer>
         </div>
 
-        {/* Customer concentration */}
-        <div className="rounded-xl border border-amber-500/20 bg-card p-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-card-foreground">Customer Concentration</p>
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-500/20 bg-amber-500/10 text-amber-400">Watch</span>
-          </div>
-          <div className="space-y-2.5">
-            {customerConcentration.slice(0, 5).map((c) => (
-              <div key={c.name}>
-                <div className="flex items-center justify-between mb-0.5">
-                  <span className="text-[11px] text-card-foreground truncate">{c.name}</span>
-                  <span className="text-[11px] text-muted-foreground ml-2 flex-shrink-0">{c.revenuePct}%</span>
-                </div>
-                <div className="h-1.5 bg-muted rounded-full">
-                  <div className={cn('h-1.5 rounded-full', c.revenuePct > 20 ? 'bg-red-500' : c.revenuePct > 10 ? 'bg-amber-500' : 'bg-emerald-500')}
-                    style={{ width: `${c.revenuePct * 3}%` }} />
-                </div>
+        {/* Customer Risk Metrics */}
+        {(() => {
+          const custScores = liveScores?.category_scores?.customer_risk?.sub_scores ?? {}
+          const custComposite = liveScores?.category_scores?.customer_risk?.composite ?? null
+          const custStatus = custComposite >= 80 ? 'emerald' : custComposite >= 60 ? 'amber' : 'red'
+          const custItems = [
+            { label: 'Customers',      value: metrics ? String(metrics.total_customer_count) : '—',  sub: 'active base' },
+            { label: 'Avg Tenure',     value: metrics ? `${metrics.avg_customer_tenure_years.toFixed(1)}yr` : '—', sub: 'retention signal' },
+            { label: 'Recurring Rev',  value: metrics ? `${metrics.recurring_revenue_pct.toFixed(0)}%` : '—', sub: 'of TTM revenue' },
+            { label: 'Concentration',  value: custScores.concentration?.score != null ? `${custScores.concentration.score.toFixed(0)}` : '—', sub: 'HHI score /100' },
+          ]
+          return (
+            <div className={cn('rounded-xl border bg-card p-4', `border-${custStatus}-500/20`)}>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold text-card-foreground">Customer Risk</p>
+                {custComposite != null && (
+                  <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border',
+                    custComposite >= 80 ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400' :
+                    custComposite >= 60 ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' :
+                    'border-red-500/20 bg-red-500/10 text-red-400')}>
+                    {custComposite.toFixed(0)}/100
+                  </span>
+                )}
               </div>
-            ))}
-          </div>
-        </div>
+              <div className="grid grid-cols-2 gap-2">
+                {custItems.map(item => (
+                  <div key={item.label} className="p-2 rounded-lg bg-muted/30 border border-border/50">
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{item.label}</p>
+                    <p className="text-base font-bold text-foreground">{item.value}</p>
+                    <p className="text-[9px] text-muted-foreground">{item.sub}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Diligence blockers */}
         <div className="rounded-xl border border-red-500/20 bg-card p-4">
           <p className="text-xs font-semibold text-card-foreground mb-3">Diligence Blockers</p>
           <div className="space-y-2.5">
-            {[
-              { label: 'Key Person Risk',       detail: '2 advisors own 71% of closed deals',                      sev: 'critical' },
-              { label: 'Missing Contracts',      detail: 'Top 3 customers (44% revenue) have no signed agreements', sev: 'high'     },
-              { label: 'Customer Concentration', detail: 'Acme Corp = 22% of revenue, no multi-year contract',      sev: 'watch'    },
-            ].map((b) => (
+            {(blockers.length > 0 ? blockers : [{ label: 'Loading risk flags…', detail: '', sev: 'high' }]).map((b) => (
               <div key={b.label} className="flex gap-2">
                 <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 h-fit',
                   b.sev === 'critical' ? 'border-red-500/20 bg-red-500/10 text-red-400' :

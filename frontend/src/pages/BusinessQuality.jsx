@@ -2,13 +2,25 @@ import { useState, useEffect } from 'react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { fmtM } from '../lib/utils'
-import { monthlyRevenue, kpis as mockKpis } from '../lib/mockData'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell
 } from 'recharts'
 
 const COMPANY_ID = 1
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function buildChartData(monthly24m) {
+  if (!monthly24m) return []
+  return Object.entries(monthly24m)
+    .filter(([, v]) => v > 100)
+    .map(([k, v]) => {
+      const [yr, mo] = k.split('-')
+      return { month: MONTHS[parseInt(mo) - 1] + " '" + yr.slice(2), revenue: Math.round(v) }
+    })
+    .slice(-12)
+}
 
 function MetricPanel({ label, displayValue, benchmark, percentile, status, trendDir, trendLabel, children }) {
   const colors = {
@@ -30,7 +42,7 @@ function MetricPanel({ label, displayValue, benchmark, percentile, status, trend
       <div className="min-h-[60px]">{children}</div>
       <div className="flex items-center justify-between text-[10px]">
         <span className="text-muted-foreground">{benchmark}</span>
-        {percentile && <span className={cn('font-bold', c.value)}>{percentile}th pctile</span>}
+        {percentile != null && <span className={cn('font-bold', c.value)}>{percentile}th pctile</span>}
       </div>
       {trendLabel && (
         <p className={cn('text-[10px]', trendDir === 'up' ? 'text-emerald-400' : trendDir === 'down' ? 'text-red-400' : 'text-muted-foreground')}>
@@ -43,17 +55,63 @@ function MetricPanel({ label, displayValue, benchmark, percentile, status, trend
 
 export default function BusinessQuality() {
   const [scores, setScores] = useState(null)
+  const [metrics, setMetrics] = useState(null)
 
   useEffect(() => {
     fetch(`/api/analytics/scores/${COMPANY_ID}`)
       .then(r => r.ok ? r.json() : null)
       .then(setScores)
       .catch(() => {})
+    fetch(`/api/analytics/metrics/${COMPANY_ID}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setMetrics)
+      .catch(() => {})
   }, [])
 
+  // ── Derived values from real API ──────────────────────────────────────────
   const cats = scores?.category_scores ?? {}
-  const recurringRate = cats.revenue_quality?.sub_scores?.recurring_rate?.value ?? mockKpis.recurringRevenuePct
-  const revenuePerEmp = cats.management_team?.sub_scores?.size?.value ?? mockKpis.ttmRevenue / 13
+
+  const totalRevenue   = metrics?.total_revenue_ttm ?? 0
+  const ebitda         = metrics?.ebitda_ttm ?? 0
+  const recurringRate  = metrics?.recurring_revenue_pct ?? cats.revenue_quality?.sub_scores?.recurring_rate?.value ?? 0
+  const revenuePerEmp  = metrics?.revenue_per_employee ?? 0
+  const headcount      = metrics?.total_headcount ?? 0
+
+  // YoY growth from total_revenue_by_year
+  const revByYear  = metrics?.total_revenue_by_year ?? {}
+  const years      = Object.keys(revByYear).sort()
+  const yoyGrowth  = years.length >= 2
+    ? ((revByYear[years[years.length - 1]] - revByYear[years[years.length - 2]]) / revByYear[years[years.length - 2]] * 100)
+    : null
+
+  // EBITDA margin (payroll-adjusted — no other opex in dataset)
+  const ebitdaMargin   = totalRevenue > 0 ? (ebitda / totalRevenue) * 100 : 0
+
+  // Implied payroll ratio: revenue - EBITDA = payroll (when no other opex tracked)
+  const impliedPayroll = totalRevenue - ebitda
+  const payrollRatio   = totalRevenue > 0 ? (impliedPayroll / totalRevenue) * 100 : 0
+
+  // Revenue CAGR from sub_scores or metrics
+  const cagr = metrics?.cagr_3yr ?? 0
+
+  // Chart data from real monthly_revenue_24m
+  const chartData = buildChartData(metrics?.monthly_revenue_24m)
+
+  // Estimated monthly payroll for chart comparison line
+  const monthlyPayroll = impliedPayroll / 12
+
+  const chartWithExp = chartData.map(d => ({
+    ...d,
+    expenses: Math.round(monthlyPayroll),
+  }))
+
+  // ── Status helpers ─────────────────────────────────────────────────────────
+  const yoyStatus = yoyGrowth == null ? 'adequate'
+    : yoyGrowth >= 20 ? 'strong' : yoyGrowth >= 10 ? 'adequate' : yoyGrowth >= 0 ? 'watch' : 'concern'
+  const recurringStatus = recurringRate >= 75 ? 'strong' : recurringRate >= 55 ? 'adequate' : recurringRate >= 40 ? 'watch' : 'concern'
+  const ebitdaStatus    = ebitdaMargin >= 25 ? 'strong' : ebitdaMargin >= 15 ? 'adequate' : ebitdaMargin >= 8 ? 'watch' : 'concern'
+  const payrollStatus   = payrollRatio <= 27 ? 'strong' : payrollRatio <= 33 ? 'adequate' : payrollRatio <= 42 ? 'watch' : 'concern'
+  const empStatus       = revenuePerEmp >= 220000 ? 'strong' : revenuePerEmp >= 165000 ? 'adequate' : 'watch'
 
   return (
     <div className="space-y-5 max-w-[1400px]">
@@ -63,19 +121,20 @@ export default function BusinessQuality() {
         action={<span className="text-[10px] font-semibold px-2.5 py-1 rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-400">Internal Data · Source of Record</span>}
       />
 
-      {/* Metric panels */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+        {/* Revenue Growth YoY */}
         <MetricPanel
           label="Revenue Growth (YoY)"
-          displayValue={`${mockKpis.revenueGrowthYoY}%`}
+          displayValue={yoyGrowth != null ? `${yoyGrowth.toFixed(1)}%` : '—'}
           benchmark="8% industry median · 18% top quartile"
-          percentile={62}
-          status="adequate"
-          trendDir="up"
-          trendLabel="+12.7% trailing 12 months"
+          percentile={yoyGrowth != null ? (yoyGrowth >= 18 ? 82 : yoyGrowth >= 8 ? 62 : 40) : null}
+          status={yoyStatus}
+          trendDir={yoyGrowth != null ? (yoyGrowth >= 0 ? 'up' : 'down') : 'flat'}
+          trendLabel={yoyGrowth != null ? `${yoyGrowth >= 0 ? '+' : ''}${yoyGrowth.toFixed(1)}% trailing 12 months` : 'Calculating…'}
         >
           <ResponsiveContainer width="100%" height={60}>
-            <AreaChart data={monthlyRevenue} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="bqRevG" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(160,84%,39%)" stopOpacity={0.3} />
@@ -87,18 +146,19 @@ export default function BusinessQuality() {
           </ResponsiveContainer>
         </MetricPanel>
 
+        {/* Recurring Revenue */}
         <MetricPanel
           label="Recurring Revenue %"
           displayValue={`${recurringRate.toFixed(0)}%`}
           benchmark="55% median · 75% top quartile"
-          percentile={58}
-          status={recurringRate >= 75 ? 'strong' : recurringRate >= 55 ? 'adequate' : recurringRate >= 40 ? 'watch' : 'concern'}
-          trendDir="up"
-          trendLabel="Above industry median"
+          percentile={recurringRate >= 75 ? 82 : recurringRate >= 55 ? 58 : 35}
+          status={recurringStatus}
+          trendDir={recurringRate >= 55 ? 'up' : 'down'}
+          trendLabel={recurringRate >= 55 ? 'Above industry median' : 'Below industry median'}
         >
           <div className="space-y-1.5 mt-1">
             <div className="h-2 bg-muted rounded-full">
-              <div className="h-2 bg-emerald-500 rounded-full" style={{ width: `${recurringRate}%` }} />
+              <div className="h-2 bg-emerald-500 rounded-full" style={{ width: `${Math.min(recurringRate, 100)}%` }} />
             </div>
             <div className="flex justify-between text-[9px] text-muted-foreground">
               <span>0%</span><span className="text-amber-400">55% med</span><span className="text-emerald-400">75% UQ</span>
@@ -106,63 +166,78 @@ export default function BusinessQuality() {
           </div>
         </MetricPanel>
 
+        {/* EBITDA Margin */}
         <MetricPanel
-          label="Gross Margin"
-          displayValue={`${mockKpis.grossMargin}%`}
-          benchmark="38% median · 52% top quartile"
-          percentile={55}
-          status={mockKpis.grossMargin >= 52 ? 'strong' : mockKpis.grossMargin >= 38 ? 'adequate' : 'watch'}
+          label="EBITDA Margin (Payroll-Adj.)"
+          displayValue={ebitdaMargin > 0 ? `${ebitdaMargin.toFixed(1)}%` : '—'}
+          benchmark="13% median · 22% top quartile"
+          percentile={ebitdaMargin >= 35 ? 92 : ebitdaMargin >= 22 ? 75 : ebitdaMargin >= 13 ? 50 : 30}
+          status={ebitdaStatus}
           trendDir="up"
-          trendLabel="Above median for professional services"
+          trendLabel="Payroll-only cost base (COGS not available)"
         >
           <div className="space-y-1.5 mt-1">
             <div className="h-2 bg-muted rounded-full">
-              <div className="h-2 bg-blue-500 rounded-full" style={{ width: `${(mockKpis.grossMargin / 70) * 100}%` }} />
+              <div className="h-2 bg-emerald-500 rounded-full" style={{ width: `${Math.min((ebitdaMargin / 50) * 100, 100)}%` }} />
             </div>
             <div className="flex justify-between text-[9px] text-muted-foreground">
-              <span>0%</span><span className="text-amber-400">38% med</span><span className="text-emerald-400">52% UQ</span>
+              <span>0%</span><span className="text-amber-400">13% med</span><span className="text-emerald-400">22% UQ</span>
             </div>
           </div>
         </MetricPanel>
 
+        {/* Payroll Ratio */}
         <MetricPanel
           label="Payroll Ratio"
-          displayValue={`${mockKpis.payrollRatio}%`}
+          displayValue={payrollRatio > 0 ? `${payrollRatio.toFixed(1)}%` : '—'}
           benchmark="33% median · 27% top quartile"
-          percentile={35}
-          status="watch"
-          trendDir="down"
-          trendLabel="500bps above 33% benchmark"
+          percentile={payrollRatio <= 27 ? 80 : payrollRatio <= 33 ? 55 : 35}
+          status={payrollStatus}
+          trendDir={payrollRatio <= 33 ? 'up' : 'down'}
+          trendLabel={payrollRatio > 0 ? `${payrollRatio.toFixed(0)}% of revenue to payroll (${headcount} employees)` : 'No payroll data'}
         >
-          <div className="space-y-1.5 mt-1">
+          <div className="space-y-1.5">
             <div>
               <div className="flex justify-between text-[10px] mb-0.5">
                 <span className="text-muted-foreground">This company</span>
-                <span className="text-red-400 font-bold">{mockKpis.payrollRatio}%</span>
+                <span className={cn('font-bold', payrollRatio > 33 ? 'text-amber-400' : 'text-emerald-400')}>{payrollRatio.toFixed(0)}%</span>
               </div>
-              <div className="h-1.5 bg-muted rounded-full"><div className="h-1.5 bg-red-500 rounded-full" style={{ width: '76%' }} /></div>
+              <div className="h-1.5 bg-muted rounded-full">
+                <div className={cn('h-1.5 rounded-full', payrollRatio > 40 ? 'bg-red-500' : payrollRatio > 33 ? 'bg-amber-500' : 'bg-emerald-500')}
+                  style={{ width: `${Math.min((payrollRatio / 60) * 100, 100)}%` }} />
+              </div>
             </div>
             <div>
               <div className="flex justify-between text-[10px] mb-0.5">
                 <span className="text-muted-foreground">Market median</span>
                 <span className="text-amber-400 font-bold">33%</span>
               </div>
-              <div className="h-1.5 bg-muted rounded-full"><div className="h-1.5 bg-amber-500 rounded-full" style={{ width: '66%' }} /></div>
+              <div className="h-1.5 bg-muted rounded-full">
+                <div className="h-1.5 bg-amber-500 rounded-full" style={{ width: `${(33/60)*100}%` }} />
+              </div>
             </div>
           </div>
         </MetricPanel>
 
+        {/* Revenue per Employee */}
         <MetricPanel
           label="Revenue per Employee"
-          displayValue={fmtM(revenuePerEmp)}
+          displayValue={revenuePerEmp > 0 ? `$${Math.round(revenuePerEmp / 1000)}K` : '—'}
           benchmark="$165K median · $220K top quartile"
-          percentile={48}
-          status={revenuePerEmp >= 220000 ? 'strong' : revenuePerEmp >= 165000 ? 'adequate' : 'watch'}
-          trendDir="up"
-          trendLabel={`$${Math.round(revenuePerEmp/1000)}K per employee`}
+          percentile={revenuePerEmp >= 220000 ? 78 : revenuePerEmp >= 165000 ? 58 : 35}
+          status={empStatus}
+          trendDir={revenuePerEmp >= 165000 ? 'up' : 'down'}
+          trendLabel={`$${Math.round(revenuePerEmp / 1000)}K per employee · ${headcount} headcount`}
         >
           <ResponsiveContainer width="100%" height={60}>
-            <BarChart data={[{ n: 'This Co.', v: revenuePerEmp/1000 }, { n: 'Median', v: 165 }, { n: 'UQ', v: 220 }]} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+            <BarChart
+              data={[
+                { n: 'This Co.', v: revenuePerEmp > 0 ? Math.round(revenuePerEmp / 1000) : 0 },
+                { n: 'Median',   v: 165 },
+                { n: 'UQ',       v: 220 },
+              ]}
+              margin={{ top: 2, right: 0, bottom: 0, left: 0 }}
+            >
               <XAxis dataKey="n" tick={{ fontSize: 9, fill: 'hsl(220,10%,46%)' }} axisLine={false} tickLine={false} />
               <Bar dataKey="v" radius={[3, 3, 0, 0]} barSize={20}>
                 <Cell fill="hsl(217,91%,60%)" />
@@ -173,61 +248,76 @@ export default function BusinessQuality() {
           </ResponsiveContainer>
         </MetricPanel>
 
+        {/* Revenue CAGR */}
         <MetricPanel
-          label="EBITDA Margin"
-          displayValue={scores ? `${((scores.enterprise_value.ebitda_base / (scores.enterprise_value.ebitda_base / 0.22)) * 100).toFixed(1)}%` : `${mockKpis.ebitda ? ((mockKpis.ebitda / mockKpis.ttmRevenue) * 100).toFixed(1) : '22.0'}%`}
-          benchmark="13% median · 22% top quartile"
-          percentile={68}
-          status="strong"
-          trendDir="up"
-          trendLabel="Above top quartile"
+          label="Revenue CAGR (3-Year)"
+          displayValue={cagr > 0 ? `${cagr.toFixed(1)}%` : '—'}
+          benchmark="6% industry median · 15% top quartile"
+          percentile={cagr >= 15 ? 80 : cagr >= 6 ? 60 : 35}
+          status={cagr >= 15 ? 'strong' : cagr >= 6 ? 'adequate' : 'watch'}
+          trendDir={cagr >= 6 ? 'up' : 'down'}
+          trendLabel={years.length >= 2
+            ? `${fmtM(revByYear[years[0]])} (${years[0]}) → ${fmtM(revByYear[years[years.length-1]])} (${years[years.length-1]})`
+            : 'Computing…'}
         >
           <div className="space-y-1.5 mt-1">
-            <div className="h-2 bg-muted rounded-full">
-              <div className="h-2 bg-emerald-500 rounded-full" style={{ width: '75%' }} />
-            </div>
-            <div className="flex justify-between text-[9px] text-muted-foreground">
-              <span>0%</span><span className="text-amber-400">13% med</span><span className="text-emerald-400">22% UQ</span>
-            </div>
+            {years.slice(-3).map((yr, i) => (
+              <div key={yr}>
+                <div className="flex justify-between text-[10px] mb-0.5">
+                  <span className="text-muted-foreground">{yr}</span>
+                  <span className="text-foreground font-medium">{fmtM(revByYear[yr])}</span>
+                </div>
+                <div className="h-1 bg-muted rounded-full">
+                  <div className="h-1 bg-blue-500 rounded-full transition-all"
+                    style={{ width: `${(revByYear[yr] / Math.max(...Object.values(revByYear))) * 100}%`, opacity: 0.4 + i * 0.3 }} />
+                </div>
+              </div>
+            ))}
           </div>
         </MetricPanel>
       </div>
 
-      {/* Revenue vs Expense chart */}
+      {/* Revenue chart */}
       <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h3 className="text-sm font-semibold text-card-foreground">Revenue vs Expenses — Operating Consistency</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Trailing 12 months · Source: QuickBooks Online</p>
+            <h3 className="text-sm font-semibold text-card-foreground">Revenue vs Payroll — Operating Consistency</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Trailing 12 months · {fmtM(totalRevenue)} TTM · Source: QuickBooks Online + Gusto
+            </p>
           </div>
           <span className="text-[9px] font-semibold px-2 py-0.5 rounded border border-border text-muted-foreground">Internal Data</span>
         </div>
-        <ResponsiveContainer width="100%" height={200}>
-          <AreaChart data={monthlyRevenue} margin={{ top: 5, right: 5, bottom: 0, left: 10 }}>
-            <defs>
-              <linearGradient id="bqRev2" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(160,84%,39%)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(160,84%,39%)" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="bqExp" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(0,72%,51%)" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="hsl(0,72%,51%)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'hsl(220,10%,46%)' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: 'hsl(220,10%,46%)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} width={44} />
-            <Tooltip
-              content={({ active, payload, label }) => active && payload?.length ? (
-                <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-xl text-xs">
-                  <p className="font-semibold text-foreground mb-1">{label}</p>
-                  {payload.map((p, i) => <p key={i} style={{ color: p.color }}>{p.name}: ${(p.value/1000).toFixed(0)}K</p>)}
-                </div>
-              ) : null}
-            />
-            <Area type="monotone" dataKey="revenue" name="Revenue" stroke="hsl(160,84%,39%)" fill="url(#bqRev2)" strokeWidth={2} dot={false} />
-            <Area type="monotone" dataKey="expenses" name="Expenses" stroke="hsl(0,72%,51%)" fill="url(#bqExp)" strokeWidth={1.5} dot={false} />
-          </AreaChart>
-        </ResponsiveContainer>
+        {chartWithExp.length > 0 ? (
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={chartWithExp} margin={{ top: 5, right: 5, bottom: 0, left: 10 }}>
+              <defs>
+                <linearGradient id="bqRev2" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(160,84%,39%)" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(160,84%,39%)" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="bqExp" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(217,91%,60%)" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="hsl(217,91%,60%)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'hsl(220,10%,46%)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: 'hsl(220,10%,46%)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}K`} width={44} />
+              <Tooltip
+                content={({ active, payload, label }) => active && payload?.length ? (
+                  <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-xl text-xs">
+                    <p className="font-semibold text-foreground mb-1">{label}</p>
+                    {payload.map((p, i) => <p key={i} style={{ color: p.color }}>{p.name}: ${(p.value/1000).toFixed(0)}K</p>)}
+                  </div>
+                ) : null}
+              />
+              <Area type="monotone" dataKey="revenue" name="Revenue" stroke="hsl(160,84%,39%)" fill="url(#bqRev2)" strokeWidth={2} dot={false} />
+              <Area type="monotone" dataKey="expenses" name="Payroll (monthly avg)" stroke="hsl(217,91%,60%)" fill="url(#bqExp)" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">Loading chart data…</div>
+        )}
       </div>
     </div>
   )

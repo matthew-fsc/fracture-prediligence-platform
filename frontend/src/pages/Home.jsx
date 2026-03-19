@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { fmtM } from '../lib/utils'
-import { kpis as mockKpis, recentActivity } from '../lib/mockData'
+import { recentActivity } from '../lib/mockData'
 
 const COMPANY_ID = 1
 
@@ -22,7 +22,7 @@ const colorCfg = {
 
 const MODULES = [
   { label: 'Company Workspace',   path: '/CompanyWorkspace',  icon: Building2,  color: 'blue',    desc: 'Entity-centric intelligence hub' },
-  { label: 'Buyer Risk Profile',  path: '/BuyerLens',         icon: Shield,     color: 'red',     desc: '6 active flags · 2 critical' },
+  { label: 'Buyer Risk Profile',  path: '/BuyerLens',         icon: Shield,     color: 'red',     desc: null },
   { label: 'Value Gap Analysis',  path: '/ValueGap',          icon: Target,     color: 'emerald', desc: 'Addressable value creation opportunity' },
   { label: 'Business Quality',    path: '/BusinessQuality',   icon: BarChart2,  color: 'blue',    desc: 'Operating metrics vs benchmarks' },
   { label: 'Scenario Simulator',  path: '/ScenarioSimulator', icon: Activity,   color: 'amber',   desc: 'Model adverse events in real time' },
@@ -42,18 +42,27 @@ const quickActions = [
 export default function Home() {
   const navigate = useNavigate()
   const [liveData, setLiveData] = useState(null)
+  const [bqData, setBqData] = useState(null)
 
   useEffect(() => {
     fetch(`/api/analytics/scores/${COMPANY_ID}`)
       .then(r => r.ok ? r.json() : null)
-      .then(d => setLiveData(d))
+      .then(setLiveData)
+      .catch(() => {})
+    fetch(`/api/analytics/buyer-questions/${COMPANY_ID}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setBqData)
       .catch(() => {})
   }, [])
 
-  const drs = liveData?.drs?.base ?? mockKpis.drs
-  const currentEV = liveData?.enterprise_value?.midpoint ?? mockKpis.currentEV
-  const ceilingEV = liveData?.enterprise_value?.ceiling ?? mockKpis.potentialEV
-  const valueGap = liveData ? Math.max(0, ceilingEV - currentEV) : mockKpis.valueGap
+  const drs      = liveData?.drs?.base ?? 0
+  const currentEV = liveData?.enterprise_value?.midpoint ?? 0
+  const ceilingEV = liveData?.enterprise_value?.ceiling ?? 0
+  const valueGap  = Math.max(0, ceilingEV - currentEV)
+
+  const criticalCount = bqData?.questions?.filter(q => q.severity === 'CRITICAL').length ?? 0
+  const highCount     = bqData?.questions?.filter(q => q.severity === 'HIGH').length ?? 0
+  const blockerCount  = criticalCount + highCount
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
@@ -81,7 +90,7 @@ export default function Home() {
         {[
           { label: 'Active Engagements', value: '1',              sub: 'Meridian Group',      color: 'blue'    },
           { label: 'Readiness Score',    value: `${drs}/100`,     sub: 'Investment Grade',    color: 'amber'   },
-          { label: 'Open Blockers',      value: '4',              sub: '2 critical flags',    color: 'red'     },
+          { label: 'Open Blockers',      value: bqData ? String(blockerCount) : '—', sub: `${criticalCount} critical flags`, color: 'red' },
           { label: 'Value Opportunity',  value: `+${fmtM(valueGap)}`, sub: 'ceiling vs midpoint', color: 'emerald' },
         ].map(c => (
           <div key={c.label} className={cn('rounded-xl border p-3', colorCfg[c.color])}>
@@ -103,7 +112,11 @@ export default function Home() {
                 className={cn('rounded-lg border p-4 hover:scale-[1.02] transition-all cursor-pointer group', colorCfg[m.color])}>
                 <Icon className="w-5 h-5 mb-2" />
                 <p className="text-sm font-semibold text-foreground">{m.label}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{m.desc}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {m.path === '/BuyerLens' && bqData
+                    ? `${bqData.total} flags · ${criticalCount} critical`
+                    : m.desc}
+                </p>
                 <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">
                   Open <ChevronRight className="w-3 h-3" />
                 </div>

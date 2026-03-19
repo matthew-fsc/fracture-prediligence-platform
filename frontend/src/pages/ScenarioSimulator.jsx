@@ -1,47 +1,44 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { cn } from '../lib/utils'
 import { fmtM } from '../lib/utils'
-import { AlertTriangle, TrendingDown, TrendingUp, Activity, UserMinus, Shield } from 'lucide-react'
+import { TrendingDown, TrendingUp, Activity, UserMinus, Shield } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { kpis as mockKpis } from '../lib/mockData'
 
-const BASE = {
-  revenue:  mockKpis.ttmRevenue,
-  ebitda:   mockKpis.ebitda,
-  multiple: 6.0,
-  ev:       mockKpis.currentEV,
-}
+const COMPANY_ID = 1
 
+// SCENARIOS define structure and compute logic; they receive `base` as 2nd arg
 const SCENARIOS = [
   {
     id: 'top_customer_loss', label: 'Loss of Top Customer', icon: UserMinus, color: 'red',
-    description: 'Top customer (22% of revenue) terminates relationship',
+    description: 'Top customer terminates relationship',
     params: [
-      { id: 'customer_pct',    label: 'Customer Revenue Share',    min: 5,  max: 45, step: 1,  default: 22, unit: '%' },
+      { id: 'customer_pct',    label: 'Customer Revenue Share',     min: 5,  max: 45, step: 1,  default: 22, unit: '%' },
       { id: 'recovery_months', label: 'Recovery Timeline (months)', min: 3,  max: 36, step: 3,  default: 12, unit: 'mo' },
     ],
-    compute: (p) => {
-      const lost = BASE.revenue * (p.customer_pct / 100)
-      const newEbitda = (BASE.revenue - lost) * 0.22
+    compute: (p, base) => {
+      const ebitdaMargin = base.ebitda / base.revenue
+      const lost = base.revenue * (p.customer_pct / 100)
+      const newEbitda = (base.revenue - lost) * ebitdaMargin
       const mHit = p.customer_pct > 20 ? -0.8 : p.customer_pct > 15 ? -0.4 : -0.2
-      const newEV = Math.max(BASE.multiple + mHit, 2.5) * newEbitda
-      return { revenueImpact: -lost, ebitdaImpact: newEbitda - BASE.ebitda, multipleImpact: mHit, evImpact: newEV - BASE.ev, newEV, severity: p.customer_pct > 20 ? 'critical' : 'high' }
+      const newEV = Math.max(base.multiple + mHit, 2.5) * newEbitda
+      return { revenueImpact: -lost, ebitdaImpact: newEbitda - base.ebitda, multipleImpact: mHit, evImpact: newEV - base.ev, newEV, severity: p.customer_pct > 20 ? 'critical' : 'high' }
     },
   },
   {
     id: 'key_employee', label: 'Key Employee Departure', icon: UserMinus, color: 'amber',
-    description: 'Senior advisor responsible for 35%+ of deal origination departs',
+    description: 'Senior advisor responsible for deal origination departs',
     params: [
-      { id: 'deal_pct',         label: 'Deal Attribution',          min: 10, max: 60, step: 5,  default: 35, unit: '%' },
-      { id: 'replacement_cost', label: 'Replacement Cost ($K)',     min: 50, max: 500, step: 25, default: 150, unit: 'K' },
+      { id: 'deal_pct',         label: 'Deal Attribution',      min: 10, max: 60,  step: 5,  default: 35, unit: '%' },
+      { id: 'replacement_cost', label: 'Replacement Cost ($K)', min: 50, max: 500, step: 25, default: 150, unit: 'K' },
     ],
-    compute: (p) => {
-      const atRisk = BASE.revenue * (p.deal_pct / 100) * 0.4
+    compute: (p, base) => {
+      const ebitdaMargin = base.ebitda / base.revenue
+      const atRisk = base.revenue * (p.deal_pct / 100) * 0.4
       const repCost = p.replacement_cost * 1000
-      const ebitdaHit = atRisk * 0.22 + repCost
+      const ebitdaHit = atRisk * ebitdaMargin + repCost
       const mHit = p.deal_pct > 30 ? -0.5 : -0.2
-      const newEV = (BASE.multiple + mHit) * (BASE.ebitda - ebitdaHit)
-      return { revenueImpact: -atRisk, ebitdaImpact: -ebitdaHit, multipleImpact: mHit, evImpact: newEV - BASE.ev, newEV, severity: p.deal_pct > 40 ? 'critical' : 'high' }
+      const newEV = (base.multiple + mHit) * (base.ebitda - ebitdaHit)
+      return { revenueImpact: -atRisk, ebitdaImpact: -ebitdaHit, multipleImpact: mHit, evImpact: newEV - base.ev, newEV, severity: p.deal_pct > 40 ? 'critical' : 'high' }
     },
   },
   {
@@ -51,43 +48,45 @@ const SCENARIOS = [
       { id: 'margin_reduction', label: 'Margin Reduction (pp)', min: 1, max: 15, step: 0.5, default: 5, unit: 'pp' },
       { id: 'duration_months',  label: 'Duration (months)',    min: 3, max: 24, step: 3,   default: 6, unit: 'mo' },
     ],
-    compute: (p) => {
-      const eHit = BASE.revenue * (p.margin_reduction / 100)
-      const newEbitda = BASE.ebitda - eHit
+    compute: (p, base) => {
+      const eHit = base.revenue * (p.margin_reduction / 100)
+      const newEbitda = base.ebitda - eHit
       const mHit = p.margin_reduction > 8 ? -0.3 : -0.1
-      const newEV = (BASE.multiple + mHit) * newEbitda
-      return { revenueImpact: 0, ebitdaImpact: -eHit, multipleImpact: mHit, evImpact: newEV - BASE.ev, newEV, severity: p.margin_reduction > 8 ? 'critical' : 'warning' }
+      const newEV = (base.multiple + mHit) * newEbitda
+      return { revenueImpact: 0, ebitdaImpact: -eHit, multipleImpact: mHit, evImpact: newEV - base.ev, newEV, severity: p.margin_reduction > 8 ? 'critical' : 'warning' }
     },
   },
   {
     id: 'security_incident', label: 'Security Incident', icon: Shield, color: 'red',
     description: 'Data breach or ransomware during diligence process',
     params: [
-      { id: 'breach_severity',   label: 'Incident Severity (1-10)', min: 1, max: 10, step: 1,  default: 6,   unit: ''  },
-      { id: 'remediation_cost',  label: 'Remediation Cost ($K)',    min: 25, max: 500, step: 25, default: 100, unit: 'K' },
+      { id: 'breach_severity',  label: 'Incident Severity (1-10)', min: 1, max: 10,  step: 1,  default: 6,   unit: ''  },
+      { id: 'remediation_cost', label: 'Remediation Cost ($K)',    min: 25, max: 500, step: 25, default: 100, unit: 'K' },
     ],
-    compute: (p) => {
+    compute: (p, base) => {
+      const ebitdaMargin = base.ebitda / base.revenue
       const remCost = p.remediation_cost * 1000
-      const repHit = BASE.revenue * (p.breach_severity / 100) * 0.3
-      const eHit = remCost + repHit * 0.22
+      const repHit = base.revenue * (p.breach_severity / 100) * 0.3
+      const eHit = remCost + repHit * ebitdaMargin
       const mHit = p.breach_severity > 7 ? -1.0 : p.breach_severity > 4 ? -0.5 : -0.2
-      const newEV = (BASE.multiple + mHit) * (BASE.ebitda - eHit)
-      return { revenueImpact: -repHit, ebitdaImpact: -eHit, multipleImpact: mHit, evImpact: newEV - BASE.ev, newEV, severity: p.breach_severity > 7 ? 'critical' : 'high' }
+      const newEV = (base.multiple + mHit) * (base.ebitda - eHit)
+      return { revenueImpact: -repHit, ebitdaImpact: -eHit, multipleImpact: mHit, evImpact: newEV - base.ev, newEV, severity: p.breach_severity > 7 ? 'critical' : 'high' }
     },
   },
   {
     id: 'revenue_growth', label: 'Revenue Growth Change', icon: TrendingUp, color: 'emerald',
     description: 'Model acceleration or deceleration in revenue trajectory',
     params: [
-      { id: 'growth_rate', label: 'New Annual Growth Rate', min: -20, max: 50, step: 2, default: 20, unit: '%' },
-      { id: 'years',       label: 'Projection Period (years)', min: 1, max: 5, step: 1, default: 2, unit: 'yr' },
+      { id: 'growth_rate', label: 'New Annual Growth Rate',      min: -20, max: 50, step: 2, default: 20, unit: '%' },
+      { id: 'years',       label: 'Projection Period (years)',   min: 1,   max: 5,  step: 1, default: 2,  unit: 'yr' },
     ],
-    compute: (p) => {
-      const newRev = BASE.revenue * Math.pow(1 + p.growth_rate / 100, p.years)
-      const newEbitda = newRev * 0.22
+    compute: (p, base) => {
+      const ebitdaMargin = base.ebitda / base.revenue
+      const newRev = base.revenue * Math.pow(1 + p.growth_rate / 100, p.years)
+      const newEbitda = newRev * ebitdaMargin
       const mBonus = p.growth_rate > 20 ? 0.5 : p.growth_rate > 10 ? 0.3 : p.growth_rate < 0 ? -0.5 : 0
-      const newEV = (BASE.multiple + mBonus) * newEbitda
-      return { revenueImpact: newRev - BASE.revenue, ebitdaImpact: newEbitda - BASE.ebitda, multipleImpact: mBonus, evImpact: newEV - BASE.ev, newEV, severity: p.growth_rate < 0 ? 'warning' : 'positive' }
+      const newEV = (base.multiple + mBonus) * newEbitda
+      return { revenueImpact: newRev - base.revenue, ebitdaImpact: newEbitda - base.ebitda, multipleImpact: mBonus, evImpact: newEV - base.ev, newEV, severity: p.growth_rate < 0 ? 'warning' : 'positive' }
     },
   },
 ]
@@ -104,6 +103,7 @@ const sevColor = {
 }
 
 export default function ScenarioSimulator() {
+  const [base, setBase] = useState(null)
   const [activeScenario, setActiveScenario] = useState(SCENARIOS[0].id)
   const [params, setParams] = useState(() => {
     const p = {}
@@ -111,15 +111,37 @@ export default function ScenarioSimulator() {
     return p
   })
 
+  useEffect(() => {
+    Promise.all([
+      fetch(`/api/analytics/metrics/${COMPANY_ID}`).then(r => r.ok ? r.json() : null),
+      fetch(`/api/analytics/scores/${COMPANY_ID}`).then(r => r.ok ? r.json() : null),
+    ]).then(([metrics, scores]) => {
+      if (!metrics || !scores) return
+      const ev = scores.enterprise_value
+      const midMultiple = ev?.midpoint && metrics.ebitda_ttm > 0
+        ? ev.midpoint / metrics.ebitda_ttm
+        : 6.0
+      setBase({
+        revenue:  metrics.total_revenue_ttm,
+        ebitda:   metrics.ebitda_ttm,
+        multiple: parseFloat(midMultiple.toFixed(1)),
+        ev:       ev?.midpoint ?? 0,
+      })
+    }).catch(() => {})
+  }, [])
+
+  // While loading, use placeholder so UI doesn't crash
+  const liveBase = base ?? { revenue: 0, ebitda: 0, multiple: 6.0, ev: 0 }
+
   const scenario = SCENARIOS.find(s => s.id === activeScenario)
   const scenarioParams = {}
   scenario.params.forEach(p => { scenarioParams[p.id] = params[`${activeScenario}_${p.id}`] })
-  const result = scenario.compute(scenarioParams)
+  const result = base ? scenario.compute(scenarioParams, liveBase) : { revenueImpact: 0, ebitdaImpact: 0, multipleImpact: 0, evImpact: 0, newEV: 0, severity: 'high' }
 
   const waterfall = [
-    { name: 'Current EV',  value: BASE.ev,       fill: 'hsl(217,91%,60%)' },
+    { name: 'Current EV',  value: liveBase.ev,       fill: 'hsl(217,91%,60%)' },
     { name: 'EBITDA Δ',    value: Math.abs(result.ebitdaImpact), fill: result.ebitdaImpact >= 0 ? 'hsl(160,84%,39%)' : 'hsl(0,72%,51%)' },
-    { name: 'Multiple Δ',  value: Math.abs(result.multipleImpact * BASE.ebitda), fill: result.multipleImpact >= 0 ? 'hsl(160,84%,39%)' : 'hsl(0,72%,51%)' },
+    { name: 'Multiple Δ',  value: Math.abs(result.multipleImpact * liveBase.ebitda), fill: result.multipleImpact >= 0 ? 'hsl(160,84%,39%)' : 'hsl(0,72%,51%)' },
     { name: 'Scenario EV', value: result.newEV,   fill: 'hsl(217,91%,60%)' },
   ]
 
@@ -239,10 +261,10 @@ export default function ScenarioSimulator() {
             <p className="text-xs font-semibold text-foreground mb-2">Baseline vs Scenario</p>
             <div className="space-y-2">
               {[
-                { label: 'Revenue',  base: fmtM(BASE.revenue),  scen: fmtM(BASE.revenue + result.revenueImpact),   delta: result.revenueImpact  },
-                { label: 'EBITDA',   base: fmtM(BASE.ebitda),   scen: fmtM(BASE.ebitda + result.ebitdaImpact),     delta: result.ebitdaImpact   },
-                { label: 'Multiple', base: `${BASE.multiple}×`, scen: `${(BASE.multiple + result.multipleImpact).toFixed(1)}×`, delta: result.multipleImpact },
-                { label: 'EV',       base: fmtM(BASE.ev),       scen: fmtM(result.newEV),                          delta: result.evImpact       },
+                { label: 'Revenue',  base: fmtM(liveBase.revenue),  scen: fmtM(liveBase.revenue + result.revenueImpact),   delta: result.revenueImpact  },
+                { label: 'EBITDA',   base: fmtM(liveBase.ebitda),   scen: fmtM(liveBase.ebitda + result.ebitdaImpact),     delta: result.ebitdaImpact   },
+                { label: 'Multiple', base: `${liveBase.multiple}×`, scen: `${(liveBase.multiple + result.multipleImpact).toFixed(1)}×`, delta: result.multipleImpact },
+                { label: 'EV',       base: fmtM(liveBase.ev),       scen: fmtM(result.newEV),                              delta: result.evImpact       },
               ].map(r => (
                 <div key={r.label} className="flex items-center justify-between text-[10px] py-1.5 border-b border-border/50 last:border-0">
                   <span className="text-muted-foreground">{r.label}</span>
