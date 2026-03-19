@@ -108,6 +108,10 @@ def _try_read_dataframe(data: bytes, filename: str, encoding: str) -> tuple[Opti
     """
     Returns (dataframe, header_row_index, detected_format).
     Tries Excel first if extension suggests it, then CSV.
+
+    Uses a two-pass approach for CSV: first reads a small sample with the
+    Python engine (tolerant of jagged rows like QB title blocks) to detect
+    the header row, then reads the full file with the detected header.
     """
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
@@ -122,14 +126,46 @@ def _try_read_dataframe(data: bytes, filename: str, encoding: str) -> tuple[Opti
             pass
 
     # Try CSV / TSV
+    text = data.decode(encoding, errors="replace")
+    # Sample the first 20 lines for header detection (Python engine handles jagged rows)
+    sample = "\n".join(text.splitlines()[:20])
+
     for sep in (",", "\t", ";", "|"):
         try:
-            text = data.decode(encoding, errors="replace")
-            df = pd.read_csv(io.StringIO(text), sep=sep, header=None, low_memory=False)
+            # Pass 1: small sample with Python engine to detect header row.
+            # Python engine tolerates jagged rows (QB title blocks, etc.);
+            # low_memory is not supported by the Python engine.
+            df_sample = pd.read_csv(
+                io.StringIO(sample), sep=sep, header=None,
+                engine="python", on_bad_lines="skip"
+            )
+            header_row = _detect_header_row(df_sample) if df_sample.shape[1] >= 2 else None
+
+            # Fallback: if sample has only 1 column (title block wider than data),
+            # try header rows 0–7 directly with a small nrows probe.
+            if header_row is None or df_sample.shape[1] < 2:
+                header_row = None
+                for h in range(8):
+                    try:
+                        probe = pd.read_csv(
+                            io.StringIO(text), sep=sep, header=h,
+                            nrows=10, low_memory=False
+                        )
+                        if probe.shape[1] >= 2:
+                            header_row = h
+                            break
+                    except Exception:
+                        continue
+                if header_row is None:
+                    continue
+
+            # Pass 2: full file read with detected header
+            df = pd.read_csv(
+                io.StringIO(text), sep=sep, header=header_row,
+                low_memory=False
+            )
             if df.shape[1] < 2:
                 continue
-            header_row = _detect_header_row(df)
-            df = pd.read_csv(io.StringIO(text), sep=sep, header=header_row, low_memory=False)
             fmt = "csv" if sep == "," else ("tsv" if sep == "\t" else "csv")
             return df, header_row, fmt
         except Exception:

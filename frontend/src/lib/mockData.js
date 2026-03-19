@@ -6,25 +6,26 @@ export const company = {
   name: 'Meridian Consulting Group',
   initials: 'MC',
   industry: 'Professional Services',
-  employees: 42,
+  employees: 13,
   founded: 2018,
   status: 'Active Engagement',
   stage: 'Pre-Diligence',
 }
 
+// Baseline fallback values — overridden by live API data where available
 export const kpis = {
-  drs: 72,
-  drsPercentile: 38,
-  ebitda: 1_030_000,
-  ebitdaMultiple: 5.0,
-  currentEV: 5_130_000,
-  potentialEV: 9_410_000,
-  valueGap: 4_280_000,
-  ttmRevenue: 6_840_000,
-  revenueGrowthYoY: 12.4,
-  recurringRevenuePct: 64,
-  grossMargin: 68,
-  payrollRatio: 38,
+  drs: 75,
+  drsPercentile: 62,
+  ebitda: 2_820_000,
+  ebitdaMultiple: 5.9,
+  currentEV: 16_900_000,
+  potentialEV: 19_700_000,
+  valueGap: 2_800_000,
+  ttmRevenue: 4_280_000,
+  revenueGrowthYoY: 12.7,
+  recurringRevenuePct: 68,
+  grossMargin: 66,
+  payrollRatio: 34,
 }
 
 export const drsCategories = [
@@ -98,10 +99,10 @@ export const advisoryWorkflowStages = [
 ]
 
 export const recentActivity = [
-  { event: 'Readiness score updated: 69 → 72',                  detail: '12,450 records processed',    time: '2h ago' },
-  { event: 'QuickBooks sync completed',                          detail: '12,450 records',               time: '2h ago' },
-  { event: 'Pre-Diligence Report v3 generated',                  detail: 'PDF + DOCX',                  time: '7h ago' },
-  { event: 'Buyer Lens analysis updated',                        detail: '6 flags · 2 critical',        time: '1d ago' },
+  { event: 'Readiness score updated: 72 → 75',                  detail: '1,948 revenue records · 13 employees', time: '1h ago' },
+  { event: 'QuickBooks transaction list ingested',               detail: '1,917 rows · P11 COMPLETE',    time: '1h ago' },
+  { event: 'Gusto payroll report ingested',                      detail: '13 employees · 379 pay periods', time: '1h ago' },
+  { event: 'HubSpot deals ingested',                             detail: '31 deals · $4.28M revenue',   time: '1h ago' },
 ]
 
 export const marketBenchmarks = [

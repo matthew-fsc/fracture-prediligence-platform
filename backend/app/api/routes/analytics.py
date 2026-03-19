@@ -68,7 +68,7 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
         # A10: Enterprise value based on DRS tier
         from decimal import Decimal as _Decimal
         metrics = compute_metrics(company_id, db)
-        ebitda_raw = getattr(metrics, "ebitda", None) or 0
+        ebitda_raw = metrics.ebitda_ttm
         ebitda_dec = _Decimal(str(round(float(ebitda_raw), 2)))
         ev = compute_enterprise_value(ebitda_dec, drs.tier)
 
@@ -158,7 +158,7 @@ def get_value_gap(company_id: int, db: Session = Depends(get_db)):
             "growth_drivers":           growth.composite,
         }
         from decimal import Decimal as _D
-        ebitda = float(getattr(metrics, "ebitda", None) or 0)
+        ebitda = float(metrics.ebitda_ttm)
 
         result = compute_value_gap(company_id, cat_scores, ebitda)
         return result.to_dict()

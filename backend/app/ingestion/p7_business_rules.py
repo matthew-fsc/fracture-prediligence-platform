@@ -250,7 +250,8 @@ def _check_customer(record: dict, row_idx: int) -> list[RuleViolation]:
 _ENTITY_FIELD_MAP = {
     "revenue":  {"REVENUE_GROSS", "REVENUE_TYPE", "REVENUE_PERIOD", "REVENUE_RECURRING_FLAG"},
     "expense":  {"EXPENSE_AMOUNT", "EXPENSE_CATEGORY", "EXPENSE_PERIOD"},
-    "employee": {"EMPLOYEE_NAME", "EMPLOYEE_COMP_ANNUAL", "EMPLOYEE_ROLE"},
+    "employee": {"EMPLOYEE_NAME", "EMPLOYEE_COMP_ANNUAL", "EMPLOYEE_ROLE",
+                 "EMPLOYEE_DEPARTMENT", "EMPLOYEE_STATUS", "EMPLOYEE_HIRE_DATE"},
     "contract": {"CONTRACT_START_DATE", "CONTRACT_END_DATE", "CONTRACT_ANNUAL_VALUE"},
     "customer": {"CUSTOMER_NAME", "CUSTOMER_TENURE_START", "CUSTOMER_IS_ACTIVE"},
 }
@@ -294,6 +295,13 @@ def apply_business_rules(
     """
     if entity_type is None:
         entity_type = _detect_entity_type(records)
+
+    # When the entity is revenue but Amount was mapped to EXPENSE_AMOUNT instead of
+    # REVENUE_GROSS (common with QB/HubSpot "Amount" columns), promote it in-place.
+    if entity_type == "revenue":
+        for rec in records:
+            if rec.get("REVENUE_GROSS") is None and rec.get("EXPENSE_AMOUNT") is not None:
+                rec["REVENUE_GROSS"] = rec.pop("EXPENSE_AMOUNT")
 
     rule_fn = _RULE_FUNCTIONS.get(entity_type)
     result = BusinessRuleResult(

@@ -53,6 +53,7 @@ class MetricRegistry:
     gross_profit: Decimal = Decimal(0)
     gross_margin_pct: float = 0.0
     total_opex_ttm: Decimal = Decimal(0)
+    ebitda_ttm: Decimal = Decimal(0)      # gross_profit - opex (proxy when full P&L not available)
     owner_compensation_total: Decimal = Decimal(0)
     market_rate_replacement_cost: Decimal = Decimal(0)
     owner_comp_delta: Decimal = Decimal(0)
@@ -69,7 +70,14 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
     """
     m = MetricRegistry()
     today = date.today()
-    ttm_start = today - timedelta(days=365)
+
+    # Use the latest revenue_period in the database as the reference "today"
+    # so that sandbox / historical datasets aren't excluded by a future TTM window.
+    latest_rev_date = db.query(func.max(RevenueStream.revenue_period)).filter(
+        RevenueStream.company_id == company_id
+    ).scalar()
+    ref_date = latest_rev_date if latest_rev_date and latest_rev_date < today else today
+    ttm_start = ref_date - timedelta(days=365)
 
     # --- Revenue: TTM ---
     ttm_revenue_rows = (
@@ -100,8 +108,8 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
         # HHI
         m.hhi = sum((float(v / m.total_revenue_ttm) * 100) ** 2 for v in m.revenue_by_customer.values())
 
-    # YoY revenue by year (3yr)
-    for yr in range(today.year - 3, today.year):
+    # YoY revenue by year (3yr, including ref year)
+    for yr in range(ref_date.year - 2, ref_date.year + 1):
         yr_start = date(yr, 1, 1)
         yr_end = date(yr, 12, 31)
         total = db.query(func.sum(RevenueStream.revenue_gross)).filter(
@@ -120,7 +128,7 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
     # Revenue consistency (coefficient of variation on monthly)
     monthly_vals = []
     for i in range(24):
-        mo_start = today.replace(day=1) - timedelta(days=30 * i)
+        mo_start = ref_date.replace(day=1) - timedelta(days=30 * i)
         mo_end = (mo_start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
         mo_rev = sum(r.revenue_gross for r in ttm_revenue_rows if mo_start <= r.revenue_period <= mo_end)
         key = mo_start.strftime("%Y-%m")
@@ -165,6 +173,17 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
     if m.total_revenue_ttm:
         m.gross_margin_pct = float(m.gross_profit / m.total_revenue_ttm) * 100
     m.total_opex_ttm = opex
+    # EBITDA proxy: when no expense data, estimate from employee comp as labor cost
+    if opex > 0 or cogs > 0:
+        m.ebitda_ttm = m.gross_profit - opex
+    else:
+        # Fall back to payroll data as labor cost proxy.
+        # comp_annual is stored from monthly payroll rows (Gross Pay per period),
+        # so annualize by multiplying by 12.
+        active_emps_all = db.query(Employee).filter(Employee.company_id == company_id, Employee.status == EmployeeStatus.ACTIVE).all()
+        labor_monthly_sum = Decimal(str(sum(float(e.comp_annual or 0) for e in active_emps_all)))
+        labor_est = labor_monthly_sum * 12
+        m.ebitda_ttm = m.total_revenue_ttm - labor_est
 
     owner_comp = sum(e.amount for e in expenses if e.category in (ExpenseCategory.OWNER, ExpenseCategory.PERSONAL))
     employees_q = db.query(Employee).filter(Employee.company_id == company_id, Employee.is_owner == True, Employee.status == EmployeeStatus.ACTIVE).all()

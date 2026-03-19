@@ -1,7 +1,10 @@
 import { Bell, Building2, ChevronDown, Search } from 'lucide-react'
 import { kpis } from '../../lib/mockData'
+import { fmtM } from '../../lib/utils'
 
-export default function Header() {
+export default function Header({ liveScores }) {
+  const drs = liveScores?.drs?.base ?? kpis.drs
+  const ev  = liveScores?.enterprise_value?.midpoint ?? null
   return (
     <header className="h-14 border-b border-border bg-card/60 backdrop-blur-sm flex items-center justify-between px-4 sticky top-0 z-40 flex-shrink-0">
       {/* Left */}
@@ -11,8 +14,11 @@ export default function Header() {
           <span className="max-w-[140px] truncate">Meridian Consulting Group</span>
           <ChevronDown className="w-3 h-3 text-muted-foreground" />
         </button>
-        <span className="text-xs text-muted-foreground font-medium">{kpis.drs}/100 Readiness</span>
-        <span className="text-xs font-semibold text-primary">$5.13M EV</span>
+        <span className="text-xs text-muted-foreground font-medium">{drs}/100 Readiness</span>
+        {ev !== null && ev > 0
+          ? <span className="text-xs font-semibold text-primary">{fmtM(ev)} EV</span>
+          : <span className="text-xs font-semibold text-primary">No EV data</span>
+        }
       </div>
 
       {/* Right */}

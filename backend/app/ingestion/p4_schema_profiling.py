@@ -203,10 +203,10 @@ def _detect_patterns(series: pd.Series) -> list[str]:
 def profile_column(raw_header: str, series: pd.Series) -> ColumnProfile:
     norm = _normalize_header(raw_header)
     total = len(series)
-    null_count = series.isna().sum() + (series.astype(str).str.strip() == "").sum()
+    null_count = int(series.isna().sum()) + int((series.astype(str).str.strip() == "").sum())
     null_rate = null_count / max(total, 1)
     non_null = series.dropna()
-    unique_count = non_null.nunique()
+    unique_count = int(non_null.nunique())
 
     inferred_type = _infer_type(series)
 
@@ -229,12 +229,12 @@ def profile_column(raw_header: str, series: pd.Series) -> ColumnProfile:
         raw_header=raw_header,
         normalized_header=norm,
         inferred_type=inferred_type,
-        null_rate=null_rate,
-        unique_count=unique_count,
-        total_count=total,
+        null_rate=float(null_rate),
+        unique_count=int(unique_count),
+        total_count=int(total),
         sample_values=top5,
-        is_currency=is_currency,
-        is_id_like=is_id_like,
+        is_currency=bool(is_currency),
+        is_id_like=bool(is_id_like),
     )
 
     # Numeric stats

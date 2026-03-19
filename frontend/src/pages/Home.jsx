@@ -43,8 +43,10 @@ export default function Home() {
 
   const kpis = {
     ...mockKpis,
-    drs:      liveData?.drs?.base ?? mockKpis.drs,
-    valueGap: liveData
+    drs:        liveData?.drs?.base            ?? mockKpis.drs,
+    currentEV:  liveData?.enterprise_value?.midpoint  ?? mockKpis.currentEV,
+    potentialEV: liveData?.enterprise_value?.ceiling  ?? mockKpis.potentialEV,
+    valueGap:   liveData
       ? Math.max(0, (liveData.enterprise_value?.ceiling ?? 0) - (liveData.enterprise_value?.midpoint ?? 0))
       : mockKpis.valueGap,
   }
@@ -68,10 +70,10 @@ export default function Home() {
 
       {/* KPI Row */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <KpiCard label="Active Engagements" value="3"                      sublabel="1 in pre-diligence" />
-        <KpiCard label="Readiness Score"    value={`${kpis.drs}/100`}      sublabel="Meridian Group" />
-        <KpiCard label="Open Blockers"      value="4"                      sublabel="2 critical flags" />
-        <KpiCard label="Value Opportunity"  value={`+${fmtM(kpis.valueGap)}`} sublabel="addressable gap" />
+        <KpiCard label="Readiness Score"   value={`${kpis.drs}/100`}           sublabel="Investment Grade tier" />
+        <KpiCard label="Enterprise Value"  value={fmtM(kpis.currentEV)}        sublabel="midpoint valuation" />
+        <KpiCard label="TTM Revenue"       value={fmtM(mockKpis.ttmRevenue)}   sublabel="12-month trailing" />
+        <KpiCard label="Value Opportunity" value={`+${fmtM(kpis.valueGap)}`}   sublabel="ceiling vs. midpoint" />
       </div>
 
       {/* Advisory Modules */}

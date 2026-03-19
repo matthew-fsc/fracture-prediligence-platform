@@ -88,11 +88,11 @@ def compute_management_team(company_id: int, db: Session) -> ManagementTeamScore
     owners = [e for e in active if e.is_owner]
 
     # Classify roles
-    roles = [str(e.role or "") for e in active]
-    mgmt_roles = [r for r in roles if _C_SUITE.search(r) or _VP_LEVEL.search(r) or
-                  (e.management_level is not None and e.management_level <= 1)
-                  for e in active if str(e.role or "") == r]
-    mgmt_count = sum(1 for e in active if _C_SUITE.search(str(e.role or "")) or _VP_LEVEL.search(str(e.role or "")))
+    mgmt_count = sum(
+        1 for e in active
+        if _C_SUITE.search(str(e.role or "")) or _VP_LEVEL.search(str(e.role or ""))
+        or (e.management_level is not None and e.management_level <= 1)
+    )
 
     has_finance = any(_FINANCE.search(str(e.role or "")) for e in active)
     has_sales   = any(_SALES.search(str(e.role or "")) for e in active)

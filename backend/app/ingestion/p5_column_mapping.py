@@ -28,7 +28,7 @@ ONTOLOGY_REGISTRY: dict[str, tuple[str, str, list[str]]] = {
     "REVENUE_GROSS": (
         "revenue_stream", "numeric",
         ["sales", "revenue", "net sales", "gross revenue", "billing", "invoiced amount",
-         "total revenue", "income", "gross sales", "billings", "fees", "service revenue",
+         "total revenue", "gross sales", "billings", "fees", "service revenue",
          "consulting fees", "project revenue", "total income", "net revenue"],
     ),
     "REVENUE_TYPE": (
@@ -89,7 +89,8 @@ ONTOLOGY_REGISTRY: dict[str, tuple[str, str, list[str]]] = {
     "EMPLOYEE_NAME": (
         "employee", "text",
         ["employee name", "name", "full name", "staff name", "worker name",
-         "employee", "staff", "personnel", "person"],
+         "employee", "staff", "personnel", "person",
+         "first name", "last name", "given name", "surname", "worker"],
     ),
     "EMPLOYEE_ROLE": (
         "employee", "categorical",
