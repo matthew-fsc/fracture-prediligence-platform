@@ -22,7 +22,12 @@
       "Bash(.venv/Scripts/python.exe -c \":*)",
       "Bash(PYTHONUTF8=1 .venv/Scripts/python.exe scripts/ingest_sandbox_data.py)",
       "Bash(PYTHONUTF8=1 .venv/Scripts/python.exe -c \":*)",
-      "Bash(curl -s http://127.0.0.1:8000/api/analytics/scores/1)"
+      "Bash(curl -s http://127.0.0.1:8000/api/analytics/scores/1)",
+      "Read(//c/Users/Fracture Systems/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/361c4891-f4c4-488d-8956-1730450329df/8622a0a7-ceca-40b4-8635-b6bd3ffaf5c3/skills/docx/**)",
+      "Bash(pandoc \"C:/Users/Fracture Systems/Downloads/Blueprint I RawData to Ontology.docx\" -o /tmp/blueprint1.md)",
+      "Bash(pandoc \"C:/Users/Fracture Systems/Downloads/Blueprint II Ontology to Insight.docx\" -o /tmp/blueprint2.md)",
+      "Bash(where pandoc:*)",
+      "Bash(python -c \"import zipfile, sys; z=zipfile.ZipFile\\(''''C:/Users/Fracture Systems/Downloads/Blueprint I RawData to Ontology.docx''''\\); [print\\(n\\) for n in z.namelist\\(\\)]\")"
     ]
   }
 }
