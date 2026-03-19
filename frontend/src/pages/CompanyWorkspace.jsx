@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Line, ComposedChart } from 'recharts'
 import { useNavigate } from 'react-router-dom'
 import PageHeader from '../components/ui/PageHeader'
@@ -5,11 +6,35 @@ import KpiCard from '../components/ui/KpiCard'
 import StatusBadge from '../components/ui/StatusBadge'
 import SectionDivider from '../components/ui/SectionDivider'
 import ProgressBar from '../components/ui/ProgressBar'
-import { company, kpis, monthlyRevenue, customerConcentration, valueCreationLevers, marketBenchmarks } from '../lib/mockData'
+import { company, kpis as mockKpis, monthlyRevenue, customerConcentration, valueCreationLevers, marketBenchmarks } from '../lib/mockData'
 import { fmtM } from '../lib/utils'
+
+const COMPANY_ID = 1
 
 export default function CompanyWorkspace() {
   const navigate = useNavigate()
+  const [liveScores, setLiveScores] = useState(null)
+
+  useEffect(() => {
+    fetch(`/api/analytics/scores/${COMPANY_ID}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setLiveScores(d))
+      .catch(() => {})
+  }, [])
+
+  // Overlay live data on mock KPIs when available
+  const kpis = {
+    ...mockKpis,
+    drs:         liveScores?.drs?.base            ?? mockKpis.drs,
+    currentEV:   liveScores?.enterprise_value?.midpoint ?? mockKpis.currentEV,
+    potentialEV: liveScores?.enterprise_value?.ceiling  ?? mockKpis.potentialEV,
+    valueGap:    liveScores
+      ? (liveScores.enterprise_value?.ceiling - liveScores.enterprise_value?.midpoint)
+      : mockKpis.valueGap,
+    ebitdaMultiple: liveScores?.enterprise_value
+      ? liveScores.enterprise_value.multiple_used?.split('–')?.[0] ?? mockKpis.ebitdaMultiple
+      : mockKpis.ebitdaMultiple,
+  }
 
   return (
     <div>

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   FileText, Shield, Target, BarChart2,
@@ -5,8 +6,10 @@ import {
 } from 'lucide-react'
 import KpiCard from '../components/ui/KpiCard'
 import SectionDivider from '../components/ui/SectionDivider'
-import { recentActivity, kpis } from '../lib/mockData'
+import { recentActivity, kpis as mockKpis } from '../lib/mockData'
 import { fmtM } from '../lib/utils'
+
+const COMPANY_ID = 1
 
 const modules = [
   { label: 'Company Workspace',  icon: FileText,  subtitle: 'Entity-centric intelligence hub',         href: '/CompanyWorkspace' },
@@ -29,6 +32,22 @@ const quickActions = [
 
 export default function Home() {
   const navigate = useNavigate()
+  const [liveData, setLiveData] = useState(null)
+
+  useEffect(() => {
+    fetch(`/api/analytics/scores/${COMPANY_ID}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setLiveData(d))
+      .catch(() => {})
+  }, [])
+
+  const kpis = {
+    ...mockKpis,
+    drs:      liveData?.drs?.base ?? mockKpis.drs,
+    valueGap: liveData
+      ? Math.max(0, (liveData.enterprise_value?.ceiling ?? 0) - (liveData.enterprise_value?.midpoint ?? 0))
+      : mockKpis.valueGap,
+  }
 
   return (
     <div>
