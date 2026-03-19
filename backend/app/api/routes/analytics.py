@@ -14,6 +14,8 @@ from app.analytics.a7_growth_drivers import compute_growth_drivers
 from app.analytics.a8_financial_integrity import compute_financial_integrity
 from app.analytics.a9_drs_composite import CategoryScores, compute_drs
 from app.analytics.a10_enterprise_value import compute_enterprise_value
+from app.analytics.a11_value_gap import compute_value_gap
+from app.analytics.a13_buyer_questions import generate_buyer_questions
 
 router = APIRouter()
 
@@ -133,6 +135,64 @@ def get_growth_drivers(company_id: int, db: Session = Depends(get_db)):
 def get_financial_integrity(company_id: int, db: Session = Depends(get_db)):
     """A8: Financial integrity sub-scores."""
     return compute_financial_integrity(company_id, db).to_dict()
+
+
+@router.get("/value-gap/{company_id}")
+def get_value_gap(company_id: int, db: Session = Depends(get_db)):
+    """A11: Value gap analysis — current EV vs potential EV if gaps resolved."""
+    try:
+        rev    = compute_revenue_quality(company_id, db)
+        ops    = compute_operational_independence(company_id, db)
+        cust   = compute_customer_risk(company_id, db)
+        mgmt   = compute_management_team(company_id, db)
+        growth = compute_growth_drivers(company_id, db)
+        fin    = compute_financial_integrity(company_id, db)
+        metrics = compute_metrics(company_id, db)
+
+        cat_scores = {
+            "revenue_quality":          rev.composite,
+            "financial_integrity":      fin.composite,
+            "operational_independence": ops.composite,
+            "customer_risk":            cust.composite,
+            "management_team":          mgmt.composite,
+            "growth_drivers":           growth.composite,
+        }
+        from decimal import Decimal as _D
+        ebitda = float(getattr(metrics, "ebitda", None) or 0)
+
+        result = compute_value_gap(company_id, cat_scores, ebitda)
+        return result.to_dict()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/buyer-questions/{company_id}")
+def get_buyer_questions(company_id: int, db: Session = Depends(get_db)):
+    """A13: Generate prioritized buyer due diligence questions from DRS weaknesses."""
+    try:
+        rev    = compute_revenue_quality(company_id, db)
+        ops    = compute_operational_independence(company_id, db)
+        cust   = compute_customer_risk(company_id, db)
+        mgmt   = compute_management_team(company_id, db)
+        growth = compute_growth_drivers(company_id, db)
+        fin    = compute_financial_integrity(company_id, db)
+
+        cat_scores = {
+            "revenue_quality":          rev.composite,
+            "financial_integrity":      fin.composite,
+            "operational_independence": ops.composite,
+            "customer_risk":            cust.composite,
+            "management_team":          mgmt.composite,
+            "growth_drivers":           growth.composite,
+        }
+        questions = generate_buyer_questions(cat_scores)
+        return {
+            "company_id": company_id,
+            "total":      len(questions),
+            "questions":  [q.to_dict() for q in questions],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/drs/{company_id}")
