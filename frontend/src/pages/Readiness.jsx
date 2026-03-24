@@ -3,6 +3,7 @@ import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { AlertTriangle } from 'lucide-react'
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
+import { Skeleton } from '../components/ui/Skeleton'
 
 const COMPANY_ID = 1
 
@@ -43,7 +44,34 @@ export default function Readiness() {
       .catch(() => {})
   }, [])
 
-  const drs = data?.drs?.base ?? 75.3
+  if (data === null) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-12 gap-4">
+          <div className="col-span-12 lg:col-span-3">
+            <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+              <Skeleton className="h-3 w-24 mx-auto" />
+              <Skeleton className="h-32 w-32 rounded-full mx-auto" />
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-3 w-full" />)}
+            </div>
+          </div>
+          <div className="col-span-12 lg:col-span-9">
+            <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="space-y-1.5">
+                  <div className="flex justify-between"><Skeleton className="h-3 w-40" /><Skeleton className="h-3 w-16" /></div>
+                  <Skeleton className="h-2 w-full" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const drs = data?.drs?.base ?? 0
   const tier = tierLabel(drs)
   const cats = data?.category_scores ?? {}
 

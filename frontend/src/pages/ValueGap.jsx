@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import SectionHeader from '../components/ui/SectionHeader'
-import { cn } from '../lib/utils'
-import { fmtM } from '../lib/utils'
+import { cn, fmtM } from '../lib/utils'
 import { Target, ChevronDown, ChevronRight, Clock } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { valueCreationLevers, kpis as mockKpis } from '../lib/mockData'
+import { valueCreationLevers } from '../lib/mockData'
+import { Skeleton } from '../components/ui/Skeleton'
 
 const COMPANY_ID = 1
 
@@ -87,12 +87,35 @@ export default function ValueGap() {
       .catch(() => {})
   }, [])
 
+  if (liveData === null || gapData === null) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-3 gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-4 space-y-2">
+              <Skeleton className="h-2 w-24" /><Skeleton className="h-8 w-28" /><Skeleton className="h-2 w-20" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-12 gap-4">
+          <div className="col-span-12 lg:col-span-5 rounded-xl border border-border bg-card p-5">
+            <Skeleton className="h-56 w-full" />
+          </div>
+          <div className="col-span-12 lg:col-span-7 space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const ev = liveData?.enterprise_value
-  const currentEV = ev?.midpoint ?? mockKpis.currentEV
-  const ceilingEV = ev?.ceiling ?? mockKpis.potentialEV
-  const floorEV = ev?.floor ?? (mockKpis.currentEV * 0.83)
+  const currentEV = ev?.midpoint ?? 0
+  const ceilingEV = ev?.ceiling ?? 0
+  const floorEV = ev?.floor ?? 0
   const valueGap = Math.max(0, ceilingEV - currentEV)
-  const ebitda = ev?.ebitda_base ?? mockKpis.ebitda
+  const ebitda = ev?.ebitda_base ?? 0
 
   // Use live gap data if available, fall back to mock valueCreationLevers
   const drivers = gapData?.gaps

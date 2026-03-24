@@ -5,9 +5,9 @@ import {
   ArrowRight, Activity, ListChecks, Bot, ChevronRight,
   Zap, Clock
 } from 'lucide-react'
-import { cn } from '../lib/utils'
-import { fmtM } from '../lib/utils'
+import { cn, fmtM } from '../lib/utils'
 import { recentActivity } from '../lib/mockData'
+import { Skeleton } from '../components/ui/Skeleton'
 
 const COMPANY_ID = 1
 
@@ -82,18 +82,28 @@ export default function Home() {
 
       {/* Status strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'Active Engagements', value: '1',              sub: 'Meridian Group',      color: 'blue'    },
-          { label: 'Readiness Score',    value: `${drs}/100`,     sub: 'Investment Grade',    color: 'amber'   },
-          { label: 'Open Blockers',      value: bqData ? String(blockerCount) : '—', sub: `${criticalCount} critical flags`, color: 'red' },
-          { label: 'Value Opportunity',  value: `+${fmtM(valueGap)}`, sub: 'ceiling vs midpoint', color: 'emerald' },
-        ].map(c => (
-          <div key={c.label} className={cn('rounded-xl border p-3', colorCfg[c.color])}>
-            <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{c.label}</p>
-            <p className="text-xl font-bold">{c.value}</p>
-            <p className="text-[10px] text-muted-foreground">{c.sub}</p>
-          </div>
-        ))}
+        {liveData === null ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-3 space-y-2">
+              <Skeleton className="h-2 w-24" />
+              <Skeleton className="h-6 w-16" />
+              <Skeleton className="h-2 w-20" />
+            </div>
+          ))
+        ) : (
+          [
+            { label: 'Active Engagements', value: '1',                   sub: 'Meridian Group',         color: 'blue'    },
+            { label: 'Readiness Score',    value: `${drs}/100`,           sub: 'Investment Grade',       color: 'amber'   },
+            { label: 'Open Blockers',      value: String(blockerCount),   sub: `${criticalCount} critical flags`, color: 'red' },
+            { label: 'Value Opportunity',  value: `+${fmtM(valueGap)}`,  sub: 'ceiling vs midpoint',    color: 'emerald' },
+          ].map(c => (
+            <div key={c.label} className={cn('rounded-xl border p-3', colorCfg[c.color])}>
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{c.label}</p>
+              <p className="text-xl font-bold">{c.value}</p>
+              <p className="text-[10px] text-muted-foreground">{c.sub}</p>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Module grid */}

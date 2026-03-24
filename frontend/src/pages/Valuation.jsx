@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import SectionHeader from '../components/ui/SectionHeader'
-import { cn } from '../lib/utils'
-import { fmtM } from '../lib/utils'
+import { cn, fmtM } from '../lib/utils'
 import { TrendingUp, DollarSign, Zap, BarChart2, AlertTriangle } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { Skeleton } from '../components/ui/Skeleton'
 
 const COMPANY_ID = 1
 
@@ -22,14 +22,39 @@ export default function Valuation() {
       .catch(() => {})
   }, [])
 
+  if (data === null || metrics === null) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <Skeleton className="h-8 w-72" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-4 space-y-2">
+              <Skeleton className="h-2 w-20" />
+              <Skeleton className="h-7 w-28" />
+              <Skeleton className="h-2 w-32" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-12 gap-4">
+          <div className="col-span-12 lg:col-span-5 rounded-xl border border-border bg-card p-5 space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
+          </div>
+          <div className="col-span-12 lg:col-span-7 rounded-xl border border-border bg-card p-5">
+            <Skeleton className="h-48 w-full" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const ev = data?.enterprise_value
-  const ebitda = ev?.ebitda_base ?? 2_819_483
-  const floor = ev?.floor ?? 14_097_415
-  const midpoint = ev?.midpoint ?? 16_916_898
-  const ceiling = ev?.ceiling ?? 19_736_381
-  const multipleUsed = ev?.multiple_used ?? '5.0–7.0'
-  const drs = data?.drs?.base ?? 75.3
-  const tier = data?.drs?.tier ?? 'Investment Grade'
+  const ebitda = ev?.ebitda_base ?? 0
+  const floor = ev?.floor ?? 0
+  const midpoint = ev?.midpoint ?? 0
+  const ceiling = ev?.ceiling ?? 0
+  const multipleUsed = ev?.multiple_used ?? '—'
+  const drs = data?.drs?.base ?? 0
+  const tier = data?.drs?.tier ?? '—'
 
   // Real metrics from /api/analytics/metrics/1
   const normalizedEBITDA = metrics?.ebitda_ttm ?? ebitda

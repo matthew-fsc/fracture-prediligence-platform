@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { AlertCircle, AlertTriangle, Info, FileText } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
+import { Skeleton } from '../components/ui/Skeleton'
 
 const COMPANY_ID = 1
 
@@ -72,8 +73,15 @@ export default function BuyerLens() {
       />
 
       {loading && (
-        <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
-          Generating buyer questions…
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-4 space-y-2">
+              <div className="flex gap-2"><Skeleton className="h-4 w-16" /><Skeleton className="h-4 w-20" /></div>
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-4/5" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+          ))}
         </div>
       )}
 
