@@ -13,7 +13,7 @@ const COLORS = {
 const FEATURES = [
   'Your own client data across unlimited engagements',
   'PDF reports with your firm\'s branding',
-  'Team sharing and multi-advisor workspace',
+  'Priority support and direct feature requests',
   'Founding rate locked for life at $179/mo',
 ]
 
