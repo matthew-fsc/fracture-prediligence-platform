@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import ingestion, analytics, companies, reports
+from app.api.routes import ingestion, analytics, companies, reports, demo
 from app.core.database import engine, SessionLocal, Base
 
 
@@ -49,6 +49,7 @@ app.include_router(ingestion.router,  prefix="/api/ingestion",  tags=["ingestion
 app.include_router(analytics.router,  prefix="/api/analytics",  tags=["analytics"])
 app.include_router(companies.router,  prefix="/api/companies",  tags=["companies"])
 app.include_router(reports.router,    prefix="/api/reports",    tags=["reports"])
+app.include_router(demo.router,       prefix="/api",            tags=["demo"])
 
 
 @app.get("/health")

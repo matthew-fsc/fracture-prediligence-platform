@@ -173,3 +173,24 @@ class Contract(Base, LineageMixin):
 
     company:  Mapped[Company]           = relationship(back_populates="contracts")
     customer: Mapped[Optional[Customer]] = relationship(back_populates="contracts")
+
+
+# ---------------------------------------------------------------------------
+# Demo link tracking
+# ---------------------------------------------------------------------------
+
+class DemoLink(Base):
+    __tablename__ = "demo_links"
+
+    id:               Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    slug:             Mapped[str]            = mapped_column(String(128), unique=True, index=True)
+    recipient_name:   Mapped[str]            = mapped_column(String(256))
+    recipient_firm:   Mapped[str]            = mapped_column(String(256))
+    recipient_email:  Mapped[str]            = mapped_column(String(256))
+    sender_note:      Mapped[Optional[str]]  = mapped_column(Text)
+    created_at:       Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
+    visit_count:      Mapped[int]            = mapped_column(Integer, default=0)
+    first_visited_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_visited_at:  Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    converted:        Mapped[bool]           = mapped_column(Boolean, default=False)
+    ref_code:         Mapped[Optional[str]]  = mapped_column(String(128), nullable=True)
