@@ -95,7 +95,7 @@ export default function App() {
         {/* Demo routes (no auth, DemoShell)                                  */}
         {/* ---------------------------------------------------------------- */}
         <Route path="/demo" element={<DemoShell />}>
-          <Route index element={<DemoHome />} />
+          <Route index element={<DemoHome2 />} />
           <Route path="home"               element={<DemoHome2 />} />
           <Route path="company"            element={<DemoCompanyWorkspace />} />
           <Route path="workflow"           element={<DemoAdvisoryWorkflow />} />
@@ -110,7 +110,7 @@ export default function App() {
           <Route path="reports"            element={<DemoReports />} />
         </Route>
         <Route path="/demo/:slug" element={<DemoShellWithSlug />}>
-          <Route index element={<DemoHome />} />
+          <Route index element={<DemoHome2 />} />
           <Route path="home"               element={<DemoHome2 />} />
           <Route path="company"            element={<DemoCompanyWorkspace />} />
           <Route path="workflow"           element={<DemoAdvisoryWorkflow />} />
