@@ -77,12 +77,7 @@ export default function Home() {
           <h1 className="text-2xl font-bold text-foreground">{greeting}, Advisor</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Here's your advisory intelligence briefing</p>
         </div>
-        <button
-          onClick={() => navigate('/CompanyWorkspace')}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors"
-        >
-          <Network className="w-4 h-4" /> Open Workspace
-        </button>
+
       </div>
 
       {/* Status strip */}
