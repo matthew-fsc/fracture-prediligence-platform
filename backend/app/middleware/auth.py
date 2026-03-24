@@ -1,0 +1,118 @@
+"""
+Clerk JWT verification middleware for FastAPI.
+
+Usage:
+    from app.middleware.auth import get_current_user, CurrentUser
+    from fastapi import Depends
+
+    @router.get("/protected")
+    async def protected(user: CurrentUser = Depends(get_current_user)):
+        return {"user_id": user.user_id}
+
+Environment variables:
+    CLERK_JWKS_URL  — your Clerk instance JWKS URL, e.g.:
+                      https://your-instance.clerk.accounts.dev/.well-known/jwks.json
+    SECRET_KEY      — fallback HS256 secret for local dev (when CLERK_JWKS_URL is empty)
+"""
+
+import os
+import time
+from typing import Optional
+
+import httpx
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
+
+CLERK_JWKS_URL: str = os.getenv("CLERK_JWKS_URL", "")
+SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret")
+
+# ---------------------------------------------------------------------------
+# JWKS in-memory cache (refreshed every hour)
+# ---------------------------------------------------------------------------
+_jwks_keys: list = []
+_jwks_fetched_at: float = 0.0
+_JWKS_TTL: float = 3600.0
+
+security = HTTPBearer(auto_error=False)
+
+
+async def _get_jwks_keys() -> list:
+    global _jwks_keys, _jwks_fetched_at
+    now = time.monotonic()
+    if _jwks_keys and (now - _jwks_fetched_at) < _JWKS_TTL:
+        return _jwks_keys
+    if not CLERK_JWKS_URL:
+        return []
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(CLERK_JWKS_URL)
+            resp.raise_for_status()
+            data = resp.json()
+            _jwks_keys = data.get("keys", [])
+            _jwks_fetched_at = now
+    except Exception:
+        pass  # Return stale cache on network errors
+    return _jwks_keys
+
+
+# ---------------------------------------------------------------------------
+# CurrentUser value object
+# ---------------------------------------------------------------------------
+
+class CurrentUser:
+    def __init__(self, user_id: str, payload: dict):
+        self.user_id = user_id
+        self.payload = payload
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"CurrentUser(user_id={self.user_id!r})"
+
+
+# ---------------------------------------------------------------------------
+# FastAPI dependency
+# ---------------------------------------------------------------------------
+
+async def get_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> CurrentUser:
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+
+    token = credentials.credentials
+
+    try:
+        keys = await _get_jwks_keys()
+
+        if keys:
+            # Clerk RS256 path
+            header = jwt.get_unverified_header(token)
+            kid = header.get("kid")
+            key = next((k for k in keys if k.get("kid") == kid), keys[0])
+            payload = jwt.decode(
+                token,
+                key,
+                algorithms=["RS256"],
+                options={"verify_aud": False},
+            )
+        else:
+            # Local dev HS256 fallback (SECRET_KEY)
+            payload = jwt.decode(
+                token,
+                SECRET_KEY,
+                algorithms=["HS256"],
+                options={"verify_aud": False},
+            )
+
+        user_id: Optional[str] = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Token missing sub claim")
+
+        return CurrentUser(user_id=user_id, payload=payload)
+
+    except JWTError as exc:
+        raise HTTPException(status_code=401, detail=f"Token invalid: {exc}") from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail=f"Authentication failed: {exc}") from exc

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Frontend (Vite)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["start-frontend.mjs"],
+      "port": 5173
+    },
+    {
+      "name": "Backend (FastAPI)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["start-backend.mjs", "--port", "8001"],
+      "port": 8001
+    }
+  ]
+}

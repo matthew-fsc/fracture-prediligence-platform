@@ -1,0 +1,243 @@
+import { useState, useEffect } from 'react'
+import { cn } from '../lib/utils'
+import { fmtM } from '../lib/utils'
+import { Target, CheckCircle, Circle, Clock } from 'lucide-react'
+import { valueCreationLevers, kpis as mockKpis } from '../lib/mockData'
+
+const COMPANY_ID = 1
+
+// Static initiative library for gap categories (live API fallback)
+const INITIATIVES_BY_CAT = {
+  revenue_quality: [
+    { title: 'Formalize recurring contracts', effort: 'Medium', timeline: '60–90 days', ev_impact: 'High', description: 'Convert month-to-month clients to annual contracts to reduce concentration risk.' },
+    { title: 'Implement CRM pipeline tracker', effort: 'Low', timeline: '30 days', ev_impact: 'Medium', description: 'Document all revenue relationships in a CRM to create institutional visibility.' },
+  ],
+  operational_independence: [
+    { title: 'Document all core operating procedures', effort: 'Medium', timeline: '60 days', ev_impact: 'High', description: 'Create SOPs for client onboarding, service delivery, and account management.' },
+    { title: 'Hire or promote an operations manager', effort: 'High', timeline: '60–120 days', ev_impact: 'Critical', description: 'A credible GM/COO running day-to-day removes the largest PE valuation discount.' },
+  ],
+  customer_risk: [
+    { title: 'Reduce top-customer revenue concentration', effort: 'High', timeline: '6–12 months', ev_impact: 'High', description: 'Target: no single customer > 20% of revenue.' },
+    { title: 'Add customer reference letters to VDR', effort: 'Low', timeline: '14 days', ev_impact: 'Medium', description: 'Written references reduce buyer concern about post-close customer attrition.' },
+  ],
+  management_team: [
+    { title: 'Hire fractional CFO', effort: 'Medium', timeline: '30–60 days', ev_impact: 'High', description: 'Financial leadership independent of the owner removes a major red flag for PE buyers.' },
+    { title: 'Execute retention agreements for key managers', effort: 'Low', timeline: '14 days', ev_impact: 'High', description: 'Retention bonuses tied to transaction close remove key-person deal risk.' },
+  ],
+  financial_integrity: [
+    { title: 'Commission a CPA review or audit', effort: 'Low', timeline: '30–60 days', ev_impact: 'Critical', description: 'An independent CPA review dramatically increases buyer confidence.' },
+    { title: 'Prepare 3-year normalized EBITDA schedule', effort: 'Low', timeline: '14 days', ev_impact: 'High', description: 'Document each add-back with supporting receipts to reduce buyer skepticism.' },
+  ],
+  growth_drivers: [
+    { title: 'Build and document a 3-year growth plan', effort: 'Low', timeline: '30 days', ev_impact: 'Medium', description: 'A credible, data-backed growth plan increases strategic value to potential buyers.' },
+    { title: 'Launch structured outbound sales motion', effort: 'Medium', timeline: '60–90 days', ev_impact: 'High', description: 'Adding a repeatable new-client acquisition channel improves growth score.' },
+  ],
+}
+
+const catColors = {
+  operations:    'bg-red-500/10 text-red-400 border-red-500/20',
+  revenue:       'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  margin:        'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  documentation: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  revenue_quality: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  operational_independence: 'bg-red-500/10 text-red-400 border-red-500/20',
+  customer_risk: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  management_team: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  financial_integrity: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  growth_drivers: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+}
+
+function buildMockDrivers() {
+  return valueCreationLevers.map(d => ({
+    initiative: d.initiative,
+    detail: d.detail,
+    valueMin: d.valueMin,
+    valueMax: d.valueMax,
+    timeline: d.timeline,
+    severity: d.severity,
+    category: d.rank <= 2 ? 'operations' : d.rank === 3 ? 'margin' : d.rank === 4 ? 'revenue' : 'documentation',
+    months: parseInt(d.timeline) || 9,
+  }))
+}
+
+export default function InitiativeImpact() {
+  const [selected, setSelected] = useState(new Set())
+  const [gapData, setGapData] = useState(null)
+
+  useEffect(() => {
+    fetch(`/api/analytics/value-gap/${COMPANY_ID}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setGapData)
+      .catch(() => {})
+  }, [])
+
+  const toggle = (id) => {
+    const s = new Set(selected)
+    s.has(id) ? s.delete(id) : s.add(id)
+    setSelected(s)
+  }
+
+  // Build driver list: from live gap data or mock
+  const DRIVERS = gapData?.gaps
+    ? gapData.gaps.flatMap((g, gi) =>
+        (INITIATIVES_BY_CAT[g.category] ?? []).map((init, ii) => ({
+          initiative: init.title,
+          detail: init.description,
+          valueMin: (g.ev_uplift * 0.6) / (INITIATIVES_BY_CAT[g.category]?.length || 1),
+          valueMax: g.ev_uplift / (INITIATIVES_BY_CAT[g.category]?.length || 1),
+          timeline: init.timeline,
+          severity: g.priority <= 1 ? 'critical' : 'high',
+          category: g.category,
+          months: 9,
+        }))
+      )
+    : buildMockDrivers()
+
+  const active = DRIVERS.filter((_, i) => selected.has(i))
+  const totalEVMin = active.reduce((s, d) => s + (d.valueMin || 0), 0)
+  const totalEVMax = active.reduce((s, d) => s + (d.valueMax || 0), 0)
+  const maxMonths = active.length > 0 ? Math.max(...active.map(d => d.months || 9)) : 0
+  const maxVal = Math.max(...DRIVERS.map(d => d.valueMax || 1))
+
+  return (
+    <div className="space-y-4 max-w-[1400px]">
+      <div>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-0.5">Value Creation</p>
+        <h1 className="text-xl font-bold text-foreground">Initiative Impact Modeling</h1>
+        <p className="text-sm text-muted-foreground">Select initiatives to model combined enterprise value impact and projected timeline</p>
+      </div>
+
+      {selected.size > 0 && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-6">
+              <div>
+                <p className="text-[9px] text-muted-foreground uppercase tracking-wider">EV Increase</p>
+                <p className="text-xl font-bold text-emerald-400">+{fmtM(totalEVMin)}–{fmtM(totalEVMax)}</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Time to Realize</p>
+                <p className="text-xl font-bold text-foreground">{maxMonths} months</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold px-2 py-1 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">
+                {selected.size} of {DRIVERS.length} selected
+              </span>
+              <button onClick={() => setSelected(new Set())}
+                className="text-xs px-2.5 py-1 rounded border border-border text-muted-foreground hover:bg-muted/30 transition-colors">
+                Clear all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-12 gap-4">
+        {/* Initiative list */}
+        <div className="col-span-12 lg:col-span-7 space-y-2">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Value Creation Initiatives · Ranked by Impact</p>
+          {DRIVERS.map((d, i) => {
+            const isActive = selected.has(i)
+            return (
+              <button key={i} onClick={() => toggle(i)}
+                className={cn('w-full text-left rounded-xl border p-4 transition-all',
+                  isActive ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-border bg-card hover:bg-muted/20')}>
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5">
+                    {isActive ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <Circle className="w-4 h-4 text-muted-foreground/40" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-3 mb-1">
+                      <p className="text-sm font-semibold text-foreground">{d.initiative}</p>
+                      <span className="text-sm font-bold text-emerald-400 flex-shrink-0">
+                        +{fmtM(d.valueMin)}–{fmtM(d.valueMax)}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mb-2">{d.detail}</p>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className={cn('text-[9px] font-semibold px-1.5 py-0.5 rounded border', catColors[d.category] || 'border-border text-muted-foreground')}>{d.category?.replace('_', ' ')}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded border border-border text-muted-foreground flex items-center gap-0.5">
+                        <Clock className="w-2.5 h-2.5" />{d.timeline}
+                      </span>
+                      {d.severity && <span className={cn('text-[9px] px-1.5 py-0.5 rounded border font-semibold',
+                        d.severity === 'critical' ? 'border-red-500/20 bg-red-500/10 text-red-400' :
+                        d.severity === 'high' ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' :
+                        'border-border text-muted-foreground')}>{d.severity}</span>}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Right panel */}
+        <div className="col-span-12 lg:col-span-5 space-y-4">
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-xs font-semibold text-foreground mb-3">Value Creation by Initiative</p>
+            {DRIVERS.map((d, i) => {
+              const isActive = selected.has(i)
+              const widthPct = (d.valueMax / maxVal) * 100
+              return (
+                <div key={i} className="flex items-center gap-2 mb-2">
+                  <span className="text-[9px] text-muted-foreground w-28 truncate flex-shrink-0">{d.initiative.split(' ').slice(0, 2).join(' ')}</span>
+                  <div className="flex-1 h-4 bg-muted/30 rounded relative">
+                    <div className={cn('h-full rounded transition-all', isActive ? 'bg-emerald-500/70' : 'bg-muted/60')}
+                      style={{ width: `${widthPct}%` }} />
+                    <span className="absolute right-1 top-0 h-full flex items-center text-[8px] text-muted-foreground">+{fmtM(d.valueMax)}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-xs font-semibold text-foreground mb-3">Implementation Timeline</p>
+            <div className="flex justify-between text-[9px] text-muted-foreground mb-3">
+              {[0, 3, 6, 9, 12].map(m => <span key={m}>{m}mo</span>)}
+            </div>
+            {DRIVERS.map((d, i) => {
+              const isActive = selected.has(i)
+              const widthPct = Math.min(((d.months || 9) / 12) * 100, 100)
+              return (
+                <div key={i} className="flex items-center gap-2 mb-2">
+                  <span className="text-[9px] text-muted-foreground w-28 truncate flex-shrink-0">{d.initiative.split(' ').slice(0, 2).join(' ')}</span>
+                  <div className="flex-1 h-4 bg-muted/30 rounded relative">
+                    <div className={cn('h-full rounded transition-all', isActive ? 'bg-emerald-500/40' : 'bg-muted/60')}
+                      style={{ width: `${widthPct}%` }} />
+                    <span className="absolute right-1 top-0 h-full flex items-center text-[8px] text-muted-foreground">{d.months || 9}mo</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-xs font-semibold text-foreground mb-3">EV Bridge Summary</p>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Current Enterprise Value</span>
+                <span className="font-bold text-foreground">{fmtM(mockKpis.currentEV)}</span>
+              </div>
+              {selected.size > 0 && (
+                <div className="flex justify-between text-emerald-400">
+                  <span>Selected initiatives</span>
+                  <span className="font-bold">+{fmtM(totalEVMin)}–{fmtM(totalEVMax)}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-border pt-2 mt-2">
+                <span className="font-semibold text-foreground">Projected EV</span>
+                <span className="font-bold text-emerald-400 text-sm">
+                  {selected.size > 0
+                    ? `${fmtM(mockKpis.currentEV + totalEVMin)}–${fmtM(mockKpis.currentEV + totalEVMax)}`
+                    : fmtM(mockKpis.currentEV)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
