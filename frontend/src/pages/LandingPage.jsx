@@ -514,24 +514,6 @@ function Pricing() {
                 ))}
               </ul>
 
-              <Link
-                to="/demo"
-                style={{
-                  display: 'block',
-                  textAlign: 'center',
-                  background: 'transparent',
-                  color: COLORS.gold,
-                  border: `1.5px solid ${COLORS.gold}`,
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontWeight: 600,
-                  fontSize: 14,
-                  padding: '12px 20px',
-                  borderRadius: 8,
-                  textDecoration: 'none',
-                }}
-              >
-                See Demo →
-              </Link>
             </div>
           ))}
         </div>
