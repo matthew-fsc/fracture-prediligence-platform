@@ -41,12 +41,6 @@ function Nav() {
           >
             See Demo
           </Link>
-          <Link
-            to="/Home"
-            style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, textDecoration: 'none' }}
-          >
-            Sign In
-          </Link>
         </div>
       </div>
     </nav>
@@ -105,54 +99,23 @@ function Hero() {
           SMB clients for diligence — before buyers find the gaps.
         </p>
 
-        {/* CTAs */}
-        <div className="flex items-center justify-center gap-4 flex-wrap">
-          <Link
-            to="/demo"
-            style={{
-              background: COLORS.gold,
-              color: COLORS.bg,
-              fontFamily: "'DM Sans', sans-serif",
-              fontWeight: 600,
-              fontSize: 15,
-              padding: '14px 32px',
-              borderRadius: 8,
-              textDecoration: 'none',
-              display: 'inline-block',
-            }}
-          >
-            See Live Demo →
-          </Link>
-          <Link
-            to="/pricing"
-            style={{
-              border: `1.5px solid ${COLORS.gold}`,
-              color: COLORS.gold,
-              fontFamily: "'DM Sans', sans-serif",
-              fontWeight: 600,
-              fontSize: 15,
-              padding: '14px 32px',
-              borderRadius: 8,
-              textDecoration: 'none',
-              display: 'inline-block',
-              background: 'transparent',
-            }}
-          >
-            Request Founding Access
-          </Link>
-        </div>
-
-        {/* Sub-CTA note */}
-        <p
+        {/* CTA */}
+        <Link
+          to="/demo"
           style={{
-            color: COLORS.muted,
+            background: COLORS.gold,
+            color: COLORS.bg,
             fontFamily: "'DM Sans', sans-serif",
-            fontSize: 13,
-            marginTop: 20,
+            fontWeight: 600,
+            fontSize: 15,
+            padding: '14px 32px',
+            borderRadius: 8,
+            textDecoration: 'none',
+            display: 'inline-block',
           }}
         >
-          20 founding advisor spots · $179/mo · Cancel anytime
-        </p>
+          See Live Demo →
+        </Link>
       </div>
     </section>
   )
@@ -552,13 +515,13 @@ function Pricing() {
               </ul>
 
               <Link
-                to={tier.ctaLink}
+                to="/demo"
                 style={{
                   display: 'block',
                   textAlign: 'center',
-                  background: tier.highlight ? COLORS.gold : 'transparent',
-                  color: tier.highlight ? COLORS.bg : COLORS.gold,
-                  border: tier.highlight ? 'none' : `1.5px solid ${COLORS.gold}`,
+                  background: 'transparent',
+                  color: COLORS.gold,
+                  border: `1.5px solid ${COLORS.gold}`,
                   fontFamily: "'DM Sans', sans-serif",
                   fontWeight: 600,
                   fontSize: 14,
@@ -567,7 +530,7 @@ function Pricing() {
                   textDecoration: 'none',
                 }}
               >
-                {tier.cta}
+                See Demo →
               </Link>
             </div>
           ))}
@@ -636,7 +599,6 @@ function Footer() {
         <div style={{ display: 'flex', gap: 24, marginBottom: 20 }}>
           {[
             { label: 'Demo', to: '/demo' },
-            { label: 'Pricing', to: '/pricing' },
             { label: 'Contact', to: 'mailto:matthew@fracturesystems.com' },
           ].map(({ label, to }) => (
             <Link
