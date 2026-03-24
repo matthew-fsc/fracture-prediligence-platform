@@ -2,13 +2,13 @@ import { Link } from 'react-router-dom'
 import { AlertTriangle, Clock, BarChart3, FolderOpen, TrendingUp, FileText, CheckSquare } from 'lucide-react'
 
 const COLORS = {
-  bg: '#0A1628',
+  bg: '#0C0E12',
   gold: '#C9973A',
   lightGold: '#E8B96A',
-  offWhite: '#F0EDE8',
-  muted: '#8A9BB0',
-  card: '#0F2040',
-  border: '#1E3A5F',
+  offWhite: '#E8EAED',
+  muted: '#6C7585',
+  card: '#15181E',
+  border: '#212630',
 }
 
 // ---------------------------------------------------------------------------
@@ -17,7 +17,7 @@ const COLORS = {
 function Nav() {
   return (
     <nav
-      style={{ background: 'rgba(10,22,40,0.95)', borderBottom: `1px solid ${COLORS.border}`, backdropFilter: 'blur(12px)' }}
+      style={{ background: 'rgba(12,14,18,0.95)', borderBottom: `1px solid ${COLORS.border}`, backdropFilter: 'blur(12px)' }}
       className="sticky top-0 z-50 w-full"
     >
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -675,7 +675,7 @@ function Footer() {
 // ---------------------------------------------------------------------------
 export default function LandingPage() {
   return (
-    <div style={{ background: COLORS.bg, minHeight: '100vh' }}>
+    <div className="dark" style={{ background: COLORS.bg, minHeight: '100vh' }}>
       <Nav />
       <Hero />
       <ProblemStrip />
