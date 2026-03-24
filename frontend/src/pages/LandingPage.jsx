@@ -624,7 +624,6 @@ export default function LandingPage() {
       <Hero />
       <ProblemStrip />
       <Features />
-      <SocialProof />
       <Pricing />
       <Footer />
     </div>
