@@ -20,7 +20,7 @@ export default function DemoBanner({ onClaim, onDismiss, spotsRemaining }) {
           onClick={onClaim}
           className="px-3 py-1 rounded-md text-[11px] font-semibold bg-warning/10 border border-warning/30 text-warning hover:bg-warning/20 transition-colors"
         >
-          Claim Your Spot
+          Request a License
         </button>
         <button
           onClick={onDismiss}
