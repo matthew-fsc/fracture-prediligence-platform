@@ -1,0 +1,32 @@
+Deal ID,Deal Name,Associated Company,Deal Stage,Close Date,Contract Start Date,Contract End Date,Amount,Deal Type,Deal Owner,Create Date,Number of Associated Contacts,HS Deal ID
+HS-1001,Pinnacle Manufacturing LLC - Strategy Retainer,Pinnacle Manufacturing LLC,Closed Won,2022-01-01,2022-01-01,2025-12-31,"384,000.00",Recurring Retainer,Robert Chen,2021-12-02,3,1001
+HS-1002,Pinnacle Manufacturing LLC - 2023 Transformation Project,Pinnacle Manufacturing LLC,Closed Won,2022-04-01,2022-04-01,2022-09-28,"45,000.00",Project,Robert Chen,2022-02-15,3,1002
+HS-1003,Vertex Capital Partners - Strategy Retainer,Vertex Capital Partners,Closed Won,2022-01-01,2022-01-01,2025-12-31,"264,000.00",Recurring Retainer,Robert Chen,2021-12-02,2,1003
+HS-1004,Vertex Capital Partners - 2023 Transformation Project,Vertex Capital Partners,Closed Won,2022-04-01,2022-04-01,2022-09-28,"20,000.00",Project,Robert Chen,2022-02-15,2,1004
+HS-1005,Cascade Health Systems - Strategy Retainer,Cascade Health Systems,Closed Won,2022-03-01,2022-03-01,2025-12-31,"222,000.00",Recurring Retainer,Robert Chen,2022-01-30,1,1005
+HS-1006,Cascade Health Systems - 2023 Transformation Project,Cascade Health Systems,Closed Won,2022-05-30,2022-05-30,2022-11-26,"15,000.00",Project,Robert Chen,2022-04-15,3,1006
+HS-1007,Redwood Logistics Inc - Strategy Retainer,Redwood Logistics Inc,Closed Won,2022-01-01,2022-01-01,2025-12-31,"192,000.00",Recurring Retainer,Robert Chen,2021-12-02,2,1007
+HS-1008,Redwood Logistics Inc - 2023 Transformation Project,Redwood Logistics Inc,Closed Won,2022-04-01,2022-04-01,2022-09-28,"10,000.00",Project,Sarah Mitchell,2022-02-15,1,1008
+HS-1009,Summit Technology Group - Strategy Retainer,Summit Technology Group,Closed Won,2022-06-01,2022-06-01,2025-12-31,"168,000.00",Recurring Retainer,Robert Chen,2022-05-02,2,1009
+HS-1010,Summit Technology Group - 2023 Transformation Project,Summit Technology Group,Closed Won,2022-08-30,2022-08-30,2023-02-26,"25,000.00",Project,Sarah Mitchell,2022-07-16,3,1010
+HS-1011,Harbor Financial Services - Strategy Retainer,Harbor Financial Services,Closed Won,2022-02-01,2022-02-01,2025-12-31,"150,000.00",Recurring Retainer,Robert Chen,2022-01-02,2,1011
+HS-1012,Harbor Financial Services - 2023 Transformation Project,Harbor Financial Services,Closed Won,2022-05-02,2022-05-02,2022-10-29,"8,000.00",Project,Sarah Mitchell,2022-03-18,3,1012
+HS-1013,BlueSky Retail Partners - Strategy Retainer,BlueSky Retail Partners,Closed Won,2022-09-01,2022-09-01,2025-12-31,"132,000.00",Recurring Retainer,Robert Chen,2022-08-02,3,1013
+HS-1014,BlueSky Retail Partners - 2023 Transformation Project,BlueSky Retail Partners,Closed Won,2022-11-30,2022-11-30,2023-05-29,"12,000.00",Project,Robert Chen,2022-10-16,2,1014
+HS-1015,Irongate Construction - Strategy Retainer,Irongate Construction,Closed Won,2023-01-01,2023-01-01,2025-12-31,"114,000.00",Recurring Retainer,Robert Chen,2022-12-02,2,1015
+HS-1016,Irongate Construction - 2023 Transformation Project,Irongate Construction,Closed Won,2023-04-01,2023-04-01,2023-09-28,"6,000.00",Project,Sarah Mitchell,2023-02-15,1,1016
+HS-1017,Meridian Data Solutions - Strategy Retainer,Meridian Data Solutions,Closed Won,2023-03-01,2023-03-01,2025-12-31,"108,000.00",Recurring Retainer,Robert Chen,2023-01-30,3,1017
+HS-1018,Meridian Data Solutions - 2023 Transformation Project,Meridian Data Solutions,Closed Won,2023-05-30,2023-05-30,2023-11-26,"18,000.00",Project,Robert Chen,2023-04-15,3,1018
+HS-1019,Northfield Pharma - Strategy Retainer,Northfield Pharma,Closed Won,2023-06-01,2023-06-01,2025-12-31,"102,000.00",Recurring Retainer,Robert Chen,2023-05-02,2,1019
+HS-1020,Northfield Pharma - 2023 Transformation Project,Northfield Pharma,Closed Won,2023-08-30,2023-08-30,2024-02-26,"5,000.00",Project,Robert Chen,2023-07-16,1,1020
+HS-1021,Pacific Ventures LLC - Strategy Retainer,Pacific Ventures LLC,Closed Won,2022-01-01,2022-01-01,2025-12-31,"90,000.00",Recurring Retainer,Robert Chen,2021-12-02,3,1021
+HS-1022,Clearwater Energy - Strategy Retainer,Clearwater Energy,Closed Won,2022-04-01,2022-04-01,2025-12-31,"84,000.00",Recurring Retainer,Robert Chen,2022-03-02,1,1022
+HS-1023,Clearwater Energy - 2023 Transformation Project,Clearwater Energy,Closed Won,2022-06-30,2022-06-30,2022-12-27,"8,000.00",Project,Robert Chen,2022-05-16,1,1023
+HS-1024,Granite Peak Advisors - Strategy Retainer,Granite Peak Advisors,Closed Won,2022-07-01,2022-07-01,2025-12-31,"78,000.00",Recurring Retainer,Robert Chen,2022-06-01,1,1024
+HS-1025,Foxwood Media Group - Strategy Retainer,Foxwood Media Group,Closed Won,2023-09-01,2023-09-01,2025-12-31,"72,000.00",Recurring Retainer,Robert Chen,2023-08-02,3,1025
+HS-1026,Foxwood Media Group - 2023 Transformation Project,Foxwood Media Group,Closed Won,2023-11-30,2023-11-30,2024-05-28,"10,000.00",Project,Robert Chen,2023-10-16,3,1026
+HS-1027,Thornton Aerospace - Strategy Retainer,Thornton Aerospace,Closed Lost,2022-01-01,2022-01-01,2023-06-30,"66,000.00",Recurring Retainer,Robert Chen,2021-12-02,4,1027
+HS-1028,Cedar Grove Capital - Strategy Retainer,Cedar Grove Capital,Closed Lost,2022-01-01,2022-01-01,2023-01-31,"60,000.00",Recurring Retainer,Robert Chen,2021-12-02,1,1028
+HS-1029,Waverly Biotech - Strategy Retainer,Waverly Biotech,Closed Won,2024-01-01,2024-01-01,2025-12-31,"54,000.00",Recurring Retainer,Robert Chen,2023-12-02,4,1029
+HS-1030,Waverly Biotech - 2023 Transformation Project,Waverly Biotech,Closed Won,2024-03-31,2024-03-31,2024-09-27,"22,000.00",Project,Sarah Mitchell,2024-02-15,3,1030
+HS-1031,Blackrock Distribution - Strategy Retainer,Blackrock Distribution,Closed Won,2024-06-01,2024-06-01,2025-12-31,"48,000.00",Recurring Retainer,Robert Chen,2024-05-02,3,1031

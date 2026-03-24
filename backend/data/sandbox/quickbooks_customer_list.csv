@@ -1,0 +1,19 @@
+Customer,Company,Email,Phone,Billing Address,Billing City,Billing State,Billing ZIP,Balance,Open Balance,Active,Customer Since
+Pinnacle Manufacturing LLC,Pinnacle Manufacturing LLC,pinnaclemanu@pinnacle.com,(756) 684-5150,699 Oak St,Seattle,WA,16265,"31,348.63","31,348.63",Yes,01/01/2022
+Vertex Capital Partners,Vertex Capital Partners,vertexcapita@vertex.com,(539) 479-3039,6129 Park St,Austin,GA,67637,"23,609.51","23,609.51",Yes,01/01/2022
+Cascade Health Systems,Cascade Health Systems,cascadehealt@cascade.com,(595) 547-4060,8229 Park St,Seattle,MA,44959,"19,960.16","19,960.16",Yes,03/01/2022
+Redwood Logistics Inc,Redwood Logistics Inc,redwoodlogis@redwood.com,(944) 634-2293,7155 Lake St,Denver,MA,48504,"16,963.67","16,963.67",Yes,01/01/2022
+Summit Technology Group,Summit Technology Group,summittechno@summit.com,(281) 535-5843,5121 Park St,Boston,GA,65851,"13,499.39","13,499.39",Yes,06/01/2022
+Harbor Financial Services,Harbor Financial Services,harborfinanc@harbor.com,(654) 559-8325,793 Elm St,Boston,TX,45986,"11,666.61","11,666.61",Yes,02/01/2022
+BlueSky Retail Partners,BlueSky Retail Partners,blueskyretai@bluesky.com,(258) 276-7655,6052 Lake St,Atlanta,GA,30969,"11,306.83","11,306.83",Yes,09/01/2022
+Irongate Construction,Irongate Construction,irongatecons@irongate.com,(346) 822-8179,670 Oak St,Chicago,CO,94562,"10,360.30","10,360.30",Yes,01/01/2023
+Meridian Data Solutions,Meridian Data Solutions,meridiandata@meridian.com,(592) 780-1530,2613 Park St,Seattle,WA,68188,"8,759.39","8,759.39",Yes,03/01/2023
+Northfield Pharma,Northfield Pharma,northfieldph@northfield.com,(787) 340-9674,6112 Park St,Seattle,GA,46528,"8,947.24","8,947.24",Yes,06/01/2023
+Pacific Ventures LLC,Pacific Ventures LLC,pacificventu@pacific.com,(316) 226-4048,8276 Lake St,Austin,MA,25435,"7,124.42","7,124.42",Yes,01/01/2022
+Clearwater Energy,Clearwater Energy,clearwateren@clearwater.com,(466) 920-8311,3615 Lake St,Seattle,GA,74382,"6,666.49","6,666.49",Yes,04/01/2022
+Granite Peak Advisors,Granite Peak Advisors,granitepeaka@granite.com,(338) 275-8406,2928 Park St,Chicago,GA,51889,"6,110.23","6,110.23",Yes,07/01/2022
+Foxwood Media Group,Foxwood Media Group,foxwoodmedia@foxwood.com,(926) 266-9882,4857 Elm St,Denver,GA,93584,"6,201.41","6,201.41",Yes,09/01/2023
+Thornton Aerospace,Thornton Aerospace,thorntonaero@thornton.com,(378) 570-9335,3773 Main St,Denver,CO,41029,0.00,0.00,No,01/01/2022
+Cedar Grove Capital,Cedar Grove Capital,cedargroveca@cedar.com,(705) 226-6912,9177 Lake St,Seattle,TX,82305,0.00,0.00,No,01/01/2022
+Waverly Biotech,Waverly Biotech,waverlybiote@waverly.com,(288) 267-6067,6623 Park St,Boston,TX,63665,"4,166.79","4,166.79",Yes,01/01/2024
+Blackrock Distribution,Blackrock Distribution,blackrockdis@blackrock.com,(275) 328-6194,1315 Park St,Austin,GA,77811,"4,258.67","4,258.67",Yes,06/01/2024
