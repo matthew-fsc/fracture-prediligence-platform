@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { X, Zap } from 'lucide-react'
 
 const COLORS = {
   bg: '#0A1628',
@@ -105,7 +105,7 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '' }) 
             marginBottom: 22,
           }}
         >
-          <span style={{ color: COLORS.gold, fontSize: 16 }}>⚡</span>
+          <Zap style={{ color: COLORS.gold, width: 14, height: 14, flexShrink: 0 }} />
           <span
             style={{
               color: COLORS.gold,

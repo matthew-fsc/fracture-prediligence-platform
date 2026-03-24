@@ -364,7 +364,7 @@ export default function DemoHome() {
         <div style={CARD_STYLE}>
           <h2 style={SECTION_HEADING}>Monthly Revenue — 2024</h2>
           <p style={{ color: '#8A9BB0', fontFamily: "'DM Sans', sans-serif", fontSize: 12, margin: '0 0 16px 0' }}>
-            Seasonal HVAC pattern · TTM {fmtDollar(company.ttm_revenue)}
+            Retainer-driven professional services · TTM {fmtDollar(company.ttm_revenue)}
           </p>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={monthly_revenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>

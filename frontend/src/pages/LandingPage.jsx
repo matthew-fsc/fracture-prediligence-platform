@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { AlertTriangle, Clock, BarChart3, FolderOpen, TrendingUp, FileText, CheckSquare } from 'lucide-react'
 
 const COLORS = {
   bg: '#0A1628',
@@ -163,17 +164,17 @@ function Hero() {
 function ProblemStrip() {
   const problems = [
     {
-      emoji: '🔥',
+      Icon: AlertTriangle,
       title: 'Deals fall apart in diligence',
       description: 'Buyers find gaps that sellers didn\'t know existed. By then, it\'s too late to fix them.',
     },
     {
-      emoji: '⏱',
+      Icon: Clock,
       title: 'Manual prep consumes your bandwidth',
       description: 'Advisors spend 40+ hours per engagement chasing documents and building spreadsheets.',
     },
     {
-      emoji: '📊',
+      Icon: BarChart3,
       title: 'Your reports look like spreadsheets',
       description: 'Client-facing deliverables that don\'t reflect the premium service you provide.',
     },
@@ -185,7 +186,9 @@ function ProblemStrip() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {problems.map((p) => (
             <div key={p.title} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 36, marginBottom: 16 }}>{p.emoji}</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                <p.Icon style={{ color: COLORS.gold, width: 32, height: 32 }} />
+              </div>
               <h3
                 style={{
                   color: COLORS.offWhite,
@@ -223,25 +226,25 @@ function ProblemStrip() {
 function Features() {
   const features = [
     {
-      icon: '📁',
+      Icon: FolderOpen,
       title: 'Structured Data Room',
       description:
         'Organize every engagement into a buyer-ready data room. Track completeness, flag gaps, and generate a clean document index.',
     },
     {
-      icon: '📈',
+      Icon: TrendingUp,
       title: 'Diligence Gap Scoring',
       description:
         'Our DRS engine scores 6 dimensions of business quality. Know exactly what a buyer will find — and fix it first.',
     },
     {
-      icon: '📄',
+      Icon: FileText,
       title: 'Advisor Reports & Summaries',
       description:
         'Generate professional PDF reports in one click. DRS Summary, Value Gap Analysis, Buyer Prep Package.',
     },
     {
-      icon: '✅',
+      Icon: CheckSquare,
       title: 'Guided Checklist Workflow',
       description:
         'A 15-point pre-diligence checklist tailored to your client\'s industry. Track progress, set due dates, escalate gaps.',
@@ -276,7 +279,9 @@ function Features() {
                 padding: '32px 28px',
               }}
             >
-              <div style={{ fontSize: 28, marginBottom: 14 }}>{f.icon}</div>
+              <div style={{ marginBottom: 14 }}>
+                <f.Icon style={{ color: COLORS.gold, width: 26, height: 26 }} />
+              </div>
               <h3
                 style={{
                   color: COLORS.offWhite,
@@ -360,7 +365,7 @@ function SocialProof() {
                   justifyContent: 'center',
                 }}
               >
-                <span style={{ color: COLORS.muted, fontSize: 16 }}>👤</span>
+                <span style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600 }}>A</span>
               </div>
 
               <p
