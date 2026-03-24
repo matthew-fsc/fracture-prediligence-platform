@@ -2,18 +2,23 @@ import { useState, useEffect } from 'react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { fmtM } from '../lib/utils'
-import { TrendingUp, DollarSign, Zap, BarChart2 } from 'lucide-react'
+import { TrendingUp, DollarSign, Zap, BarChart2, AlertTriangle } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 const COMPANY_ID = 1
 
 export default function Valuation() {
   const [data, setData] = useState(null)
+  const [metrics, setMetrics] = useState(null)
 
   useEffect(() => {
     fetch(`/api/analytics/scores/${COMPANY_ID}`)
       .then(r => r.ok ? r.json() : null)
       .then(setData)
+      .catch(() => {})
+    fetch(`/api/analytics/metrics/${COMPANY_ID}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setMetrics)
       .catch(() => {})
   }, [])
 
@@ -26,14 +31,21 @@ export default function Valuation() {
   const drs = data?.drs?.base ?? 75.3
   const tier = data?.drs?.tier ?? 'Investment Grade'
 
-  const reportedEBITDA = ebitda * 0.75
-  const taxNetIncome = ebitda * 0.45
+  // Real metrics from /api/analytics/metrics/1
+  const normalizedEBITDA = metrics?.ebitda_ttm ?? ebitda
+  const totalRevenueTTM  = metrics?.total_revenue_ttm ?? 0
+  const impliedPayroll   = totalRevenueTTM > 0 ? totalRevenueTTM - normalizedEBITDA : 0
+  const ebitdaMarginReal = totalRevenueTTM > 0 ? (normalizedEBITDA / totalRevenueTTM) * 100 : 0
+
+  // Estimated figures — no D&A/interest/tax data in dataset
+  const reportedEBITDA = ebitda * 0.75   // estimated Operating Income (adj.)
+  const taxNetIncome   = ebitda * 0.45   // estimated Net Income
 
   const headlines = [
-    { label: 'Tax-Reported Net Income', value: fmtM(taxNetIncome),  sub: 'FY basis',                    color: 'blue',    icon: DollarSign },
-    { label: 'Reported EBITDA',         value: fmtM(reportedEBITDA),sub: 'After D&A, Interest, Tax',    color: 'purple',  icon: BarChart2  },
-    { label: 'Normalized EBITDA',       value: fmtM(ebitda),        sub: 'After owner addbacks',        color: 'emerald', icon: Zap        },
-    { label: 'Indicated EV (Midpoint)', value: fmtM(midpoint),      sub: `${multipleUsed}× EBITDA`,    color: 'amber',   icon: TrendingUp },
+    { label: 'Net Income (est.)',       value: fmtM(taxNetIncome),     sub: 'Estimated · Tax/interest not in dataset', color: 'blue',    icon: DollarSign },
+    { label: 'Operating Income (adj.)', value: fmtM(reportedEBITDA),   sub: 'Estimated · D&A not in dataset',          color: 'purple',  icon: BarChart2  },
+    { label: 'Normalized EBITDA',       value: fmtM(normalizedEBITDA), sub: 'After owner addbacks · Real from payroll', color: 'emerald', icon: Zap        },
+    { label: 'Indicated EV (Midpoint)', value: fmtM(midpoint),         sub: `${multipleUsed}× EBITDA`,                 color: 'amber',   icon: TrendingUp },
   ]
 
   const colorMap = {
@@ -50,9 +62,10 @@ export default function Valuation() {
   ]
 
   const multiples = [4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5]
+  // Use real normalizedEBITDA as base for sensitivity variants
   const ebitdaVariants = [-15, -10, -5, 0, 5, 10, 15].map(pct => ({
     label: `${pct >= 0 ? '+' : ''}${pct}%`,
-    value: ebitda * (1 + pct / 100),
+    value: normalizedEBITDA * (1 + pct / 100),
   }))
 
   return (
@@ -81,6 +94,47 @@ export default function Valuation() {
             </div>
           )
         })}
+      </div>
+
+      {/* EBITDA Bridge */}
+      <div className="rounded-xl border border-border bg-card p-5">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-card-foreground">EBITDA Bridge</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Normalization walk from TTM revenue to defensible EBITDA — real values from Gusto payroll data</p>
+          </div>
+          <span className="text-[9px] font-semibold px-2 py-0.5 rounded border border-border text-muted-foreground">Payroll Data</span>
+        </div>
+
+        <div className="space-y-2 font-mono text-xs mb-4">
+          <div className="flex items-center justify-between py-2 border-b border-border/50">
+            <span className="text-muted-foreground">TTM Revenue</span>
+            <span className="font-semibold text-foreground">{totalRevenueTTM > 0 ? fmtM(totalRevenueTTM) : '—'}</span>
+          </div>
+          <div className="flex items-center justify-between py-2 border-b border-border/50">
+            <span className="text-muted-foreground">− Implied Payroll</span>
+            <span className="font-semibold text-red-400">
+              {impliedPayroll > 0 ? `(${fmtM(impliedPayroll)})` : '—'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between py-2 border-b border-border/50">
+            <span className="font-semibold text-foreground">= Defensible EBITDA</span>
+            <span className="font-bold text-emerald-400">{normalizedEBITDA > 0 ? fmtM(normalizedEBITDA) : '—'}</span>
+          </div>
+          <div className="flex items-center justify-between py-1.5 pl-4">
+            <span className="text-muted-foreground">EBITDA Margin</span>
+            <span className="font-semibold text-emerald-400">
+              {ebitdaMarginReal > 0 ? `${ebitdaMarginReal.toFixed(1)}%` : '—'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[11px] text-amber-400">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          <span>
+            <strong>Data limitation:</strong> COGS, rent, software, and professional fees are not available in the current dataset. EBITDA margin reflects a payroll-only cost structure. True margin will be lower once full operating expenses are ingested.
+          </span>
+        </div>
       </div>
 
       {/* EV Range bar */}
@@ -127,7 +181,7 @@ export default function Valuation() {
       <div className="rounded-xl border border-border bg-card p-5">
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-card-foreground">Sensitivity Matrix — EBITDA × Multiple</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Enterprise value at each EBITDA scenario and multiple combination</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Enterprise value at each EBITDA scenario and multiple combination · Base EBITDA from real payroll data</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-[10px]">

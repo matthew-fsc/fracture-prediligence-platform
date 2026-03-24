@@ -49,12 +49,17 @@ WEIGHTS = {"cagr": 0.40, "new_customers": 0.30, "pipeline": 0.30}
 
 
 def compute_growth_drivers(company_id: int, db: Session) -> GrowthDriversScore:
-    revenue   = db.query(RevenueStream).filter(RevenueStream.company_id == company_id).all()
-    customers = db.query(Customer).filter(Customer.company_id == company_id).all()
-    contracts = db.query(Contract).filter(Contract.company_id == company_id, Contract.is_active == True).all()
+    revenue       = db.query(RevenueStream).filter(RevenueStream.company_id == company_id).all()
+    customers     = db.query(Customer).filter(Customer.company_id == company_id).all()
+    contracts_all = db.query(Contract).filter(Contract.company_id == company_id, Contract.is_active == True).all()
 
-    today = date.today()
-    twelve_months_ago = today - timedelta(days=365)
+    # Use data reference date (latest revenue period) instead of wall-clock today
+    data_dates = [r.revenue_period for r in revenue if r.revenue_period]
+    ref_date = max(data_dates) if data_dates else date.today()
+    twelve_months_ago = ref_date - timedelta(days=365)
+
+    # Filter contracts to those still active as of the data reference date
+    contracts = [c for c in contracts_all if c.end_date and c.end_date > ref_date]
 
     # 1. Revenue CAGR
     by_year: dict[int, float] = {}
@@ -65,9 +70,12 @@ def compute_growth_drivers(company_id: int, db: Session) -> GrowthDriversScore:
     years = sorted(by_year.keys())
     cagr_pct = 0.0
     if len(years) >= 2:
-        n = years[-1] - years[0]
-        if n > 0 and by_year[years[0]] > 0:
-            cagr_pct = ((by_year[years[-1]] / by_year[years[0]]) ** (1 / n) - 1) * 100
+        # Use prior full year → most-recent full year to avoid partial-year base distortion.
+        # With 2 years: YoY. With 3+: use last 2 consecutive full years for accuracy.
+        base_year = years[-2]
+        n = years[-1] - base_year
+        if n > 0 and by_year[base_year] > 0:
+            cagr_pct = ((by_year[years[-1]] / by_year[base_year]) ** (1 / n) - 1) * 100
 
     if cagr_pct >= 30:
         s_cagr = 95
@@ -102,7 +110,7 @@ def compute_growth_drivers(company_id: int, db: Session) -> GrowthDriversScore:
         s_new = new_pct / 5 * 35
 
     # 3. Contract pipeline vs trailing revenue
-    pipeline_value = sum(float(c.annual_value or 0) for c in contracts if c.end_date and c.end_date > today)
+    pipeline_value = sum(float(c.annual_value or 0) for c in contracts)
     trailing_rev = sum(float(r.revenue_gross or 0) for r in revenue if r.revenue_period and r.revenue_period >= twelve_months_ago)
 
     pipeline_ratio = pipeline_value / trailing_rev if trailing_rev > 0 else 0.0

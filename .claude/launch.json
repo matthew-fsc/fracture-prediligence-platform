@@ -10,8 +10,8 @@
     {
       "name": "Backend (FastAPI)",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["start-backend.mjs"],
-      "port": 8000
+      "runtimeArgs": ["start-backend.mjs", "--port", "8001"],
+      "port": 8001
     }
   ]
 }

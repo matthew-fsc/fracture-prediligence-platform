@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { fmtM } from '../lib/utils'
+import { AlertTriangle } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell
@@ -56,6 +57,7 @@ function MetricPanel({ label, displayValue, benchmark, percentile, status, trend
 export default function BusinessQuality() {
   const [scores, setScores] = useState(null)
   const [metrics, setMetrics] = useState(null)
+  const [bannerDismissed, setBannerDismissed] = useState(false)
 
   useEffect(() => {
     fetch(`/api/analytics/scores/${COMPANY_ID}`)
@@ -120,6 +122,22 @@ export default function BusinessQuality() {
         subtitle="Internal operating truth derived from normalized data — source of record for all advisory analysis"
         action={<span className="text-[10px] font-semibold px-2.5 py-1 rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-400">Internal Data · Source of Record</span>}
       />
+
+      {!bannerDismissed && metrics?.total_opex_ttm === 0 && (
+        <div className="flex items-start gap-2 p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[11px] text-amber-400">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          <span className="flex-1">
+            <strong>Partial expense data:</strong> Only payroll costs available from Gusto. COGS, rent, software, and other operating expenses not ingested. Metrics reflect payroll-adjusted margins only.
+          </span>
+          <button
+            onClick={() => setBannerDismissed(true)}
+            className="flex-shrink-0 text-amber-400/60 hover:text-amber-400 transition-colors ml-1"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 

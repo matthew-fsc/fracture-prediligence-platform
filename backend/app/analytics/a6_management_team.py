@@ -14,7 +14,7 @@ DRS weight: Management & Team = 10% of composite score.
 
 from __future__ import annotations
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
@@ -46,6 +46,7 @@ class ManagementTeamScore:
     has_sales_role: bool
     has_ops_role: bool
     data_confidence: str
+    data_gaps: list = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -58,6 +59,7 @@ class ManagementTeamScore:
                 "role_coverage": {"score": self.role_coverage_score, "value": None,                        "label": f"Finance:{self.has_finance_role} Sales:{self.has_sales_role} Ops:{self.has_ops_role}"},
             },
             "data_confidence": self.data_confidence,
+            "data_gaps": self.data_gaps,
         }
 
 
@@ -81,6 +83,7 @@ def compute_management_team(company_id: int, db: Session) -> ManagementTeamScore
             mgmt_count=0, total_headcount=0, revenue_per_employee=0.0,
             owner_count=0, has_finance_role=False, has_sales_role=False, has_ops_role=False,
             data_confidence="LOW",
+            data_gaps=["management_classification", "role_classification"],
         )
 
     active = [e for e in employees if e.status == EmployeeStatus.ACTIVE]
@@ -98,8 +101,13 @@ def compute_management_team(company_id: int, db: Session) -> ManagementTeamScore
     has_sales   = any(_SALES.search(str(e.role or "")) for e in active)
     has_ops     = any(_OPS.search(str(e.role or "")) for e in active)
 
+    data_gaps: list[str] = []
+
     # 1. Management completeness
-    if mgmt_count == 0:
+    if mgmt_count == 0 and total >= 3:
+        s_comp = 50   # data gap — can't classify roles from payroll data
+        data_gaps.append("management_classification")
+    elif mgmt_count == 0:
         s_comp = 20
     elif mgmt_count == 1:
         s_comp = 45
@@ -138,7 +146,11 @@ def compute_management_team(company_id: int, db: Session) -> ManagementTeamScore
 
     # 4. Key role coverage
     coverage_hits = sum([has_finance, has_sales, has_ops])
-    s_roles = {0: 20, 1: 50, 2: 75, 3: 95}.get(coverage_hits, 20)
+    if coverage_hits == 0 and total >= 3:
+        s_roles = 50  # data gap — role labels not present in payroll data
+        data_gaps.append("role_classification")
+    else:
+        s_roles = {0: 20, 1: 50, 2: 75, 3: 95}.get(coverage_hits, 20)
 
     composite = (
         s_comp  * WEIGHTS["completeness"]
@@ -147,7 +159,11 @@ def compute_management_team(company_id: int, db: Session) -> ManagementTeamScore
         + s_roles * WEIGHTS["role_coverage"]
     )
 
-    confidence = "HIGH" if total >= 5 else "MEDIUM" if total >= 2 else "LOW"
+    # LOW confidence when both management classification and role data are missing
+    if mgmt_count == 0 and coverage_hits == 0 and total > 0:
+        confidence = "LOW"
+    else:
+        confidence = "HIGH" if total >= 5 else "MEDIUM" if total >= 2 else "LOW"
 
     return ManagementTeamScore(
         company_id=company_id,
@@ -164,4 +180,5 @@ def compute_management_team(company_id: int, db: Session) -> ManagementTeamScore
         has_sales_role=has_sales,
         has_ops_role=has_ops,
         data_confidence=confidence,
+        data_gaps=data_gaps,
     )

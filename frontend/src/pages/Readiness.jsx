@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
+import { AlertTriangle } from 'lucide-react'
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 
 const COMPANY_ID = 1
@@ -131,6 +132,23 @@ export default function Readiness() {
                 </div>
               </div>
             </div>
+
+            {Object.entries(cats).some(([, v]) => v.data_confidence === 'LOW') && (
+              <div className="rounded-xl border border-amber-500/20 bg-card p-4 mt-4">
+                <p className="text-xs font-semibold text-amber-400 mb-2 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" /> Data Gaps May Affect Score
+                </p>
+                <div className="space-y-1">
+                  {Object.entries(cats)
+                    .filter(([, v]) => v.data_confidence === 'LOW')
+                    .map(([key, v]) => (
+                      <p key={key} className="text-[11px] text-muted-foreground">
+                        · {key.replace(/_/g, ' ')} — LOW confidence data; score may improve with fuller data
+                      </p>
+                    ))}
+                </div>
+              </div>
+            )}
 
             {/* Radar */}
             <div className="pt-3 border-t border-border">

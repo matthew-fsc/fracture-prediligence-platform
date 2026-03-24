@@ -71,9 +71,22 @@ export default function Reports() {
 
   async function generateReport(templateId) {
     setGenerating(templateId)
-    await new Promise(r => setTimeout(r, 1500))
-    setGenerated(prev => ({ ...prev, [templateId]: true }))
-    setGenerating(null)
+    try {
+      const res = await fetch(`/api/reports/${COMPANY_ID}/generate/${templateId}`)
+      if (!res.ok) throw new Error(await res.text())
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      a.download = `${templateId}_report.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      setGenerated(prev => ({ ...prev, [templateId]: true }))
+    } catch (err) {
+      console.error('Report generation failed:', err)
+    } finally {
+      setGenerating(null)
+    }
   }
 
   const readyReports = REPORT_TEMPLATES.filter(t => t.status === 'ready')

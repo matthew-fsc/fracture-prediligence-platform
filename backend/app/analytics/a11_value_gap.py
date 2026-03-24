@@ -18,15 +18,31 @@ Gap formula:
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from decimal import Decimal
 from typing import Optional
 
-from app.analytics.a9_drs_composite import CategoryScores, compute_drs, WEIGHTS, DRSTier
-from app.analytics.a10_enterprise_value import compute_enterprise_value
+from app.analytics.a9_drs_composite import CategoryScores, compute_drs, WEIGHTS
 
 
 # Target score for a "resolved" category (investment grade threshold)
 _TARGET_SCORE = 80.0
+
+# DRS-to-multiple anchors: (drs, midpoint_multiple)
+_DRS_MULTIPLE_ANCHORS = [(0, 2.0), (40, 3.0), (55, 4.25), (70, 6.0), (85, 8.0), (100, 9.0)]
+
+
+def _drs_to_multiple(drs: float) -> float:
+    """Continuous linear interpolation of midpoint EBITDA multiple by DRS score."""
+    for i in range(len(_DRS_MULTIPLE_ANCHORS) - 1):
+        lo_drs, lo_m = _DRS_MULTIPLE_ANCHORS[i]
+        hi_drs, hi_m = _DRS_MULTIPLE_ANCHORS[i + 1]
+        if lo_drs <= drs <= hi_drs:
+            t = (drs - lo_drs) / (hi_drs - lo_drs)
+            return lo_m + t * (hi_m - lo_m)
+    return _DRS_MULTIPLE_ANCHORS[-1][1]
+
+
+def _continuous_ev_mid(drs: float, ebitda: float) -> float:
+    return ebitda * _drs_to_multiple(drs)
 
 # Category display metadata
 CATEGORY_META = {
@@ -95,8 +111,6 @@ def compute_value_gap(
     current_scores: dict of {category_key: float 0-100}
     ebitda: defensible EBITDA in dollars
     """
-    ebitda_dec = Decimal(str(round(ebitda, 2)))
-
     def _build_cat_scores(overrides: dict[str, float] = {}) -> CategoryScores:
         merged = {**current_scores, **overrides}
         return CategoryScores(
@@ -110,8 +124,7 @@ def compute_value_gap(
 
     def _ev_midpoint(cat_scores: CategoryScores) -> float:
         drs = compute_drs(cat_scores)
-        ev  = compute_enterprise_value(ebitda_dec, drs.tier)
-        return float(ev.ev_midpoint)
+        return _continuous_ev_mid(drs.base_drs, ebitda)
 
     # Current state
     current_cat = _build_cat_scores()
