@@ -1,27 +1,36 @@
-import { useState, useEffect } from 'react'
-import { Outlet } from 'react-router-dom'
-import Sidebar from './Sidebar'
+import { useState, useEffect, useCallback } from 'react'
+import { Outlet, useSearchParams } from 'react-router-dom'
+import DemoSidebar from './DemoSidebar'
 import DemoBanner from '../demo/DemoBanner'
 import ConversionModal from '../demo/ConversionModal'
 import { DemoContext } from '../../context/DemoContext'
-import { Bell, Search } from 'lucide-react'
+import { Bell, Search, Share2, Check } from 'lucide-react'
+import { usePageTitle } from '../../hooks/usePageTitle'
 
 // ---------------------------------------------------------------------------
-// Demo-specific header (no company selector, shows DEMO badge)
+// Demo-specific header
 // ---------------------------------------------------------------------------
-function DemoHeader({ demoData }) {
+function DemoHeader({ demoData, slug, personalized }) {
   const drs = demoData?.drs?.base
   const ev = demoData?.enterprise_value?.midpoint
+  const [copied, setCopied] = useState(false)
+
+  const handleShare = useCallback(() => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }, [])
 
   return (
-    <header className="h-14 border-b border-border bg-card/60 backdrop-blur-sm flex items-center justify-between px-4 sticky top-0 z-40 flex-shrink-0">
+    <header className="h-14 border-b border-border bg-card/60 backdrop-blur-sm flex items-center justify-between px-4 flex-shrink-0">
       {/* Left */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-card-foreground">
           <span
             style={{
-              background: '#C9973A',
-              color: '#0A1628',
+              background: 'hsl(var(--warning))',
+              color: 'hsl(var(--background))',
               fontWeight: 700,
               fontSize: 10,
               padding: '2px 7px',
@@ -32,20 +41,31 @@ function DemoHeader({ demoData }) {
           >
             DEMO
           </span>
-          <span className="text-muted-foreground max-w-[140px] truncate">Lakeside HVAC Services</span>
+          <span className="text-muted-foreground max-w-[160px] truncate">Meridian Consulting Group</span>
         </div>
         {drs != null && (
           <span className="text-xs text-muted-foreground font-medium">{drs}/100 Readiness</span>
         )}
         {ev != null && (
           <span className="text-xs font-semibold text-primary">
-            ${(ev / 1_000_000).toFixed(2)}M EV
+            ${(ev / 1_000_000).toFixed(1)}M EV
           </span>
         )}
       </div>
 
       {/* Right */}
       <div className="flex items-center gap-2">
+        {/* Share button */}
+        <button
+          onClick={handleShare}
+          title="Copy demo link"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border hover:bg-muted/50 transition-colors text-xs font-medium"
+          style={{ color: copied ? 'hsl(var(--primary))' : 'hsl(var(--warning))' }}
+        >
+          {copied ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
+          {copied ? 'Copied!' : 'Share'}
+        </button>
+
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground w-48">
           <Search className="w-3.5 h-3.5" />
           <span>Search metrics, reports...</span>
@@ -75,9 +95,25 @@ export default function DemoShell({ slug = null }) {
   const [personalized, setPersonalized] = useState(null)
   const [spotsRemaining, setSpotsRemaining] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [searchParams] = useSearchParams()
+
+  const basePrefix = slug ? `/demo/${slug}` : '/demo'
+
+  // Page title
+  const pageTitle = personalized
+    ? `${personalized.recipient_name}'s Demo`
+    : 'Live Demo'
+  usePageTitle(pageTitle)
 
   useEffect(() => {
-    // If there's a slug, fetch personalized; otherwise fetch generic demo data
+    // Handle ?ref=REFCODE on generic demo
+    const refCode = searchParams.get('ref')
+    if (refCode) {
+      localStorage.setItem('demo_ref', refCode)
+    }
+
+    // Fetch data based on slug
     if (slug) {
       fetch(`/api/demo/${slug}`)
         .then((r) => r.ok ? r.json() : null)
@@ -85,7 +121,6 @@ export default function DemoShell({ slug = null }) {
           if (d) {
             setDemoData(d.demo_data)
             setPersonalized(d.personalized)
-            // Store ref slug for signup tracking
             localStorage.setItem('demo_ref', slug)
           }
         })
@@ -101,62 +136,61 @@ export default function DemoShell({ slug = null }) {
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d) setSpotsRemaining(d.spots_remaining) })
       .catch(() => {})
+  }, [slug, searchParams])
+
+  // ---------------------------------------------------------------------------
+  // Section tracking — called by DemoHome when sections enter viewport
+  // ---------------------------------------------------------------------------
+  const trackSection = useCallback((section) => {
+    if (!slug) return  // Only track personalized links
+    fetch(`/api/demo/${slug}/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ section }),
+    }).catch(() => {})
   }, [slug])
 
   const prefillEmail = personalized?.recipient_email ?? ''
 
   return (
-    <DemoContext.Provider value={{ demoData, personalized, spotsRemaining }}>
-      <div className="dark">
-        {/* Personalized welcome banner (shown above gold banner when slug present) */}
-        {personalized && (
-          <div
-            style={{
-              background: '#0F2040',
-              borderBottom: '1px solid #1E3A5F',
-              padding: '8px 24px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              position: 'sticky',
-              top: 0,
-              zIndex: 70,
-            }}
-          >
-            <span style={{ color: '#C9973A', fontSize: 14 }}>👋</span>
-            <p
-              style={{
-                margin: 0,
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: 13,
-                color: '#8A9BB0',
-              }}
-            >
-              Welcome,{' '}
-              <strong style={{ color: '#F0EDE8' }}>{personalized.recipient_name}</strong>
-              {personalized.recipient_firm
-                ? <> from <strong style={{ color: '#F0EDE8' }}>{personalized.recipient_firm}</strong></>
-                : ''
-              }
-              {' '}— you're viewing a private demo prepared for you.
-            </p>
-          </div>
-        )}
+    <DemoContext.Provider value={{ demoData, personalized, spotsRemaining, slug, trackSection }}>
+      <div className="dark flex h-screen overflow-hidden bg-background">
+        {/* Sidebar — fixed full height */}
+        <DemoSidebar basePrefix={basePrefix} />
 
-        {/* Gold spots banner */}
-        <DemoBanner
-          onClaim={() => setModalOpen(true)}
-          spotsRemaining={spotsRemaining}
-        />
+        {/* Content column */}
+        <div className="flex-1 flex flex-col overflow-hidden ml-56">
+          {/* Personalized welcome banner */}
+          {personalized && (
+            <div className="bg-card border-b border-border px-4 py-2 flex items-center gap-2 flex-shrink-0">
+              <span className="text-warning text-sm">👋</span>
+              <p className="text-[12px] text-muted-foreground">
+                Welcome,{' '}
+                <strong className="text-card-foreground">{personalized.recipient_name}</strong>
+                {personalized.recipient_firm && (
+                  <> from <strong className="text-card-foreground">{personalized.recipient_firm}</strong></>
+                )}
+                {' '}— you're viewing a private demo prepared for you.
+              </p>
+            </div>
+          )}
 
-        <div className="min-h-screen bg-background flex">
-          <Sidebar />
-          <div className="flex-1 flex flex-col ml-56">
-            <DemoHeader demoData={demoData} />
-            <main className="flex-1 p-6 overflow-auto">
-              <Outlet />
-            </main>
-          </div>
+          {/* Spots banner — dismissible */}
+          {!bannerDismissed && (
+            <DemoBanner
+              onClaim={() => setModalOpen(true)}
+              onDismiss={() => setBannerDismissed(true)}
+              spotsRemaining={spotsRemaining}
+            />
+          )}
+
+          {/* Header */}
+          <DemoHeader demoData={demoData} slug={slug} personalized={personalized} />
+
+          {/* Scrollable content */}
+          <main className="flex-1 p-6 overflow-y-auto">
+            <Outlet />
+          </main>
         </div>
 
         <ConversionModal

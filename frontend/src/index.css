@@ -88,7 +88,39 @@
   * {
     @apply border-border;
   }
+
+  html {
+    background-color: hsl(220, 20%, 6%);
+    overscroll-behavior: none;
+  }
+
   body {
     @apply bg-background text-foreground font-sans;
+    overscroll-behavior: none;
+  }
+
+  /* Dark scrollbars — webkit (Chrome, Edge, Safari) */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(220, 18%, 22%);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(220, 18%, 30%);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Dark scrollbars — Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(220, 18%, 22%) transparent;
   }
 }

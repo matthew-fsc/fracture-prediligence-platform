@@ -194,3 +194,32 @@ class DemoLink(Base):
     last_visited_at:  Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     converted:        Mapped[bool]           = mapped_column(Boolean, default=False)
     ref_code:         Mapped[Optional[str]]  = mapped_column(String(128), nullable=True)
+    sections_viewed:  Mapped[Optional[str]]  = mapped_column(Text, nullable=True)  # JSON array of section names
+
+
+# ---------------------------------------------------------------------------
+# User subscriptions (Clerk user ID → Stripe subscription)
+# ---------------------------------------------------------------------------
+
+class UserSubscription(Base):
+    __tablename__ = "user_subscriptions"
+
+    id:                     Mapped[int]            = mapped_column(Integer, primary_key=True)
+    user_id:                Mapped[str]            = mapped_column(String(256), unique=True, index=True)  # Clerk sub
+    stripe_customer_id:     Mapped[Optional[str]]  = mapped_column(String(256), nullable=True)
+    stripe_subscription_id: Mapped[Optional[str]]  = mapped_column(String(256), nullable=True)
+    tier:                   Mapped[Optional[str]]  = mapped_column(String(64), nullable=True)    # founding | pro | team
+    status:                 Mapped[str]            = mapped_column(String(64), default="inactive")  # active | cancelled | inactive
+    created_at:             Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at:             Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# App-wide settings key/value store (for spots_remaining etc.)
+# ---------------------------------------------------------------------------
+
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    key:        Mapped[str] = mapped_column(String(128), primary_key=True)
+    value:      Mapped[str] = mapped_column(Text)

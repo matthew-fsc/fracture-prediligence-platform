@@ -1,5 +1,5 @@
 """
-Demo routes — Lakeside HVAC Services demo data, personalized demo links,
+Demo routes — Meridian Consulting Group demo data, personalized demo links,
 spots-remaining counter, and admin link management.
 """
 
@@ -29,168 +29,168 @@ _spots_remaining = 18
 TOTAL_SPOTS = 20
 
 # ---------------------------------------------------------------------------
-# Static demo data — Lakeside HVAC Services LLC
+# Static demo data — Meridian Consulting Group (mirrors company_id=1 sandbox)
 # ---------------------------------------------------------------------------
 DEMO_DATA = {
     "company": {
         "id": "demo",
-        "name": "Lakeside HVAC Services LLC",
-        "industry": "HVAC / Mechanical Services",
-        "founded": 2009,
-        "state": "OH",
-        "employees": 9,
-        "ttm_revenue": 2397000,
-        "ebitda": 522000,
-        "ebitda_margin": 21.8,
-        "owner": "Doug Holt",
+        "name": "Meridian Consulting Group",
+        "industry": "Professional Services / Management Consulting",
+        "founded": 2014,
+        "state": "CO",
+        "employees": 13,
+        "ttm_revenue": 4280000,
+        "ebitda": 2400000,
+        "ebitda_margin": 56.1,
+        "owner": "David Merrill",
         "advisor": "Sarah Chen, CEPA",
         "engagement_stage": "Pre-Diligence",
     },
     "drs": {
-        "base": 67.4,
-        "conservative": 63.1,
-        "optimistic": 71.2,
-        "tier": "Near Investment Grade",
+        "base": 81.2,
+        "conservative": 77.4,
+        "optimistic": 85.1,
+        "tier": "Investment Grade",
         "contributions": {
-            "revenue_quality": 16.25,
-            "financial_integrity": 14.4,
-            "operational_independence": 11.4,
-            "customer_risk": 10.95,
-            "management_team": 6.8,
-            "growth_drivers": 7.6,
+            "revenue_quality": 17.6,
+            "financial_integrity": 18.3,
+            "operational_independence": 16.1,
+            "customer_risk": 14.96,
+            "management_team": 16.4,
+            "growth_drivers": 10.76,
         },
     },
     "category_scores": {
         "revenue_quality": {
-            "composite": 65,
-            "data_confidence": "MEDIUM",
+            "composite": 88,
+            "data_confidence": "HIGH",
             "sub_scores": {
-                "recurring_rate": {"score": 58, "label": "43% recurring (service contracts)"},
-                "concentration": {"score": 72, "label": "Top customer 28% of revenue"},
-                "durability": {"score": 61, "label": "61% of contracts multi-year"},
-                "consistency": {"score": 70, "label": "CV 24% — seasonal variation"},
-                "nrr": {"score": 64, "label": "NRR 91% — moderate churn"},
+                "recurring_rate": {"score": 91, "label": "87% recurring retainer contracts"},
+                "concentration": {"score": 82, "label": "Top customer 19% of revenue"},
+                "durability": {"score": 90, "label": "83% of contracts multi-year"},
+                "consistency": {"score": 88, "label": "CV 9% — highly consistent"},
+                "nrr": {"score": 89, "label": "NRR 104% — net expansion"},
             },
         },
         "financial_integrity": {
-            "composite": 72,
-            "data_confidence": "MEDIUM",
+            "composite": 91.5,
+            "data_confidence": "HIGH",
             "sub_scores": {
-                "addback_exposure": {"score": 64, "label": "Owner/personal 22% of expenses ($114K addbacks)"},
-                "expense_completeness": {"score": 88, "label": "88% categorized"},
-                "revenue_completeness": {"score": 95, "label": "95% with period + type"},
-                "data_coverage": {"score": 80, "label": "24 months of data"},
+                "addback_exposure": {"score": 88, "label": "Owner comp $320K vs $280K market (modest delta)"},
+                "expense_completeness": {"score": 96, "label": "96% categorized"},
+                "revenue_completeness": {"score": 98, "label": "98% with period + type"},
+                "data_coverage": {"score": 95, "label": "36 months of data"},
             },
         },
         "operational_independence": {
-            "composite": 57,
-            "data_confidence": "MEDIUM",
+            "composite": 80.7,
+            "data_confidence": "HIGH",
             "sub_scores": {
-                "owner_comp": {"score": 62, "label": "Owner comp $185K vs $120K market rate"},
-                "key_person": {"score": 38, "label": "Owner manages all client relationships"},
-                "management_depth": {"score": 55, "label": "1 service manager, no financial leadership"},
-                "staff_stability": {"score": 82, "label": "Avg tenure 4.2 years"},
+                "owner_comp": {"score": 82, "label": "Owner comp $320K vs $280K market ($40K delta)"},
+                "key_person": {"score": 76, "label": "3 senior consultants run day-to-day delivery"},
+                "management_depth": {"score": 84, "label": "Director of Ops + Practice Leads in place"},
+                "staff_stability": {"score": 88, "label": "Avg tenure 5.8 years"},
             },
         },
         "customer_risk": {
-            "composite": 73,
+            "composite": 74.8,
             "data_confidence": "HIGH",
             "sub_scores": {
-                "concentration": {"score": 68, "label": "Lakeside Commons Apts: 28% of revenue"},
-                "diversification": {"score": 79, "label": "340 active customers, 3 industries"},
-                "churn": {"score": 77, "label": "11% inactive last 12 months"},
-                "tenure": {"score": 81, "label": "Avg tenure 5.1 years"},
+                "concentration": {"score": 72, "label": "Top customer 19% of revenue"},
+                "diversification": {"score": 79, "label": "18 active customers, 4 industries"},
+                "churn": {"score": 71, "label": "28% inactive last 12 months — GAP"},
+                "tenure": {"score": 80, "label": "Avg tenure 4.1 years"},
             },
         },
         "management_team": {
-            "composite": 68,
+            "composite": 82,
             "data_confidence": "MEDIUM",
             "sub_scores": {
-                "completeness": {"score": 60, "label": "Missing CFO/Controller and Sales lead"},
-                "size": {"score": 72, "label": "9 employees, 2 management roles"},
-                "ownership": {"score": 55, "label": "100% owner-held, no equity sharing"},
-                "role_coverage": {"score": 74, "label": "Operations covered, Finance gap"},
+                "completeness": {"score": 84, "label": "Director of Ops, 3 Practice Leads"},
+                "size": {"score": 80, "label": "13 employees, 4 leadership roles"},
+                "ownership": {"score": 78, "label": "Partial equity sharing with 2 principals"},
+                "role_coverage": {"score": 86, "label": "Operations and delivery well-covered"},
             },
         },
         "growth_drivers": {
-            "composite": 76,
+            "composite": 53.8,
             "data_confidence": "MEDIUM",
             "sub_scores": {
-                "revenue_cagr": {"score": 78, "label": "CAGR 11.2% (2022–2024)"},
-                "new_customers": {"score": 72, "label": "18% new customers YoY"},
-                "contract_pipeline": {"score": 80, "label": "1.2x pipeline coverage"},
+                "revenue_cagr": {"score": 58, "label": "CAGR 7.9% (2022–2024) — below benchmark"},
+                "new_customers": {"score": 46, "label": "Pipeline 0.46x coverage — GAP"},
+                "contract_pipeline": {"score": 55, "label": "No formal new business development process"},
             },
         },
     },
     "enterprise_value": {
-        "floor": 1566000,
-        "midpoint": 2088000,
-        "ceiling": 2610000,
-        "multiple_used": "3.0-5.0",
-        "ebitda_base": 522000,
+        "floor": 12000000,
+        "midpoint": 14400000,
+        "ceiling": 16800000,
+        "multiple_used": "5.0-7.0",
+        "ebitda_base": 2400000,
     },
     "flagged_issues": [
         {
             "id": 1,
-            "severity": "CRITICAL",
-            "category": "operational_independence",
-            "title": "Owner-dependent sales — key person risk",
-            "description": "Doug Holt manages all customer acquisition and renewal conversations personally. No documented handoff process exists. A buyer would need a 12-18 month earnout to mitigate this risk.",
-            "data_needed": "Document CRM process, assign service manager to 30% of accounts",
-            "timeline": "12 months",
-            "ev_impact": 280000,
+            "severity": "HIGH",
+            "category": "growth_drivers",
+            "title": "Pipeline coverage at 0.46x — insufficient for buyer confidence",
+            "description": "Active deal pipeline represents only 46% of TTM revenue. PE buyers and strategics require 1.0x–1.5x pipeline coverage to underwrite a growth premium. The absence of a formal business development process creates over-dependence on existing accounts.",
+            "data_needed": "Formal pipeline report, new business development plan",
+            "timeline": "6 months",
+            "ev_impact": 1200000,
         },
         {
             "id": 2,
             "severity": "HIGH",
             "category": "customer_risk",
-            "title": "28% revenue concentration — Lakeside Commons Apartments",
-            "description": "A single property management client represents $671,000 of $2.4M TTM revenue. Their 3-year service agreement expires in 14 months. Any buyer will price this risk into their offer.",
-            "data_needed": "Renewal negotiations, backup commercial pipeline, contract copy",
+            "title": "28% customer churn rate — above professional services benchmark",
+            "description": "13 of 18 customers are active; 5 accounts went inactive in the trailing 12 months. Industry benchmark for management consulting is 10–15% annual churn. Buyers will apply a revenue quality discount until a retention program is demonstrated.",
+            "data_needed": "Churn analysis by account, client health scoring system",
             "timeline": "6 months",
-            "ev_impact": 195000,
+            "ev_impact": 840000,
         },
         {
             "id": 3,
-            "severity": "HIGH",
-            "category": "financial_integrity",
-            "title": "No CPA-reviewed financials — self-prepared QuickBooks only",
-            "description": "Three years of P&Ls are owner-prepared. PE buyers and SBA lenders require at minimum a CPA review engagement. Without it, defensible EBITDA cannot be confirmed and buyers will apply a 15-20% discount.",
-            "data_needed": "CPA review letter for FY2022–2024, addback schedule",
-            "timeline": "3 months",
-            "ev_impact": 155000,
+            "severity": "MEDIUM",
+            "category": "growth_drivers",
+            "title": "CAGR 7.9% trails professional services benchmark of 12%+",
+            "description": "Revenue grew from $3.7M to $4.28M over 36 months — solid but below the benchmark buyers use to justify a premium multiple. Without a documented pipeline and growth plan, buyers will not apply a growth premium to the valuation.",
+            "data_needed": "Revenue forecast by account, market expansion plan",
+            "timeline": "9 months",
+            "ev_impact": 720000,
         },
         {
             "id": 4,
             "severity": "MEDIUM",
-            "category": "revenue_quality",
-            "title": "Service contracts lack auto-renewal clauses",
-            "description": "14 of 23 commercial service agreements require manual renewal each year. This creates unnecessary churn risk and reduces contract durability scores. Standardized MSA with auto-renewal would add ~$180K to durable ARR.",
-            "data_needed": "Updated MSA template, customer re-signature campaign",
-            "timeline": "6 months",
-            "ev_impact": 92000,
+            "category": "customer_risk",
+            "title": "No formal client success program — renewals handled ad hoc",
+            "description": "Renewal conversations are initiated by the owner or practice leads without a standardized cadence or success criteria. Formalizing QBRs and NPS tracking would improve both churn metrics and buyer confidence in revenue durability.",
+            "data_needed": "Client success playbook, QBR schedule",
+            "timeline": "3 months",
+            "ev_impact": 480000,
         },
     ],
     "checklist": {
         "total": 15,
-        "completed": 9,
-        "pct": 60,
+        "completed": 12,
+        "pct": 80,
         "items": [
             {"id": 1, "category": "Legal", "name": "Certificate of Formation / Articles of Organization", "status": "complete"},
             {"id": 2, "category": "Legal", "name": "EIN confirmation letter", "status": "complete"},
             {"id": 3, "category": "Legal", "name": "Operating Agreement (current)", "status": "complete"},
-            {"id": 4, "category": "Legal", "name": "Buy-Sell Agreement", "status": "missing"},
-            {"id": 5, "category": "Financial", "name": "P&L Statement 2022–2024 (owner-prepared)", "status": "complete"},
+            {"id": 4, "category": "Legal", "name": "Buy-Sell Agreement (2024)", "status": "complete"},
+            {"id": 5, "category": "Financial", "name": "P&L Statement 2022–2024 (CPA-reviewed)", "status": "complete"},
             {"id": 6, "category": "Financial", "name": "Balance Sheet 2022–2024", "status": "complete"},
-            {"id": 7, "category": "Financial", "name": "CPA Review or Audit Letter", "status": "missing"},
+            {"id": 7, "category": "Financial", "name": "CPA Review Letter FY2022–2024", "status": "complete"},
             {"id": 8, "category": "Financial", "name": "Business Tax Returns 2022–2024", "status": "missing"},
-            {"id": 9, "category": "Operations", "name": "Equipment & Vehicle Inventory", "status": "complete"},
-            {"id": 10, "category": "Operations", "name": "Supplier and Vendor List", "status": "complete"},
-            {"id": 11, "category": "Operations", "name": "Insurance Certificates (GL + Workers Comp)", "status": "complete"},
+            {"id": 9, "category": "Operations", "name": "Organizational Chart (current)", "status": "complete"},
+            {"id": 10, "category": "Operations", "name": "Client List with Revenue by Account (3yr)", "status": "complete"},
+            {"id": 11, "category": "Operations", "name": "Insurance Certificates (GL + E&O)", "status": "complete"},
             {"id": 12, "category": "HR", "name": "Employee Roster with Compensation", "status": "complete"},
             {"id": 13, "category": "HR", "name": "Non-Compete and Non-Solicitation Agreements", "status": "missing"},
-            {"id": 14, "category": "Customers", "name": "Top 10 Customer Contracts", "status": "missing"},
-            {"id": 15, "category": "Customers", "name": "Customer List with Revenue by Account (3yr)", "status": "complete"},
+            {"id": 14, "category": "Customers", "name": "Top 10 Client Contracts", "status": "complete"},
+            {"id": 15, "category": "Customers", "name": "Pipeline Report (CRM export)", "status": "missing"},
         ],
     },
     "data_room": {
@@ -199,11 +199,10 @@ DEMO_DATA = {
                 "name": "Financial Documents",
                 "icon": "dollar",
                 "docs": [
-                    {"name": "P&L 2022–2024 (QuickBooks Export)", "status": "complete", "size": "2.1 MB"},
-                    {"name": "Balance Sheet — Dec 2024", "status": "complete", "size": "840 KB"},
-                    {"name": "Equipment Depreciation Schedule", "status": "complete", "size": "310 KB"},
-                    {"name": "Owner Add-Back Schedule (draft)", "status": "complete", "size": "185 KB"},
-                    {"name": "CPA Review Letter — MISSING", "status": "missing"},
+                    {"name": "P&L 2022–2024 (CPA-Reviewed)", "status": "complete", "size": "1.8 MB"},
+                    {"name": "Balance Sheet — Dec 2024", "status": "complete", "size": "740 KB"},
+                    {"name": "CPA Review Letter — FY2022–2024", "status": "complete", "size": "420 KB"},
+                    {"name": "Owner Add-Back Schedule", "status": "complete", "size": "210 KB"},
                     {"name": "Business Tax Returns 2022–2024 — MISSING", "status": "missing"},
                 ],
             },
@@ -211,29 +210,29 @@ DEMO_DATA = {
                 "name": "Legal & Corporate",
                 "icon": "shield",
                 "docs": [
-                    {"name": "Certificate of Formation (Ohio)", "status": "complete", "size": "420 KB"},
-                    {"name": "Operating Agreement — 2021 Amended", "status": "complete", "size": "1.2 MB"},
-                    {"name": "EIN Confirmation Letter (IRS)", "status": "complete", "size": "180 KB"},
-                    {"name": "Buy-Sell Agreement — MISSING", "status": "missing"},
+                    {"name": "Certificate of Formation (Colorado)", "status": "complete", "size": "380 KB"},
+                    {"name": "Operating Agreement — 2023 Amended", "status": "complete", "size": "1.4 MB"},
+                    {"name": "Buy-Sell Agreement (2024)", "status": "complete", "size": "890 KB"},
+                    {"name": "EIN Confirmation Letter (IRS)", "status": "complete", "size": "160 KB"},
                 ],
             },
             {
-                "name": "Customer Contracts",
+                "name": "Client Contracts",
                 "icon": "users",
                 "docs": [
-                    {"name": "Standard Residential Service Agreement", "status": "complete", "size": "560 KB"},
-                    {"name": "Lakeside Commons — Commercial MSA", "status": "complete", "size": "1.8 MB"},
-                    {"name": "Commercial Contract Renewals (14 accounts) — MISSING", "status": "missing"},
-                    {"name": "Warranty Documentation — MISSING", "status": "missing"},
+                    {"name": "Standard Retainer Agreement (MSA)", "status": "complete", "size": "620 KB"},
+                    {"name": "Top 10 Client Contracts", "status": "complete", "size": "4.2 MB"},
+                    {"name": "Pipeline Report (HubSpot Export) — MISSING", "status": "missing"},
+                    {"name": "Client NPS Survey Results — MISSING", "status": "missing"},
                 ],
             },
             {
                 "name": "HR & People",
                 "icon": "users",
                 "docs": [
-                    {"name": "Employee Roster with Compensation", "status": "complete", "size": "290 KB"},
-                    {"name": "Employee Handbook (2023)", "status": "complete", "size": "3.4 MB"},
-                    {"name": "Payroll Summary 2022–2024", "status": "complete", "size": "510 KB"},
+                    {"name": "Employee Roster with Compensation", "status": "complete", "size": "310 KB"},
+                    {"name": "Org Chart (current)", "status": "complete", "size": "180 KB"},
+                    {"name": "Payroll Summary 2022–2024 (Gusto)", "status": "complete", "size": "480 KB"},
                     {"name": "Non-Compete Agreements — MISSING", "status": "missing"},
                 ],
             },
@@ -241,10 +240,10 @@ DEMO_DATA = {
                 "name": "Operations",
                 "icon": "tool",
                 "docs": [
-                    {"name": "Vehicle & Equipment Fleet Inventory", "status": "complete", "size": "680 KB"},
-                    {"name": "Supplier and Vendor List", "status": "complete", "size": "220 KB"},
-                    {"name": "Insurance Certificates (GL + WC)", "status": "complete", "size": "1.1 MB"},
-                    {"name": "HVAC Contractor License (Ohio)", "status": "complete", "size": "95 KB"},
+                    {"name": "Service Delivery Playbook", "status": "complete", "size": "2.1 MB"},
+                    {"name": "Client Success Process Documentation", "status": "complete", "size": "860 KB"},
+                    {"name": "Insurance Certificates (GL + E&O)", "status": "complete", "size": "940 KB"},
+                    {"name": "Technology & Tools Inventory", "status": "complete", "size": "290 KB"},
                 ],
             },
         ]
@@ -252,50 +251,50 @@ DEMO_DATA = {
     "buyer_questions": [
         {
             "id": 1,
-            "category": "operational_independence",
-            "severity": "CRITICAL",
+            "category": "growth_drivers",
+            "severity": "HIGH",
             "buyer_type": "PE",
-            "question": "What happens to customer relationships if Doug Holt is unavailable for 90 days?",
-            "data_needed": "Transition plan, CRM ownership documentation",
+            "question": "What is your current pipeline coverage ratio and typical sales cycle for new client acquisition?",
+            "data_needed": "CRM pipeline export, average sales cycle data, new business development plan",
         },
         {
             "id": 2,
             "category": "customer_risk",
             "severity": "HIGH",
             "buyer_type": "All",
-            "question": "What is the renewal status of the Lakeside Commons service agreement expiring in 14 months?",
-            "data_needed": "Renewal conversation notes, contract extension terms",
+            "question": "Why did 5 accounts go inactive in the trailing 12 months and what is the reactivation pipeline?",
+            "data_needed": "Churn analysis by account with exit reasons, reactivation outreach log",
         },
         {
             "id": 3,
-            "category": "financial_integrity",
+            "category": "growth_drivers",
             "severity": "HIGH",
             "buyer_type": "PE",
-            "question": "Can you provide CPA-reviewed or audited financials for the past 3 years?",
-            "data_needed": "CPA engagement letter, review report",
+            "question": "What is the documented plan to accelerate revenue growth from 7.9% CAGR to the 15–20% range required for a premium multiple?",
+            "data_needed": "3-year revenue forecast, market expansion plan, new service line roadmap",
         },
         {
             "id": 4,
-            "category": "revenue_quality",
+            "category": "customer_risk",
             "severity": "MEDIUM",
             "buyer_type": "Strategic",
-            "question": "What percentage of your commercial service agreements auto-renew vs. require manual renewal?",
-            "data_needed": "Contract schedule with renewal terms for all commercial accounts",
+            "question": "How are client renewals managed and what is the NPS or client satisfaction measurement process?",
+            "data_needed": "Client success playbook, QBR cadence documentation, NPS results",
         },
     ],
     "monthly_revenue": [
-        {"month": "Jan '24", "revenue": 148000},
-        {"month": "Feb '24", "revenue": 162000},
-        {"month": "Mar '24", "revenue": 198000},
-        {"month": "Apr '24", "revenue": 241000},
-        {"month": "May '24", "revenue": 287000},
-        {"month": "Jun '24", "revenue": 312000},
-        {"month": "Jul '24", "revenue": 298000},
-        {"month": "Aug '24", "revenue": 264000},
-        {"month": "Sep '24", "revenue": 218000},
-        {"month": "Oct '24", "revenue": 194000},
-        {"month": "Nov '24", "revenue": 168000},
-        {"month": "Dec '24", "revenue": 107000},
+        {"month": "Jan '24", "revenue": 312000},
+        {"month": "Feb '24", "revenue": 298000},
+        {"month": "Mar '24", "revenue": 358000},
+        {"month": "Apr '24", "revenue": 382000},
+        {"month": "May '24", "revenue": 421000},
+        {"month": "Jun '24", "revenue": 395000},
+        {"month": "Jul '24", "revenue": 368000},
+        {"month": "Aug '24", "revenue": 412000},
+        {"month": "Sep '24", "revenue": 389000},
+        {"month": "Oct '24", "revenue": 354000},
+        {"month": "Nov '24", "revenue": 341000},
+        {"month": "Dec '24", "revenue": 250000},
     ],
 }
 
@@ -333,14 +332,15 @@ class CreateLinkRequest(BaseModel):
 
 @router.get("/demo/data")
 def get_demo_data():
-    """Return full Lakeside HVAC Services demo dataset."""
+    """Return full Meridian Consulting Group demo dataset."""
     return DEMO_DATA
 
 
 @router.get("/spots-remaining")
-def get_spots_remaining():
-    """Return current founding advisor spots remaining."""
-    return {"spots_remaining": _spots_remaining, "total_spots": TOTAL_SPOTS}
+def get_spots_remaining(db: Session = Depends(get_db)):
+    """Return current founding advisor spots remaining (from DB)."""
+    from app.core.db_functions import get_spots_remaining as _db_spots
+    return {"spots_remaining": _db_spots(db), "total_spots": TOTAL_SPOTS}
 
 
 @router.post("/demo/create-link")
@@ -405,6 +405,26 @@ def get_personalized_demo(slug: str, db: Session = Depends(get_db)):
         },
         "demo_data": DEMO_DATA,
     }
+
+
+@router.post("/demo/{slug}/track")
+def track_section(slug: str, body: dict, db: Session = Depends(get_db)):
+    """Track which section a visitor viewed. Body: { section: str }"""
+    import json as _json
+    link = db.query(DemoLink).filter(DemoLink.slug == slug).first()
+    if not link:
+        return {"status": "ok"}  # silent — don't 404 on tracking calls
+
+    section = body.get("section", "")
+    if section:
+        existing: list = _json.loads(link.sections_viewed or "[]")
+        if section not in existing:
+            existing.append(section)
+            link.sections_viewed = _json.dumps(existing)
+        link.last_visited_at = datetime.utcnow()
+        db.commit()
+
+    return {"status": "ok"}
 
 
 @router.get("/admin/demos")

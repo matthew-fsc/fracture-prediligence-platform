@@ -14,11 +14,11 @@ export default function AppShell() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-background dark flex">
+    <div className="flex h-screen overflow-hidden bg-background dark">
       <Sidebar />
-      <div className="flex-1 flex flex-col ml-56">
+      <div className="flex-1 flex flex-col overflow-hidden ml-56">
         <Header liveScores={liveScores} />
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 p-6 overflow-y-auto">
           <Outlet />
         </main>
       </div>
