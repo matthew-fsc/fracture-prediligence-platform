@@ -116,10 +116,7 @@ export default function CompanyWorkspace() {
             </div>
           </div>
         </div>
-        <div className="mt-4 flex items-center justify-between px-3 py-2 rounded-lg bg-muted/50 border border-border">
-          <span className="text-[11px] text-muted-foreground">Intelligence summary not generated · click to analyze</span>
-          <button className="text-[11px] text-primary font-medium px-2 py-0.5 rounded hover:bg-primary/10 transition-colors">Analyze</button>
-        </div>
+
       </div>
 
       {/* Intelligence cards */}
