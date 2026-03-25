@@ -1,10 +1,15 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.api.routes import ingestion, analytics, companies, reports, demo
 from app.api.routes import payments, webhooks
 from app.core.database import engine, SessionLocal, Base
+
+FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
 
 def _bootstrap_db():
@@ -44,12 +49,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://fracturesystems.com",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -66,3 +67,18 @@ app.include_router(webhooks.router,   prefix="/api",            tags=["webhooks"
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "prediligence-platform"}
+
+
+# ── Serve React SPA ──────────────────────────────────────────────────────────
+# Mount static assets (JS, CSS, images) — must come after all API routes
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+    @app.get("/favicon.svg")
+    def favicon():
+        return FileResponse(FRONTEND_DIST / "favicon.svg")
+
+    # SPA catch-all: serve index.html for every non-API route
+    @app.get("/{full_path:path}")
+    def spa_fallback(full_path: str):
+        return FileResponse(FRONTEND_DIST / "index.html")
