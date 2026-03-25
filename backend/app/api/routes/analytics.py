@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.analytics.a1_metric_computation import compute_metrics
-from app.analytics.a2_ebitda_recast import compute_ebitda_recast
+from app.analytics.a2_ebitda_recast import compute_ebitda_recast, ChallengeLikelihood
 from app.analytics.a3_revenue_quality import compute_revenue_quality
 from app.analytics.a4_operational_independence import compute_operational_independence
 from app.analytics.a5_customer_risk import compute_customer_risk
@@ -190,6 +190,121 @@ def get_buyer_questions(company_id: int, db: Session = Depends(get_db)):
             "company_id": company_id,
             "total":      len(questions),
             "questions":  [q.to_dict() for q in questions],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/ebitda-recast/{company_id}")
+def get_ebitda_recast(company_id: int, db: Session = Depends(get_db)):
+    """
+    A2: Defensible EBITDA recast — conservative / base / aggressive scenarios.
+
+    Pulls all inputs from the ontology automatically:
+      - reported_ebitda = ebitda_ttm from A1 (gross_profit - opex, or revenue - payroll proxy)
+      - owner addbacks = OWNER + PERSONAL expense categories vs $150K market rate
+      - one-time addbacks = ONE_TIME expense category
+      - related-party addbacks = RELATED_PARTY expense category
+
+    D&A, interest, and taxes are not yet extractable from plain CSV ingestion,
+    so we assume the proxy ebitda_ttm already represents pre-tax operating income
+    and set those addbacks to 0 with a confidence flag.
+    """
+    try:
+        from decimal import Decimal as _D
+        from app.ontology.models import Expense, ExpenseCategory
+
+        metrics = compute_metrics(company_id, db)
+
+        # Build addback_items from ontology expense rows
+        # OWNER / PERSONAL expenses are normalization candidates
+        expenses = db.query(Expense).filter(Expense.company_id == company_id).all()
+
+        addback_items = []
+
+        # Sum OWNER + PERSONAL vs standard market rate replacement ($150K default)
+        market_rate = _D("150000")   # advisors should override this for client-specific rate
+
+        # One-time / non-recurring expenses
+        one_time_total = sum(float(e.amount or 0) for e in expenses if e.category == ExpenseCategory.ONE_TIME)
+        if one_time_total > 0:
+            addback_items.append({
+                "description": "One-Time Non-Recurring Expenses",
+                "amount": one_time_total,
+                "challenge": ChallengeLikelihood.MEDIUM.value,
+                "category": "non_recurring",
+                "documented": False,
+                "notes": f"Aggregated from {sum(1 for e in expenses if e.category == ExpenseCategory.ONE_TIME)} ONE_TIME expense records"
+            })
+
+        # Related-party transactions
+        rp_total = sum(float(e.amount or 0) for e in expenses if e.category == ExpenseCategory.RELATED_PARTY)
+        if rp_total > 0:
+            addback_items.append({
+                "description": "Related-Party Transaction Normalization",
+                "amount": rp_total,
+                "challenge": ChallengeLikelihood.HIGH.value,
+                "category": "related_party",
+                "documented": False,
+                "notes": f"Aggregated from {sum(1 for e in expenses if e.category == ExpenseCategory.RELATED_PARTY)} RELATED_PARTY expense records"
+            })
+
+        # Personal expenses running through business P&L
+        personal_total = sum(float(e.amount or 0) for e in expenses if e.category == ExpenseCategory.PERSONAL)
+        if personal_total > 0:
+            addback_items.append({
+                "description": "Personal Expenses Through Business P&L",
+                "amount": personal_total,
+                "challenge": ChallengeLikelihood.MEDIUM.value,
+                "category": "personal",
+                "documented": False,
+                "notes": f"Aggregated from {sum(1 for e in expenses if e.category == ExpenseCategory.PERSONAL)} PERSONAL expense records"
+            })
+
+        # For the EBITDA recast, net_income = ebitda_ttm (proxy — no separate D&A/interest/tax data)
+        # We assume ebitda_ttm ≈ operating income (taxes and interest not separately tracked in CSV ingestion)
+        raw_inputs = {
+            "net_income": float(metrics.ebitda_ttm),  # proxy: treat proxy EBITDA as "reported" base
+            "da": 0,           # D&A not extractable from plain CSV; marked as 0
+            "interest": 0,     # Interest not extractable
+            "taxes": 0,        # Pass-through entity assumption
+            "market_rate_replacement_cost": float(market_rate),
+            "addback_items": addback_items,
+        }
+
+        recast = compute_ebitda_recast(metrics, raw_inputs)
+
+        return {
+            "company_id": company_id,
+            "reported_ebitda": float(recast.reported_ebitda),
+            "conservative_ebitda": float(recast.conservative_ebitda),
+            "base_ebitda": float(recast.base_ebitda),
+            "aggressive_ebitda": float(recast.aggressive_ebitda),
+            "defensible_ebitda": float(recast.defensible_ebitda),
+            "total_addbacks": float(recast.total_addbacks),
+            "addback_schedule": [
+                {
+                    "description": ab.description,
+                    "amount": float(ab.amount),
+                    "challenge": ab.challenge.value,
+                    "category": ab.category,
+                    "documented": ab.documented,
+                    "notes": ab.notes,
+                    # Challenge rating in plain English for advisor use
+                    "challenge_label": {
+                        "LOW": "Fully defensible — include in all scenarios",
+                        "MEDIUM": "Partially defensible — 50% in conservative, 100% in aggressive",
+                        "HIGH": "Challenged — excluded from conservative, flagged in aggressive",
+                        "NOT_DEFENSIBLE": "Remove — buyer will not accept",
+                    }.get(ab.challenge.value, ab.challenge.value),
+                }
+                for ab in recast.addbacks
+            ],
+            "data_notes": [
+                "D&A, interest, and income tax lines not extractable from CSV format. Add manually if QuickBooks P&L is available.",
+                f"Owner market-rate replacement set to ${float(market_rate):,.0f}/yr. Override for this client's role complexity.",
+                "Reported EBITDA = ebitda_ttm proxy (revenue minus COGS and OPEX from ontology).",
+            ],
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

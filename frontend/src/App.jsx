@@ -29,6 +29,7 @@ import DemoInitiativeImpact from './pages/InitiativeImpact'
 import DemoScenarioSimulator from './pages/ScenarioSimulator'
 import DemoDataRoom from './pages/DataRoom'
 import DemoReports from './pages/Reports'
+import DemoRiskHeatmap from './pages/RiskHeatmap'
 
 // Dashboard pages
 import Home from './pages/Home'
@@ -40,6 +41,7 @@ import BuyerLens from './pages/BuyerLens'
 import Valuation from './pages/Valuation'
 import ValueGap from './pages/ValueGap'
 import InitiativeImpact from './pages/InitiativeImpact'
+import RiskHeatmap from './pages/RiskHeatmap'
 import ScenarioSimulator from './pages/ScenarioSimulator'
 import Connectors from './pages/Connectors'
 import DataMapping from './pages/DataMapping'
@@ -105,6 +107,7 @@ export default function App() {
           <Route path="valuation"          element={<DemoValuation />} />
           <Route path="value-gap"          element={<DemoValueGap />} />
           <Route path="initiative-impact"  element={<DemoInitiativeImpact />} />
+          <Route path="risk-heatmap"       element={<DemoRiskHeatmap />} />
           <Route path="scenario-simulator" element={<DemoScenarioSimulator />} />
           <Route path="data-room"          element={<DemoDataRoom />} />
           <Route path="reports"            element={<DemoReports />} />
@@ -120,6 +123,7 @@ export default function App() {
           <Route path="valuation"          element={<DemoValuation />} />
           <Route path="value-gap"          element={<DemoValueGap />} />
           <Route path="initiative-impact"  element={<DemoInitiativeImpact />} />
+          <Route path="risk-heatmap"       element={<DemoRiskHeatmap />} />
           <Route path="scenario-simulator" element={<DemoScenarioSimulator />} />
           <Route path="data-room"          element={<DemoDataRoom />} />
           <Route path="reports"            element={<DemoReports />} />
@@ -150,6 +154,7 @@ export default function App() {
           <Route path="Valuation"         element={<Valuation />} />
           <Route path="ValueGap"          element={<ValueGap />} />
           <Route path="InitiativeImpact"  element={<InitiativeImpact />} />
+          <Route path="RiskHeatmap"       element={<RiskHeatmap />} />
           <Route path="ScenarioSimulator" element={<ScenarioSimulator />} />
           <Route path="Connectors"        element={<Connectors />} />
           <Route path="DataMapping"       element={<DataMapping />} />
