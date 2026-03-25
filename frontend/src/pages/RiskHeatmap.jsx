@@ -103,13 +103,13 @@ export default function RiskHeatmap() {
   const mediumCount   = questions.filter(q => q.severity === 'MEDIUM').length
 
   // Build per-category counts
-  const catCounts: Record<string, number> = {}
+  const catCounts = {}
   for (const q of questions) {
     catCounts[q.category] = (catCounts[q.category] ?? 0) + 1
   }
 
   // Build heatmap cell contents: cells[impactRow 0-2][urgencyCol 0-2] = list of questions
-  const cells: Record<string, Record<string, typeof questions>> = { 0: {}, 1: {}, 2: {} }
+  const cells = { 0: {}, 1: {}, 2: {} }
   for (let r = 0; r <= 2; r++) {
     for (let c = 0; c <= 2; c++) {
       cells[r][c] = []
