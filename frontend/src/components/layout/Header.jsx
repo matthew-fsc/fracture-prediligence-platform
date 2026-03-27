@@ -5,11 +5,11 @@ import { Bell, ChevronDown, Search, LogOut, Settings, Menu } from 'lucide-react'
 import CompanySwitcher from './CompanySwitcher'
 import CommandPalette from './CommandPalette'
 import { fmtM, cn } from '../../lib/utils'
-import { useUser, useClerk } from '@clerk/clerk-react'
+import { useUser, useClerk } from '@clerk/react'
 import { apiClient } from '../../lib/apiClient'
 import { toast } from '../../lib/notify'
 
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+const PUBLISHABLE_KEY = (import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim()
 
 // ---------------------------------------------------------------------------
 // Plan badge

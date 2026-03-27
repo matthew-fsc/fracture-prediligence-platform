@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth } from '@clerk/react'
 import { Navigate } from 'react-router-dom'
 
 const COLORS = { bg: '#0A1628', gold: '#C9973A', muted: '#8A9BB0' }

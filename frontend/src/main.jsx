@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { ClerkProvider } from '@clerk/clerk-react'
+import { ClerkProvider } from '@clerk/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import ClerkAuthBridge from './components/auth/ClerkAuthBridge.jsx'
@@ -9,7 +9,8 @@ import './index.css'
 import { ApiError } from './lib/apiClient'
 import { toast } from './lib/notify'
 
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+/** Trimmed — stray whitespace in .env breaks Clerk JS load. */
+const PUBLISHABLE_KEY = (import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim()
 
 function toastQueryError(err, query) {
   if (query?.meta?.suppressErrorToast) return
@@ -46,7 +47,12 @@ const root = ReactDOM.createRoot(document.getElementById('root'))
 if (PUBLISHABLE_KEY) {
   root.render(
     <React.StrictMode>
-      <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignInUrl="/Home" afterSignUpUrl="/dashboard/onboarding">
+      <ClerkProvider
+        publishableKey={PUBLISHABLE_KEY}
+        afterSignInUrl="/Home"
+        afterSignUpUrl="/dashboard/onboarding"
+        afterSignOutUrl="/"
+      >
         <ClerkAuthBridge>
           {appTree}
         </ClerkAuthBridge>

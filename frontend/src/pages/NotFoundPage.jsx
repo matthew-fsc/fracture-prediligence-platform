@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import { usePageTitle } from '../hooks/usePageTitle'
-
-const COLORS = { bg: '#0A1628', gold: '#C9973A', muted: '#8A9BB0', offWhite: '#F0EDE8', border: '#1E3A5F' }
+import { marketingColors as COLORS } from '../theme/marketingColors'
 
 export default function NotFoundPage() {
   usePageTitle('404 — Page Not Found')

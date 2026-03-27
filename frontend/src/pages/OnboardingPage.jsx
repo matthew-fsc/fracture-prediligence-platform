@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Cloud, CheckCircle, Circle } from 'lucide-react'
 import { useCompanyId } from '../context/CompanyContext'
 import { apiUrl } from '../lib/apiClient'
+import { marketingColors as COLORS } from '../theme/marketingColors'
 
 const ONBOARDING_STORAGE_KEY = 'fracture_onboarding_v1'
 
@@ -23,19 +24,9 @@ function writeOnboarding(patch) {
   }
 }
 
-const COLORS = {
-  bg: '#0A1628',
-  gold: '#C9973A',
-  lightGold: '#E8B96A',
-  offWhite: '#F0EDE8',
-  muted: '#8A9BB0',
-  card: '#0F2040',
-  border: '#1E3A5F',
-}
-
 const INPUT_STYLE = {
   width: '100%',
-  background: COLORS.bg,
+  background: COLORS.inputBg,
   border: `1px solid ${COLORS.border}`,
   borderRadius: 8,
   padding: '12px 14px',
@@ -306,7 +297,7 @@ function Step2({ onNext, onSkip }) {
           padding: '48px 24px',
           textAlign: 'center',
           cursor: 'pointer',
-          background: dragging ? 'rgba(201,151,58,0.05)' : COLORS.bg,
+          background: dragging ? 'rgba(201,151,58,0.05)' : COLORS.inputBg,
           transition: 'all 0.2s ease',
           marginBottom: 20,
         }}
@@ -513,7 +504,7 @@ function Step3({ onNext, onSkip }) {
               <button key={opt.value} type="button"
                 onClick={() => set('customer_contract_type', opt.value)}
                 style={{
-                  background: form.customer_contract_type === opt.value ? 'rgba(201,151,58,0.12)' : COLORS.bg,
+                  background: form.customer_contract_type === opt.value ? 'rgba(201,151,58,0.12)' : COLORS.inputBg,
                   border: `1px solid ${form.customer_contract_type === opt.value ? COLORS.gold : COLORS.border}`,
                   borderRadius: 8, padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
                   display: 'flex', alignItems: 'center', gap: 8,
@@ -550,7 +541,7 @@ function Step3({ onNext, onSkip }) {
               <button key={opt.value} type="button"
                 onClick={() => set('market_positioning', opt.value)}
                 style={{
-                  background: form.market_positioning === opt.value ? 'rgba(201,151,58,0.12)' : COLORS.bg,
+                  background: form.market_positioning === opt.value ? 'rgba(201,151,58,0.12)' : COLORS.inputBg,
                   border: `1px solid ${form.market_positioning === opt.value ? COLORS.gold : COLORS.border}`,
                   borderRadius: 8, padding: '10px 14px', cursor: 'pointer', textAlign: 'left',
                   display: 'flex', alignItems: 'center', gap: 10,

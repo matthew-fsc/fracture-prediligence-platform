@@ -1,4 +1,4 @@
-import { UserProfile } from '@clerk/clerk-react'
+import { UserProfile } from '@clerk/react'
 import { Link } from 'react-router-dom'
 import { usePageTitle } from '../hooks/usePageTitle'
 

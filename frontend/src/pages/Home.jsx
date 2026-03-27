@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   Network, Building2, Shield, Target, BarChart2,
   ArrowRight, Activity, ListChecks, Bot, ChevronRight,
-  Zap, Clock
+  Zap, Clock, Loader2,
 } from 'lucide-react'
-import { apiUrl } from '../lib/apiClient'
+import { apiUrl, apiClient } from '../lib/apiClient'
 import { cn, fmtM } from '../lib/utils'
 import { recentActivity } from '../lib/mockData'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -40,6 +41,15 @@ const quickActions = [
   { label: 'Open AI Copilot',           path: '/AICopilot',        color: 'text-primary' },
 ]
 
+function WorkspaceLoading({ label = 'Loading workspace…' }) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3 text-muted-foreground">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <p className="text-sm">{label}</p>
+    </div>
+  )
+}
+
 export default function Home() {
   const navigate = useNavigate()
   const companyId = useCompanyId()
@@ -47,20 +57,61 @@ export default function Home() {
   const [bqData, setBqData] = useState(null)
   const [gapData, setGapData] = useState(null)
 
+  const { data: companies = [], isLoading: companiesLoading } = useQuery({
+    queryKey: ['companies'],
+    queryFn: () => apiClient.get('/api/companies'),
+  })
+
   useEffect(() => {
-    fetch(apiUrl(`/api/analytics/scores/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
-      .then(setLiveData)
-      .catch(() => {})
-    fetch(apiUrl(`/api/analytics/buyer-questions/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
-      .then(setBqData)
-      .catch(() => {})
-    fetch(apiUrl(`/api/analytics/value-gap/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
-      .then(setGapData)
-      .catch(() => {})
+    if (companyId == null) {
+      setLiveData(null)
+      setBqData(null)
+      setGapData(null)
+      return
+    }
+    let cancelled = false
+    setLiveData(null)
+    setBqData(null)
+    setGapData(null)
+    Promise.all([
+      fetch(apiUrl(`/api/analytics/scores/${companyId}`)).then((r) => (r.ok ? r.json() : null)),
+      fetch(apiUrl(`/api/analytics/buyer-questions/${companyId}`)).then((r) => (r.ok ? r.json() : null)),
+      fetch(apiUrl(`/api/analytics/value-gap/${companyId}`)).then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([scores, buyer, gap]) => {
+        if (cancelled) return
+        setLiveData(scores)
+        setBqData(buyer)
+        setGapData(gap)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLiveData(null)
+          setBqData(null)
+          setGapData(null)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
   }, [companyId])
+
+  if (companyId == null) {
+    if (companiesLoading) {
+      return <WorkspaceLoading />
+    }
+    if (companies.length === 0) {
+      return (
+        <div className="rounded-xl border border-border bg-card p-8 text-center max-w-lg mx-auto">
+          <p className="text-foreground font-medium">No clients yet</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Create a client from the company menu in the header to see your dashboard.
+          </p>
+        </div>
+      )
+    }
+    return <WorkspaceLoading label="Preparing workspace…" />
+  }
 
   const drs       = liveData?.drs?.base ?? 0
   const currentEV  = liveData?.enterprise_value?.midpoint ?? 0

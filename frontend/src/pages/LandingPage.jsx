@@ -1,15 +1,9 @@
 import { Link } from 'react-router-dom'
+import { Show, SignInButton, SignUpButton } from '@clerk/react'
 import { AlertTriangle, Clock, BarChart3, FolderOpen, TrendingUp, FileText, CheckSquare } from 'lucide-react'
+import { marketingColors as COLORS } from '../theme/marketingColors'
 
-const COLORS = {
-  bg: '#0C0E12',
-  gold: '#C9973A',
-  lightGold: '#E8B96A',
-  offWhite: '#E8EAED',
-  muted: '#6C7585',
-  card: '#15181E',
-  border: '#212630',
-}
+const HAS_CLERK = Boolean((import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim())
 
 // ---------------------------------------------------------------------------
 // Nav
@@ -33,23 +27,82 @@ function Nav() {
           </span>
         </div>
 
-        {/* Right nav */}
+        {/* Right nav — Clerk prebuilt buttons when configured; plain links otherwise */}
         <div className="flex items-center gap-4 sm:gap-6">
-          <Link
-            to="/sign-in"
-            style={{
-              color: COLORS.offWhite,
-              fontFamily: "'DM Sans', sans-serif",
-              fontSize: 14,
-              fontWeight: 500,
-              textDecoration: 'none',
-              padding: '8px 14px',
-              borderRadius: 8,
-              border: `1px solid ${COLORS.border}`,
-            }}
-          >
-            Log in
-          </Link>
+          {HAS_CLERK ? (
+            <>
+              <Show when="signed-out">
+                <SignInButton
+                  mode="redirect"
+                  forceRedirectUrl="/Home"
+                  style={{
+                    color: COLORS.offWhite,
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: `1px solid ${COLORS.border}`,
+                    background: 'transparent',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Log in
+                </SignInButton>
+                <SignUpButton
+                  mode="redirect"
+                  forceRedirectUrl="/dashboard/onboarding"
+                  style={{
+                    color: COLORS.bg,
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: COLORS.gold,
+                    cursor: 'pointer',
+                    marginLeft: 8,
+                  }}
+                >
+                  Sign up
+                </SignUpButton>
+              </Show>
+              <Show when="signed-in">
+                <Link
+                  to="/Home"
+                  style={{
+                    color: COLORS.offWhite,
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    textDecoration: 'none',
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: `1px solid ${COLORS.border}`,
+                  }}
+                >
+                  Dashboard
+                </Link>
+              </Show>
+            </>
+          ) : (
+            <Link
+              to="/sign-in"
+              style={{
+                color: COLORS.offWhite,
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 14,
+                fontWeight: 500,
+                textDecoration: 'none',
+                padding: '8px 14px',
+                borderRadius: 8,
+                border: `1px solid ${COLORS.border}`,
+              }}
+            >
+              Log in
+            </Link>
+          )}
           <Link
             to="/demo"
             style={{ color: COLORS.gold, fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 500, textDecoration: 'none' }}
