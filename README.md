@@ -83,16 +83,13 @@ prediligence-platform/
 │   │   ├── ingestion/          # Blueprint I: P1–P11
 │   │   ├── analytics/          # Blueprint II: A1–A14
 │   │   ├── ontology/           # Data models & schema
-│   │   └── core/               # Config, DB, auth
-│   ├── tests/
+│   │   ├── services/           # Service orchestration layer
+│   │   └── core/               # Config, DB, auth, scoring rules
+│   ├── tests/                  # Pytest baseline coverage
 │   ├── requirements.txt
 │   └── alembic/                # DB migrations
 │
-├── docs/
-│   ├── blueprint-i-ingestion.md
-│   ├── blueprint-ii-analytics.md
-│   └── ui-spec.md
-│
+├── .github/workflows/          # CI (lint/build/tests)
 ├── ROADMAP.md
 └── README.md
 ```

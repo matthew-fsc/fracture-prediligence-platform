@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 
 from app.api.routes import ingestion, analytics, companies, reports, demo
 from app.api.routes import payments, webhooks
+from app.core.config import settings
 from app.core.database import engine, SessionLocal, Base
 
 FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
@@ -49,7 +50,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

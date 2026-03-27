@@ -18,16 +18,13 @@ from fpdf import FPDF
 from sqlalchemy.orm import Session
 
 from app.analytics.a1_metric_computation import compute_metrics
-from app.analytics.a3_revenue_quality import compute_revenue_quality
-from app.analytics.a4_operational_independence import compute_operational_independence
-from app.analytics.a5_customer_risk import compute_customer_risk
-from app.analytics.a6_management_team import compute_management_team
-from app.analytics.a7_growth_drivers import compute_growth_drivers
-from app.analytics.a8_financial_integrity import compute_financial_integrity
 from app.analytics.a9_drs_composite import CategoryScores, compute_drs
 from app.analytics.a10_enterprise_value import compute_enterprise_value
 from app.analytics.a11_value_gap import compute_value_gap
 from app.analytics.a13_buyer_questions import generate_buyer_questions
+from app.core.config import settings
+from app.core.scoring_rules import SCORING_RULES
+from app.services.analytics_service import compute_category_modules
 
 
 # ── Color palette ──────────────────────────────────────────────────────────────
@@ -176,12 +173,13 @@ class _BasePDF(FPDF):
 # ── Report: DRS Summary ────────────────────────────────────────────────────────
 
 def _build_drs_summary(pdf: _BasePDF, company_id: int, db: Session):
-    rev    = compute_revenue_quality(company_id, db)
-    ops    = compute_operational_independence(company_id, db)
-    cust   = compute_customer_risk(company_id, db)
-    mgmt   = compute_management_team(company_id, db)
-    growth = compute_growth_drivers(company_id, db)
-    fin    = compute_financial_integrity(company_id, db)
+    modules = compute_category_modules(company_id, db)
+    rev = modules["revenue_quality"]
+    ops = modules["operational_independence"]
+    cust = modules["customer_risk"]
+    mgmt = modules["management_team"]
+    growth = modules["growth_drivers"]
+    fin = modules["financial_integrity"]
     metrics = compute_metrics(company_id, db)
 
     cat = CategoryScores(
@@ -231,7 +229,14 @@ def _build_drs_summary(pdf: _BasePDF, company_id: int, db: Session):
         ("Management & Team",        mgmt.composite,   mgmt.data_confidence),
         ("Growth Drivers",           growth.composite, growth.data_confidence),
     ]
-    weights = [0.25, 0.20, 0.20, 0.15, 0.10, 0.10]
+    weights = [
+        SCORING_RULES.category_weights["revenue_quality"],
+        SCORING_RULES.category_weights["financial_integrity"],
+        SCORING_RULES.category_weights["operational_independence"],
+        SCORING_RULES.category_weights["customer_risk"],
+        SCORING_RULES.category_weights["management_team"],
+        SCORING_RULES.category_weights["growth_drivers"],
+    ]
 
     for i, ((label, score, conf), w) in enumerate(zip(cats, weights)):
         y = pdf.get_y()
@@ -259,8 +264,8 @@ def _build_drs_summary(pdf: _BasePDF, company_id: int, db: Session):
         "management_team":          mgmt.composite,
         "growth_drivers":           growth.composite,
     })
-    critical = [q for q in questions if q.severity == "CRITICAL"][:3]
-    high     = [q for q in questions if q.severity == "HIGH"][:3]
+    critical = [q for q in questions if q.severity == "CRITICAL"][: settings.REPORT_TOP_CRITICAL_COUNT]
+    high = [q for q in questions if q.severity == "HIGH"][: settings.REPORT_TOP_HIGH_COUNT]
 
     if critical or high:
         pdf.section_title("Top Due Diligence Risks")
@@ -291,7 +296,7 @@ def _build_drs_summary(pdf: _BasePDF, company_id: int, db: Session):
         float(metrics.ebitda_ttm),
     )
 
-    for i, gap in enumerate(gaps_result.gaps[:5], 1):
+    for i, gap in enumerate(gaps_result.gaps[: settings.REPORT_IMMEDIATE_ACTION_COUNT], 1):
         y = pdf.get_y()
         if i % 2 == 1:
             pdf.set_fill_color(250, 250, 252)
@@ -319,12 +324,13 @@ def _build_drs_summary(pdf: _BasePDF, company_id: int, db: Session):
 # ── Report: Value Gap ──────────────────────────────────────────────────────────
 
 def _build_value_gap(pdf: _BasePDF, company_id: int, db: Session):
-    rev    = compute_revenue_quality(company_id, db)
-    ops    = compute_operational_independence(company_id, db)
-    cust   = compute_customer_risk(company_id, db)
-    mgmt   = compute_management_team(company_id, db)
-    growth = compute_growth_drivers(company_id, db)
-    fin    = compute_financial_integrity(company_id, db)
+    modules = compute_category_modules(company_id, db)
+    rev = modules["revenue_quality"]
+    ops = modules["operational_independence"]
+    cust = modules["customer_risk"]
+    mgmt = modules["management_team"]
+    growth = modules["growth_drivers"]
+    fin = modules["financial_integrity"]
     metrics = compute_metrics(company_id, db)
 
     cat_scores = {
@@ -430,12 +436,13 @@ def _build_value_gap(pdf: _BasePDF, company_id: int, db: Session):
 # ── Report: Buyer Preparation Package ─────────────────────────────────────────
 
 def _build_buyer_prep(pdf: _BasePDF, company_id: int, db: Session):
-    rev    = compute_revenue_quality(company_id, db)
-    ops    = compute_operational_independence(company_id, db)
-    cust   = compute_customer_risk(company_id, db)
-    mgmt   = compute_management_team(company_id, db)
-    growth = compute_growth_drivers(company_id, db)
-    fin    = compute_financial_integrity(company_id, db)
+    modules = compute_category_modules(company_id, db)
+    rev = modules["revenue_quality"]
+    ops = modules["operational_independence"]
+    cust = modules["customer_risk"]
+    mgmt = modules["management_team"]
+    growth = modules["growth_drivers"]
+    fin = modules["financial_integrity"]
 
     cat_scores = {
         "revenue_quality":          rev.composite,

@@ -3,6 +3,7 @@ import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
 import { TrendingDown, TrendingUp, Activity, UserMinus, Shield, User } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { apiClient } from '../lib/apiClient'
 
 const COMPANY_ID = 1
 
@@ -40,8 +41,8 @@ export default function ScenarioSimulator() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/analytics/metrics/${COMPANY_ID}`).then(r => r.ok ? r.json() : null),
-      fetch(`/api/analytics/scores/${COMPANY_ID}`).then(r => r.ok ? r.json() : null),
+      apiClient.get(`/api/analytics/metrics/${COMPANY_ID}`),
+      apiClient.get(`/api/analytics/scores/${COMPANY_ID}`),
     ]).then(([metrics, scores]) => {
       if (!metrics || !scores) return
       const ev = scores.enterprise_value

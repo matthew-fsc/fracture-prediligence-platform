@@ -4,7 +4,6 @@ POST /api/create-checkout  (requires Clerk auth)
 GET  /api/user/subscription (requires Clerk auth)
 """
 
-import os
 from typing import Optional
 
 import stripe
@@ -14,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.db_functions import get_user_subscription
+from app.core.config import settings
 from app.middleware.auth import CurrentUser, get_current_user
 
 router = APIRouter()
@@ -22,14 +22,14 @@ router = APIRouter()
 # Stripe config
 # ---------------------------------------------------------------------------
 
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+FRONTEND_URL = settings.FRONTEND_URL
 
 PRICE_IDS: dict[str, Optional[str]] = {
-    "founding": os.getenv("STRIPE_FOUNDING_PRICE_ID"),
-    "pro":      os.getenv("STRIPE_PRO_PRICE_ID"),
-    "team":     os.getenv("STRIPE_TEAM_PRICE_ID"),
+    "founding": settings.STRIPE_FOUNDING_PRICE_ID,
+    "pro": settings.STRIPE_PRO_PRICE_ID,
+    "team": settings.STRIPE_TEAM_PRICE_ID,
 }
 
 

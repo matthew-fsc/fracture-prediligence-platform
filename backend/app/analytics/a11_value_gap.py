@@ -18,16 +18,16 @@ Gap formula:
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Optional
 
 from app.analytics.a9_drs_composite import CategoryScores, compute_drs, WEIGHTS
+from app.core.scoring_rules import SCORING_RULES
 
 
 # Target score for a "resolved" category (investment grade threshold)
-_TARGET_SCORE = 80.0
+_TARGET_SCORE = SCORING_RULES.value_gap_target_score
 
 # DRS-to-multiple anchors: (drs, midpoint_multiple)
-_DRS_MULTIPLE_ANCHORS = [(0, 2.0), (40, 3.0), (55, 4.25), (70, 6.0), (85, 8.0), (100, 9.0)]
+_DRS_MULTIPLE_ANCHORS = SCORING_RULES.drs_multiple_anchors
 
 
 def _drs_to_multiple(drs: float) -> float:
@@ -46,12 +46,12 @@ def _continuous_ev_mid(drs: float, ebitda: float) -> float:
 
 # Category display metadata
 CATEGORY_META = {
-    "revenue_quality":          {"label": "Revenue Quality",          "weight": 0.25},
-    "financial_integrity":      {"label": "Financial Integrity",      "weight": 0.20},
-    "operational_independence": {"label": "Operational Independence", "weight": 0.20},
-    "customer_risk":            {"label": "Customer Risk",            "weight": 0.15},
-    "management_team":          {"label": "Management & Team",        "weight": 0.10},
-    "growth_drivers":           {"label": "Growth Drivers",           "weight": 0.10},
+    "revenue_quality": {"label": "Revenue Quality", "weight": WEIGHTS["revenue_quality"]},
+    "financial_integrity": {"label": "Financial Integrity", "weight": WEIGHTS["financial_integrity"]},
+    "operational_independence": {"label": "Operational Independence", "weight": WEIGHTS["operational_independence"]},
+    "customer_risk": {"label": "Customer Risk", "weight": WEIGHTS["customer_risk"]},
+    "management_team": {"label": "Management & Team", "weight": WEIGHTS["management_team"]},
+    "growth_drivers": {"label": "Growth Drivers", "weight": WEIGHTS["growth_drivers"]},
 }
 
 

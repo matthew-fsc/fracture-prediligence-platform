@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { usePageTitle } from '../hooks/usePageTitle'
+import { apiRequest } from '../lib/apiClient'
 
 const COLORS = {
   bg: '#0A1628', gold: '#C9973A', lightGold: '#E8B96A', offWhite: '#F0EDE8',
@@ -66,7 +67,7 @@ const TIERS = [
 // Checkout handler
 // ---------------------------------------------------------------------------
 async function startCheckout(tierId, userEmail) {
-  const res = await fetch('/api/create-checkout', {
+  const data = await apiRequest('/api/create-checkout', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -75,13 +76,7 @@ async function startCheckout(tierId, userEmail) {
     },
     body: JSON.stringify({ tier: tierId, email: userEmail }),
   })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Checkout failed' }))
-    throw new Error(err.detail || 'Checkout failed')
-  }
-
-  const { checkout_url } = await res.json()
+  const { checkout_url } = data
   window.location.href = checkout_url
 }
 

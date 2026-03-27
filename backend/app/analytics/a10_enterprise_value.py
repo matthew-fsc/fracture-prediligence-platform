@@ -10,15 +10,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from app.analytics.a9_drs_composite import DRSTier
+from app.core.scoring_rules import SCORING_RULES
 
 
 # Multiple ranges by DRS tier and industry (professional services baseline)
 MULTIPLE_TABLE: dict[DRSTier, tuple[float, float]] = {
-    DRSTier.INSTITUTIONAL:  (7.0, 9.0),
-    DRSTier.INVESTMENT:     (5.0, 7.0),
-    DRSTier.CONDITIONAL:    (3.5, 5.0),
-    DRSTier.HIGH_RISK:      (2.5, 3.5),
-    DRSTier.PRE_DILIGENCE:  (2.5, 3.0),
+    DRSTier[key]: value for key, value in SCORING_RULES.enterprise_multiples.items()
 }
 
 

@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header'
+import { apiClient } from '../../lib/apiClient'
 
 export default function AppShell() {
   const [liveScores, setLiveScores] = useState(null)
 
   useEffect(() => {
-    fetch('/api/analytics/scores/1')
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get('/api/analytics/scores/1')
       .then(d => setLiveScores(d))
       .catch(() => {})
   }, [])

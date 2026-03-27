@@ -19,7 +19,10 @@ from app.analytics.a9_drs_composite import CategoryScores, compute_drs
 from app.analytics.a10_enterprise_value import compute_enterprise_value
 from app.analytics.a11_value_gap import compute_value_gap
 from app.analytics.a13_buyer_questions import generate_buyer_questions
+from app.core.config import settings
+from app.core.scoring_rules import SCORING_RULES, SCORING_RULES_VERSION
 from app.ontology.models import AdvisorOverride, QualitativeInputs, AddbackOverride
+from app.services.analytics_service import compute_category_modules
 
 router = APIRouter()
 
@@ -34,11 +37,10 @@ VALID_CATEGORIES = {
 # ---------------------------------------------------------------------------
 
 def _qual_owner_hours_score(hours: float) -> float:
-    if hours <= 5:  return 90.0
-    if hours <= 15: return 75.0
-    if hours <= 25: return 55.0
-    if hours <= 40: return 35.0
-    return 10.0
+    for threshold, score in SCORING_RULES.qual_owner_hours_thresholds:
+        if hours <= threshold:
+            return score
+    return SCORING_RULES.qual_owner_hours_thresholds[-1][1]
 
 def _qual_sop_score(pct: float) -> float:
     if pct >= 80: return 90.0
@@ -65,11 +67,10 @@ def _qual_mgmt_depth_score(qualified: int, total: int) -> float:
 def _qual_pipeline_score(pipeline_value: float, ttm_revenue: float) -> float:
     if ttm_revenue <= 0: return 40.0
     ratio = pipeline_value / ttm_revenue
-    if ratio >= 1.5:  return 95.0
-    if ratio >= 1.0:  return 80.0
-    if ratio >= 0.5:  return 60.0
-    if ratio >= 0.25: return 40.0
-    return 20.0
+    for threshold, score in SCORING_RULES.qual_pipeline_ratio_thresholds:
+        if ratio >= threshold:
+            return score
+    return SCORING_RULES.qual_pipeline_ratio_thresholds[-1][1]
 
 def _qual_market_pos_score(positioning: str) -> float:
     return {"defined": 80.0, "moderate": 45.0, "undifferentiated": 10.0}.get(positioning, 45.0)
@@ -116,12 +117,13 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
     Returns raw scores, adjusted scores, DRS composite (A9), and enterprise value (A10).
     """
     try:
-        rev    = compute_revenue_quality(company_id, db)
-        ops    = compute_operational_independence(company_id, db)
-        cust   = compute_customer_risk(company_id, db)
-        mgmt   = compute_management_team(company_id, db)
-        growth = compute_growth_drivers(company_id, db)
-        fin    = compute_financial_integrity(company_id, db)
+        modules = compute_category_modules(company_id, db)
+        rev = modules["revenue_quality"]
+        ops = modules["operational_independence"]
+        cust = modules["customer_risk"]
+        mgmt = modules["management_team"]
+        growth = modules["growth_drivers"]
+        fin = modules["financial_integrity"]
 
         # --- P2: Apply qualitative inputs to ops and growth where available ---
         qual = db.query(QualitativeInputs).filter(
@@ -243,18 +245,18 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
             customer_risk=adj_scores["customer_risk"],
             management_team=adj_scores["management_team"],
             growth_drivers=adj_scores["growth_drivers"],
-            revenue_quality_conservative=adj_scores["revenue_quality"] * (0.9 if rev.data_confidence == "LOW" else 1.0),
-            financial_integrity_conservative=adj_scores["financial_integrity"] * (0.9 if fin.data_confidence == "LOW" else 1.0),
-            operational_independence_conservative=adj_scores["operational_independence"] * (0.9 if ops.data_confidence == "LOW" else 1.0),
-            customer_risk_conservative=adj_scores["customer_risk"] * (0.9 if cust.data_confidence == "LOW" else 1.0),
-            management_team_conservative=adj_scores["management_team"] * (0.9 if mgmt.data_confidence == "LOW" else 1.0),
-            growth_drivers_conservative=adj_scores["growth_drivers"] * (0.9 if growth.data_confidence == "LOW" else 1.0),
-            revenue_quality_optimistic=min(100, adj_scores["revenue_quality"] * (1.05 if rev.data_confidence == "LOW" else 1.0)),
-            financial_integrity_optimistic=min(100, adj_scores["financial_integrity"] * (1.05 if fin.data_confidence == "LOW" else 1.0)),
-            operational_independence_optimistic=min(100, adj_scores["operational_independence"] * (1.05 if ops.data_confidence == "LOW" else 1.0)),
-            customer_risk_optimistic=min(100, adj_scores["customer_risk"] * (1.05 if cust.data_confidence == "LOW" else 1.0)),
-            management_team_optimistic=min(100, adj_scores["management_team"] * (1.05 if mgmt.data_confidence == "LOW" else 1.0)),
-            growth_drivers_optimistic=min(100, adj_scores["growth_drivers"] * (1.05 if growth.data_confidence == "LOW" else 1.0)),
+            revenue_quality_conservative=adj_scores["revenue_quality"] * (settings.DRS_CONFIDENCE_LOW_MULTIPLIER if rev.data_confidence == "LOW" else 1.0),
+            financial_integrity_conservative=adj_scores["financial_integrity"] * (settings.DRS_CONFIDENCE_LOW_MULTIPLIER if fin.data_confidence == "LOW" else 1.0),
+            operational_independence_conservative=adj_scores["operational_independence"] * (settings.DRS_CONFIDENCE_LOW_MULTIPLIER if ops.data_confidence == "LOW" else 1.0),
+            customer_risk_conservative=adj_scores["customer_risk"] * (settings.DRS_CONFIDENCE_LOW_MULTIPLIER if cust.data_confidence == "LOW" else 1.0),
+            management_team_conservative=adj_scores["management_team"] * (settings.DRS_CONFIDENCE_LOW_MULTIPLIER if mgmt.data_confidence == "LOW" else 1.0),
+            growth_drivers_conservative=adj_scores["growth_drivers"] * (settings.DRS_CONFIDENCE_LOW_MULTIPLIER if growth.data_confidence == "LOW" else 1.0),
+            revenue_quality_optimistic=min(100, adj_scores["revenue_quality"] * (settings.DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER if rev.data_confidence == "LOW" else 1.0)),
+            financial_integrity_optimistic=min(100, adj_scores["financial_integrity"] * (settings.DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER if fin.data_confidence == "LOW" else 1.0)),
+            operational_independence_optimistic=min(100, adj_scores["operational_independence"] * (settings.DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER if ops.data_confidence == "LOW" else 1.0)),
+            customer_risk_optimistic=min(100, adj_scores["customer_risk"] * (settings.DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER if cust.data_confidence == "LOW" else 1.0)),
+            management_team_optimistic=min(100, adj_scores["management_team"] * (settings.DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER if mgmt.data_confidence == "LOW" else 1.0)),
+            growth_drivers_optimistic=min(100, adj_scores["growth_drivers"] * (settings.DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER if growth.data_confidence == "LOW" else 1.0)),
         )
         drs = compute_drs(cat)
 
@@ -293,6 +295,7 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
                 "ebitda_base":   float(ebitda_dec),
                 "source_citation": f"IBBA Market Pulse Q1 2025, Business Services, $1M–$5M EBITDA — Tier: {drs.tier.value}",
             },
+            "rules": {"version": SCORING_RULES_VERSION, "category_weights": SCORING_RULES.category_weights},
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -338,12 +341,13 @@ def get_financial_integrity(company_id: int, db: Session = Depends(get_db)):
 def get_value_gap(company_id: int, db: Session = Depends(get_db)):
     """A11: Value gap analysis — current EV vs potential EV if gaps resolved."""
     try:
-        rev    = compute_revenue_quality(company_id, db)
-        ops    = compute_operational_independence(company_id, db)
-        cust   = compute_customer_risk(company_id, db)
-        mgmt   = compute_management_team(company_id, db)
-        growth = compute_growth_drivers(company_id, db)
-        fin    = compute_financial_integrity(company_id, db)
+        modules = compute_category_modules(company_id, db)
+        rev = modules["revenue_quality"]
+        ops = modules["operational_independence"]
+        cust = modules["customer_risk"]
+        mgmt = modules["management_team"]
+        growth = modules["growth_drivers"]
+        fin = modules["financial_integrity"]
         metrics = compute_metrics(company_id, db)
 
         cat_scores = {
@@ -367,12 +371,13 @@ def get_value_gap(company_id: int, db: Session = Depends(get_db)):
 def get_buyer_questions(company_id: int, db: Session = Depends(get_db)):
     """A13: Generate prioritized buyer due diligence questions from DRS weaknesses."""
     try:
-        rev    = compute_revenue_quality(company_id, db)
-        ops    = compute_operational_independence(company_id, db)
-        cust   = compute_customer_risk(company_id, db)
-        mgmt   = compute_management_team(company_id, db)
-        growth = compute_growth_drivers(company_id, db)
-        fin    = compute_financial_integrity(company_id, db)
+        modules = compute_category_modules(company_id, db)
+        rev = modules["revenue_quality"]
+        ops = modules["operational_independence"]
+        cust = modules["customer_risk"]
+        mgmt = modules["management_team"]
+        growth = modules["growth_drivers"]
+        fin = modules["financial_integrity"]
 
         cat_scores = {
             "revenue_quality":          rev.composite,

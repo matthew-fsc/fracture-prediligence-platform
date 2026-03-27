@@ -15,7 +15,6 @@ Environment variables:
     SECRET_KEY      — fallback HS256 secret for local dev (when CLERK_JWKS_URL is empty)
 """
 
-import os
 import time
 from typing import Optional
 
@@ -23,16 +22,17 @@ import httpx
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
+from app.core.config import settings
 
-CLERK_JWKS_URL: str = os.getenv("CLERK_JWKS_URL", "")
-SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret")
+CLERK_JWKS_URL: str = settings.CLERK_JWKS_URL
+SECRET_KEY: str = settings.SECRET_KEY
 
 # ---------------------------------------------------------------------------
 # JWKS in-memory cache (refreshed every hour)
 # ---------------------------------------------------------------------------
 _jwks_keys: list = []
 _jwks_fetched_at: float = 0.0
-_JWKS_TTL: float = 3600.0
+_JWKS_TTL: float = settings.AUTH_JWKS_TTL_SECONDS
 
 security = HTTPBearer(auto_error=False)
 
@@ -45,7 +45,7 @@ async def _get_jwks_keys() -> list:
     if not CLERK_JWKS_URL:
         return []
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=settings.AUTH_JWKS_TIMEOUT_SECONDS) as client:
             resp = await client.get(CLERK_JWKS_URL)
             resp.raise_for_status()
             data = resp.json()

@@ -3,30 +3,23 @@ Demo routes — Meridian Consulting Group demo data, personalized demo links,
 spots-remaining counter, and admin link management.
 """
 
-import random
-import string
-from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
-from app.ontology.models import DemoLink
+from app.services import demo_service
 
 router = APIRouter()
-
-# ---------------------------------------------------------------------------
-# Hardcoded admin key — in production this would be an env var
-# ---------------------------------------------------------------------------
-ADMIN_API_KEY = "fs-admin-2026"
 
 # ---------------------------------------------------------------------------
 # Spots remaining — module-level mutable state
 # ---------------------------------------------------------------------------
 _spots_remaining = 18
-TOTAL_SPOTS = 20
+TOTAL_SPOTS = settings.DEMO_TOTAL_SPOTS
 
 # ---------------------------------------------------------------------------
 # Static demo data — Meridian Consulting Group (mirrors company_id=1 sandbox)
@@ -304,15 +297,11 @@ DEMO_DATA = {
 # ---------------------------------------------------------------------------
 
 def _check_admin_key(x_admin_key: Optional[str] = Header(default=None)):
-    if x_admin_key != ADMIN_API_KEY:
+    if not settings.ADMIN_API_KEY:
+        raise HTTPException(status_code=503, detail="Admin API key is not configured")
+    if x_admin_key != settings.ADMIN_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing X-Admin-Key header")
     return x_admin_key
-
-
-def _generate_slug(recipient_name: str) -> str:
-    name_part = recipient_name.lower().replace(" ", "-")[:20]
-    rand_part = "".join(random.choices(string.ascii_lowercase + string.digits, k=5))
-    return f"{name_part}-{rand_part}"
 
 
 # ---------------------------------------------------------------------------
@@ -350,26 +339,13 @@ def create_demo_link(
     _: str = Depends(_check_admin_key),
 ):
     """Create a personalized demo link for a specific recipient."""
-    slug = _generate_slug(body.recipient_name)
-
-    # Ensure slug uniqueness — retry up to 5 times
-    for _ in range(5):
-        existing = db.query(DemoLink).filter(DemoLink.slug == slug).first()
-        if not existing:
-            break
-        slug = _generate_slug(body.recipient_name)
-
-    link = DemoLink(
-        slug=slug,
+    link = demo_service.create_demo_link(
+        db=db,
         recipient_name=body.recipient_name,
         recipient_firm=body.recipient_firm,
         recipient_email=body.recipient_email,
         sender_note=body.sender_note,
-        created_at=datetime.utcnow(),
     )
-    db.add(link)
-    db.commit()
-    db.refresh(link)
 
     return {
         "id": link.id,
@@ -386,16 +362,7 @@ def create_demo_link(
 @router.get("/demo/{slug}")
 def get_personalized_demo(slug: str, db: Session = Depends(get_db)):
     """Return demo data personalized for the specific recipient link."""
-    link = db.query(DemoLink).filter(DemoLink.slug == slug).first()
-    if not link:
-        raise HTTPException(status_code=404, detail="Demo link not found")
-
-    now = datetime.utcnow()
-    link.visit_count = (link.visit_count or 0) + 1
-    if link.first_visited_at is None:
-        link.first_visited_at = now
-    link.last_visited_at = now
-    db.commit()
+    link = demo_service.get_personalized_demo(db, slug)
 
     return {
         "personalized": {
@@ -410,20 +377,8 @@ def get_personalized_demo(slug: str, db: Session = Depends(get_db)):
 @router.post("/demo/{slug}/track")
 def track_section(slug: str, body: dict, db: Session = Depends(get_db)):
     """Track which section a visitor viewed. Body: { section: str }"""
-    import json as _json
-    link = db.query(DemoLink).filter(DemoLink.slug == slug).first()
-    if not link:
-        return {"status": "ok"}  # silent — don't 404 on tracking calls
-
     section = body.get("section", "")
-    if section:
-        existing: list = _json.loads(link.sections_viewed or "[]")
-        if section not in existing:
-            existing.append(section)
-            link.sections_viewed = _json.dumps(existing)
-        link.last_visited_at = datetime.utcnow()
-        db.commit()
-
+    demo_service.track_section_view(db, slug, section)
     return {"status": "ok"}
 
 
@@ -433,7 +388,7 @@ def list_demo_links(
     _: str = Depends(_check_admin_key),
 ):
     """Return all demo links ordered by created_at descending."""
-    links = db.query(DemoLink).order_by(DemoLink.created_at.desc()).all()
+    links = demo_service.list_demo_links(db)
     return [
         {
             "id": lnk.id,

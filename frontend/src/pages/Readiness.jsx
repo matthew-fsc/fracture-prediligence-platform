@@ -4,10 +4,11 @@ import { cn } from '../lib/utils'
 import { AlertTriangle, ChevronDown, ChevronRight, Edit2, Check, X, Info } from 'lucide-react'
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import { Skeleton } from '../components/ui/Skeleton'
+import { apiClient } from '../lib/apiClient'
 
 const COMPANY_ID = 1
 
-const CATEGORY_META = {
+const DEFAULT_CATEGORY_META = {
   revenue_quality:          { label: 'Revenue Quality',          weight: 25, abbr: 'Revenue' },
   financial_integrity:      { label: 'Financial Integrity',      weight: 20, abbr: 'Financial' },
   operational_independence: { label: 'Operational Independence', weight: 20, abbr: 'Operations' },
@@ -123,18 +124,14 @@ function OverridePanel({ catKey, rawScore, adjScore, override, onSave, onDelete 
     if (!rationale.trim()) return
     setSaving(true)
     try {
-      await fetch(`/api/analytics/overrides/${COMPANY_ID}/${catKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adjustment: adj, rationale }),
-      })
+      await apiClient.post(`/api/analytics/overrides/${COMPANY_ID}/${catKey}`, { adjustment: adj, rationale })
       onSave()
       setEditing(false)
     } finally { setSaving(false) }
   }
 
   const handleDelete = async () => {
-    await fetch(`/api/analytics/overrides/${COMPANY_ID}/${catKey}`, { method: 'DELETE' })
+    await apiClient.del(`/api/analytics/overrides/${COMPANY_ID}/${catKey}`)
     onDelete()
     setEditing(false)
     setAdj(0)
@@ -309,12 +306,10 @@ export default function Readiness() {
   const reload = () => setRefresh(r => r + 1)
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${COMPANY_ID}`)
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get(`/api/analytics/scores/${COMPANY_ID}`)
       .then(setData)
       .catch(() => {})
-    fetch(`/api/analytics/overrides/${COMPANY_ID}`)
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get(`/api/analytics/overrides/${COMPANY_ID}`)
       .then(d => {
         if (!d) return
         const map = {}
@@ -358,7 +353,14 @@ export default function Readiness() {
     ? 'border-amber-500/20 bg-amber-500/10 text-amber-400'
     : 'border-red-500/20 bg-red-500/10 text-red-400'
 
-  const breakdown = Object.entries(CATEGORY_META).map(([key, meta]) => {
+  const rulesWeights = data?.rules?.category_weights ?? {}
+  const categoryMeta = Object.fromEntries(
+    Object.entries(DEFAULT_CATEGORY_META).map(([key, meta]) => [
+      key,
+      { ...meta, weight: Math.round((rulesWeights[key] ?? meta.weight / 100) * 100) },
+    ]),
+  )
+  const breakdown = Object.entries(categoryMeta).map(([key, meta]) => {
     const score = cats[key]?.composite ?? 0
     const weighted = score * meta.weight / 100
     return { key, ...meta, score, weighted }

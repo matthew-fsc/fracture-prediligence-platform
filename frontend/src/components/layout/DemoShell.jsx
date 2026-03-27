@@ -6,6 +6,7 @@ import ConversionModal from '../demo/ConversionModal'
 import { DemoContext } from '../../context/DemoContext'
 import { Bell, Search, Share2, Check } from 'lucide-react'
 import { usePageTitle } from '../../hooks/usePageTitle'
+import { apiClient } from '../../lib/apiClient'
 
 // ---------------------------------------------------------------------------
 // Demo-specific header
@@ -115,8 +116,7 @@ export default function DemoShell({ slug = null }) {
 
     // Fetch data based on slug
     if (slug) {
-      fetch(`/api/demo/${slug}`)
-        .then((r) => r.ok ? r.json() : null)
+      apiClient.get(`/api/demo/${slug}`)
         .then((d) => {
           if (d) {
             setDemoData(d.demo_data)
@@ -126,14 +126,12 @@ export default function DemoShell({ slug = null }) {
         })
         .catch(() => {})
     } else {
-      fetch('/api/demo/data')
-        .then((r) => r.ok ? r.json() : null)
+      apiClient.get('/api/demo/data')
         .then((d) => { if (d) setDemoData(d) })
         .catch(() => {})
     }
 
-    fetch('/api/spots-remaining')
-      .then((r) => r.ok ? r.json() : null)
+    apiClient.get('/api/spots-remaining')
       .then((d) => { if (d) setSpotsRemaining(d.spots_remaining) })
       .catch(() => {})
   }, [slug, searchParams])
@@ -143,11 +141,7 @@ export default function DemoShell({ slug = null }) {
   // ---------------------------------------------------------------------------
   const trackSection = useCallback((section) => {
     if (!slug) return  // Only track personalized links
-    fetch(`/api/demo/${slug}/track`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ section }),
-    }).catch(() => {})
+    apiClient.post(`/api/demo/${slug}/track`, { section }).catch(() => {})
   }, [slug])
 
   const prefillEmail = personalized?.recipient_email ?? ''

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Bell, Building2, ChevronDown, Search, LogOut } from 'lucide-react'
 import { fmtM, cn } from '../../lib/utils'
 import { useUser, useClerk } from '@clerk/clerk-react'
+import { apiClient } from '../../lib/apiClient'
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
@@ -88,8 +89,7 @@ function UserSection() {
   const [sub, setSub] = useState(null)
 
   useEffect(() => {
-    fetch('/api/user/subscription')
-      .then((r) => r.ok ? r.json() : null)
+    apiClient.get('/api/user/subscription')
       .then((d) => { if (d) setSub(d) })
       .catch(() => {})
   }, [])

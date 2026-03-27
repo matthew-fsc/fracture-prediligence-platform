@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, Zap, Mail } from 'lucide-react'
+import { apiClient } from '../../lib/apiClient'
 
 const COLORS = {
   bg: '#0C0E12',
@@ -22,8 +23,7 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '' }) 
 
   useEffect(() => {
     if (!isOpen) return
-    fetch('/api/spots-remaining')
-      .then((r) => r.ok ? r.json() : null)
+    apiClient.get('/api/spots-remaining')
       .then((d) => { if (d) setSpotsRemaining(d.spots_remaining) })
       .catch(() => {})
   }, [isOpen])

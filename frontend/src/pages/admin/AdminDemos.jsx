@@ -1,8 +1,22 @@
 import { useState, useEffect } from 'react'
 import { Copy, Mail, RefreshCw, Plus, Check } from 'lucide-react'
 import { usePageTitle } from '../../hooks/usePageTitle'
+import { apiClient, setStoredAdminKey, withAdminHeader } from '../../lib/apiClient'
 
-const ADMIN_KEY = 'fs-admin-2026'
+const ADMIN_KEY_STORAGE = 'admin_demo_key'
+
+function getAdminKey() {
+  return localStorage.getItem(ADMIN_KEY_STORAGE) || ''
+}
+
+function ensureAdminKey() {
+  const current = getAdminKey()
+  if (current) return current
+  const entered = window.prompt('Enter admin key')
+  if (!entered) return ''
+  setStoredAdminKey(entered)
+  return entered
+}
 
 const COLORS = { bg: '#0A1628', gold: '#C9973A', muted: '#8A9BB0', offWhite: '#F0EDE8', card: '#0F2040', border: '#1E3A5F', green: '#4ade80', red: '#f87171' }
 
@@ -32,13 +46,7 @@ function CreateLinkModal({ onClose, onCreated }) {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/demo/create-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY },
-        body: JSON.stringify(form),
-      })
-      if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
+      const data = await apiClient.post('/api/demo/create-link', form, withAdminHeader({ 'X-Admin-Key': ensureAdminKey() }))
       onCreated(data)
       onClose()
     } catch (err) {
@@ -135,9 +143,9 @@ export default function AdminDemos() {
   const fetchLinks = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/demos', { headers: { 'X-Admin-Key': ADMIN_KEY } })
-      if (!res.ok) throw new Error('Failed to load — check your admin key')
-      setLinks(await res.json())
+      const key = ensureAdminKey()
+      const data = await apiClient.get('/api/admin/demos', { headers: { 'X-Admin-Key': key } })
+      setLinks(data)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -242,7 +250,7 @@ export default function AdminDemos() {
         </div>
 
         <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 12, marginTop: 16 }}>
-          Admin key: <code style={{ color: COLORS.gold }}>{ADMIN_KEY}</code> · {links.length} link{links.length !== 1 ? 's' : ''}
+          {links.length} link{links.length !== 1 ? 's' : ''}
         </p>
       </div>
 

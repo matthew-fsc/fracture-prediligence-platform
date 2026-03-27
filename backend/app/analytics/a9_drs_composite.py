@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from app.core.scoring_rules import SCORING_RULES
 
 class DRSTier(str, Enum):
     INSTITUTIONAL  = "Institutional Grade"   # 85–100
@@ -60,14 +61,7 @@ class CategoryScores:
                 setattr(self, f"{attr}_optimistic", getattr(self, attr))
 
 
-WEIGHTS = {
-    "revenue_quality":          0.25,
-    "financial_integrity":      0.20,
-    "operational_independence": 0.20,
-    "customer_risk":            0.15,
-    "management_team":          0.10,
-    "growth_drivers":           0.10,
-}
+WEIGHTS = SCORING_RULES.category_weights
 
 
 @dataclass
@@ -84,10 +78,9 @@ def _weighted_sum(scores: dict[str, float]) -> float:
 
 
 def _classify_tier(drs: float) -> DRSTier:
-    if drs >= 85: return DRSTier.INSTITUTIONAL
-    if drs >= 70: return DRSTier.INVESTMENT
-    if drs >= 55: return DRSTier.CONDITIONAL
-    if drs >= 40: return DRSTier.HIGH_RISK
+    for threshold, tier_name in SCORING_RULES.drs_tier_thresholds:
+        if drs >= threshold:
+            return DRSTier[tier_name]
     return DRSTier.PRE_DILIGENCE
 
 

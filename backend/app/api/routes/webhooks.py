@@ -7,20 +7,19 @@ Handles:
   customer.subscription.deleted    → cancel subscription
 """
 
-import os
-
 import stripe
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.db_functions import update_user_subscription
+from app.core.config import settings
 from fastapi import Depends
 
 router = APIRouter()
 
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = settings.STRIPE_WEBHOOK_SECRET
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
 # ---------------------------------------------------------------------------
@@ -28,9 +27,9 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
 # ---------------------------------------------------------------------------
 
 def _price_to_tier(price_id: str) -> str:
-    founding_id = os.getenv("STRIPE_FOUNDING_PRICE_ID", "")
-    pro_id      = os.getenv("STRIPE_PRO_PRICE_ID", "")
-    team_id     = os.getenv("STRIPE_TEAM_PRICE_ID", "")
+    founding_id = settings.STRIPE_FOUNDING_PRICE_ID
+    pro_id = settings.STRIPE_PRO_PRICE_ID
+    team_id = settings.STRIPE_TEAM_PRICE_ID
 
     if price_id == founding_id:
         return "founding"
