@@ -210,7 +210,8 @@ class UserSubscription(Base):
     stripe_customer_id:     Mapped[Optional[str]]  = mapped_column(String(256), nullable=True)
     stripe_subscription_id: Mapped[Optional[str]]  = mapped_column(String(256), nullable=True)
     tier:                   Mapped[Optional[str]]  = mapped_column(String(64), nullable=True)    # founding | pro | team
-    status:                 Mapped[str]            = mapped_column(String(64), default="inactive")  # active | cancelled | inactive
+    # status: active | cancelled | inactive | past_due | paused (Stripe webhooks)
+    status:                 Mapped[str]            = mapped_column(String(64), default="inactive")
     created_at:             Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
     updated_at:             Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

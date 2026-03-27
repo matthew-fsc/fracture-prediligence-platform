@@ -1,18 +1,26 @@
 """Blueprint I ingestion pipeline — API routes."""
 
+import hashlib
+from typing import Annotated
+
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_company_scope
+from app.core.config import settings
 from app.core.database import get_db
+from app.ontology.models import Company
 from app.ingestion.pipeline import run_pipeline
 from app.ontology.ingestion_models import IngestionJob, PhaseStatus
 
 router = APIRouter()
 
+CompanyScoped = Annotated[Company, Depends(get_company_scope)]
+
 
 @router.post("/upload/{company_id}")
 async def upload_file(
-    company_id: int,
+    company: CompanyScoped,
     file: UploadFile = File(...),
     source_type: str = Form(default="unknown"),
     db: Session = Depends(get_db),
@@ -26,8 +34,27 @@ async def upload_file(
     if not data:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
+    max_b = settings.INGESTION_MAX_UPLOAD_BYTES
+    if len(data) > max_b:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large (max {max_b // (1024 * 1024)} MB).",
+        )
+
+    file_hash = hashlib.sha256(data).hexdigest()
+    existing = (
+        db.query(IngestionJob)
+        .filter(IngestionJob.company_id == company.id, IngestionJob.file_hash == file_hash)
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail="This file was already ingested for this company (duplicate content).",
+        )
+
     job = run_pipeline(
-        company_id=company_id,
+        company_id=company.id,
         filename=file.filename,
         file_data=data,
         source_type=source_type,
@@ -53,11 +80,11 @@ async def upload_file(
 
 
 @router.get("/jobs/{company_id}")
-def list_jobs(company_id: int, db: Session = Depends(get_db)):
+def list_jobs(company: CompanyScoped, db: Session = Depends(get_db)):
     """List all ingestion jobs for a company."""
     jobs = (
         db.query(IngestionJob)
-        .filter(IngestionJob.company_id == company_id)
+        .filter(IngestionJob.company_id == company.id)
         .order_by(IngestionJob.created_at.desc())
         .all()
     )
@@ -79,11 +106,11 @@ def list_jobs(company_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/jobs/{company_id}/{job_id}")
-def get_job(company_id: int, job_id: int, db: Session = Depends(get_db)):
+def get_job(company: CompanyScoped, job_id: int, db: Session = Depends(get_db)):
     """Get full job details including validation report, schema, mappings, and errors."""
     job = (
         db.query(IngestionJob)
-        .filter(IngestionJob.id == job_id, IngestionJob.company_id == company_id)
+        .filter(IngestionJob.id == job_id, IngestionJob.company_id == company.id)
         .first()
     )
     if not job:
@@ -110,7 +137,7 @@ def get_job(company_id: int, job_id: int, db: Session = Depends(get_db)):
 
 @router.patch("/jobs/{company_id}/{job_id}/mappings")
 def update_mappings(
-    company_id: int,
+    company: CompanyScoped,
     job_id: int,
     overrides: dict,
     db: Session = Depends(get_db),
@@ -123,7 +150,7 @@ def update_mappings(
     """
     job = (
         db.query(IngestionJob)
-        .filter(IngestionJob.id == job_id, IngestionJob.company_id == company_id)
+        .filter(IngestionJob.id == job_id, IngestionJob.company_id == company.id)
         .first()
     )
     if not job:

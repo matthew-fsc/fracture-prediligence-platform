@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
+import { Skeleton } from '../components/ui/Skeleton'
 import { cn } from '../lib/utils'
 import { useCompanyId } from '../context/CompanyContext'
-import { apiUrl } from '../lib/apiClient'
+import { apiClient } from '../lib/apiClient'
+import { withCompanyQuery } from '../lib/navLinks'
 
 function CheckIcon({ result }) {
   if (result === 'PASS')       return <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
@@ -13,28 +17,64 @@ function CheckIcon({ result }) {
 
 export default function DataQuality() {
   const companyId = useCompanyId()
-  const [jobs, setJobs]         = useState([])
-  const [selected, setSelected] = useState(null)
+  const [selectedJobId, setSelectedJobId] = useState(null)
+
+  const companyReady = companyId != null && companyId > 0
+
+  const {
+    data: jobs = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['ingestion-jobs', companyId],
+    queryFn: () => apiClient.get(`/api/ingestion/jobs/${companyId}`),
+    enabled: companyReady,
+  })
 
   useEffect(() => {
-    fetch(apiUrl(`/api/ingestion/jobs/${companyId}`))
-      .then(r => r.json())
-      .then(data => { setJobs(data); if (data.length > 0) loadJob(data[0].job_id) })
-      .catch(() => {})
-  }, [companyId])
+    if (!jobs.length) {
+      setSelectedJobId(null)
+      return
+    }
+    setSelectedJobId((prev) => {
+      const ids = jobs.map((j) => j.job_id)
+      if (prev && ids.includes(prev)) return prev
+      return jobs[0].job_id
+    })
+  }, [jobs])
 
-  async function loadJob(id) {
-    try {
-      const res = await fetch(apiUrl(`/api/ingestion/jobs/${companyId}/${id}`))
-      setSelected(await res.json())
-    } catch {}
-  }
+  const {
+    data: selected,
+    isLoading: jobLoading,
+  } = useQuery({
+    queryKey: ['ingestion-job', companyId, selectedJobId],
+    queryFn: () => apiClient.get(`/api/ingestion/jobs/${companyId}/${selectedJobId}`),
+    enabled: companyReady && !!selectedJobId,
+  })
 
   const checks      = selected?.validation?.checks ?? []
   const parseErrors = selected?.errors?.errors ?? []
   const passCount   = checks.filter(c => c.result === 'PASS').length
   const warnCount   = checks.filter(c => c.result === 'WARNING').length
   const failCount   = checks.filter(c => c.result === 'QUARANTINE').length
+
+  const connectorsPath = withCompanyQuery('/Connectors', companyId)
+
+  if (!companyReady) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="Data Quality"
+          subtitle="Validation results, quarantine log, and parse errors per ingestion job"
+        />
+        <p className="text-sm text-muted-foreground">
+          Select or create a client in the header to view data quality for that engagement.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5 max-w-[1400px]">
@@ -51,13 +91,40 @@ export default function DataQuality() {
         ) : null}
       />
 
-      {jobs.length === 0 && (
-        <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground text-sm">
-          No ingestion jobs yet. Upload a file in <a href="/Connectors" className="text-primary">Data Sources</a> first.
+      {isError && (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400 flex items-center justify-between gap-3" role="alert">
+          <span>{error?.message || 'Could not load ingestion jobs'}</span>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="text-xs font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          >
+            Retry
+          </button>
         </div>
       )}
 
-      {jobs.length > 0 && (
+      {isLoading && (
+        <div className="space-y-3">
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-48 w-full rounded-xl" />
+        </div>
+      )}
+
+      {!isLoading && !isError && jobs.length === 0 && (
+        <div className="rounded-xl border border-border bg-card p-8 text-center space-y-3">
+          <p className="text-muted-foreground text-sm">No ingestion jobs yet.</p>
+          <p className="text-xs text-muted-foreground">Upload a file in Data Sources to run validation and profiling.</p>
+          <Link
+            to={connectorsPath}
+            className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            Go to Data Sources
+          </Link>
+        </div>
+      )}
+
+      {!isLoading && !isError && jobs.length > 0 && (
         <div className="grid grid-cols-4 gap-4">
           {/* Job list */}
           <div>
@@ -66,7 +133,7 @@ export default function DataQuality() {
               {jobs.map(job => (
                 <button
                   key={job.job_id}
-                  onClick={() => loadJob(job.job_id)}
+                  onClick={() => setSelectedJobId(job.job_id)}
                   className={cn('w-full text-left px-3 py-2.5 rounded-lg border transition-colors',
                     selected?.job_id === job.job_id
                       ? 'border-primary/20 bg-primary/5 text-foreground'
@@ -80,7 +147,13 @@ export default function DataQuality() {
           </div>
 
           <div className="col-span-3 space-y-4">
-            {selected && (
+            {jobLoading && selectedJobId && (
+              <div className="space-y-3">
+                <Skeleton className="h-32 w-full rounded-xl" />
+                <Skeleton className="h-40 w-full rounded-xl" />
+              </div>
+            )}
+            {!jobLoading && selected && (
               <>
                 {/* Summary KPIs */}
                 <div className="grid grid-cols-4 gap-3">

@@ -1,11 +1,12 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, Link } from 'react-router-dom'
 import {
   Zap, House, Building, Workflow, Grid3x3, BarChart2,
   Eye, TrendingUp, Target, Activity,
   Folder, FileText, ChevronLeft, ShieldAlert,
-  UploadCloud, GitMerge, ClipboardList,
+  UploadCloud, GitMerge, ClipboardList, LayoutDashboard,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { useDemoData } from '../../context/DemoContext'
 
 const groups = [
   {
@@ -52,6 +53,8 @@ const groups = [
 ]
 
 export default function DemoSidebar({ basePrefix = '/demo' }) {
+  const { openConversionModal } = useDemoData()
+
   return (
     <aside className="fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col z-50 w-56">
       {/* Brand */}
@@ -112,11 +115,22 @@ export default function DemoSidebar({ basePrefix = '/demo' }) {
         ))}
       </nav>
 
-      {/* Collapse stub */}
-      <div className="h-8 flex items-center px-4 border-t border-sidebar-border">
-        <button className="text-[10px] text-sidebar-foreground/40 flex items-center gap-1">
-          <ChevronLeft className="w-3 h-3" /> Collapse
+      {/* Founding CTA + back to dashboard */}
+      <div className="border-t border-sidebar-border px-3 py-3 space-y-2 flex-shrink-0">
+        <button
+          type="button"
+          onClick={openConversionModal}
+          className="w-full rounded-lg bg-primary/10 border border-primary/30 text-primary text-[11px] font-semibold py-2.5 px-2 hover:bg-primary/20 text-center"
+        >
+          Request Founding license
         </button>
+        <Link
+          to="/Home"
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] font-medium text-sidebar-foreground/60 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/40 transition-colors duration-100"
+        >
+          <LayoutDashboard className="w-3.5 h-3.5 flex-shrink-0" />
+          Back to Dashboard
+        </Link>
       </div>
     </aside>
   )

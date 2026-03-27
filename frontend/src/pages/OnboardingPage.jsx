@@ -1,7 +1,27 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Cloud, CheckCircle, Circle } from 'lucide-react'
 import { useCompanyId } from '../context/CompanyContext'
 import { apiUrl } from '../lib/apiClient'
+
+const ONBOARDING_STORAGE_KEY = 'fracture_onboarding_v1'
+
+function readOnboarding() {
+  try {
+    const raw = localStorage.getItem(ONBOARDING_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeOnboarding(patch) {
+  try {
+    const prev = readOnboarding()
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ ...prev, ...patch }))
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
 
 const COLORS = {
   bg: '#0A1628',
@@ -132,18 +152,29 @@ function ProgressBar({ step }) {
 // Step 1 — Add first client
 // ---------------------------------------------------------------------------
 function Step1({ onNext }) {
+  const saved = readOnboarding().step1
   const [form, setForm] = useState({
     name: '',
     industry: '',
     revenueRange: '',
     entityType: '',
+    ...(saved && typeof saved === 'object' ? saved : {}),
   })
+  const [nameError, setNameError] = useState('')
+
+  useEffect(() => {
+    writeOnboarding({ step1: form })
+  }, [form])
 
   const set = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }))
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (!form.name.trim()) return
+    if (!form.name.trim()) {
+      setNameError('Client name is required.')
+      return
+    }
+    setNameError('')
     onNext(form)
   }
 
@@ -173,7 +204,14 @@ function Step1({ onNext }) {
           onChange={set('name')}
           style={INPUT_STYLE}
           required
+          aria-invalid={nameError ? 'true' : 'false'}
+          aria-describedby={nameError ? 'client-name-error' : undefined}
         />
+        {nameError && (
+          <p id="client-name-error" role="alert" style={{ color: '#F87171', fontFamily: "'DM Sans', sans-serif", fontSize: 12, marginTop: 8 }}>
+            {nameError}
+          </p>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
@@ -215,6 +253,10 @@ function Step2({ onNext, onSkip }) {
   const [file, setFile] = useState(null)
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (file?.name) writeOnboarding({ step2FileName: file.name })
+  }, [file])
 
   const handleFile = (f) => {
     if (f) setFile(f)
@@ -360,6 +402,7 @@ const MARKET_OPTS = [
 
 function Step3({ onNext, onSkip }) {
   const companyId = useCompanyId()
+  const saved3 = readOnboarding().step3
   const [form, setForm] = useState({
     owner_hours_per_week: '',
     sop_pct: 50,
@@ -370,10 +413,15 @@ function Step3({ onNext, onSkip }) {
     key_person_revenue_pct: 50,
     pipeline_value: '',
     market_positioning: '',
+    ...(saved3 && typeof saved3 === 'object' ? saved3 : {}),
   })
   const [saving, setSaving] = useState(false)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  useEffect(() => {
+    writeOnboarding({ step3: form })
+  }, [form])
 
   const handleSave = async () => {
     setSaving(true)
@@ -575,8 +623,15 @@ function Success() {
 // Page
 // ---------------------------------------------------------------------------
 export default function OnboardingPage() {
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(() => {
+    const s = readOnboarding().step
+    return typeof s === 'number' && s >= 1 && s <= 3 ? s : 1
+  })
   const [done, setDone] = useState(false)
+
+  useEffect(() => {
+    writeOnboarding({ step })
+  }, [step])
 
   const finish = () => {
     setDone(true)

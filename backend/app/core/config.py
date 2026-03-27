@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     STRIPE_FOUNDING_PRICE_ID: str = ""
     STRIPE_PRO_PRICE_ID: str = ""
     STRIPE_TEAM_PRICE_ID: str = ""
+    # Only when True AND APP_ENV=development: allow Stripe webhooks without STRIPE_WEBHOOK_SECRET (local CLI tests).
+    # Never enable in staging/production — unsigned webhooks are a security risk.
+    ALLOW_UNSIGNED_STRIPE_WEBHOOKS: bool = False
     FRONTEND_URL: str = "http://localhost:5173"
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
     ADMIN_API_KEY: str = ""
@@ -29,6 +32,8 @@ class Settings(BaseSettings):
 
     RAW_DATA_DIR: str = "data/raw"
     REPORTS_DIR: str = "data/reports"
+    # Max upload size for CSV/Excel ingestion (bytes). Default 25 MiB.
+    INGESTION_MAX_UPLOAD_BYTES: int = 25 * 1024 * 1024
 
     DEMO_TOTAL_SPOTS: int = 20
     DEMO_SLUG_RETRY_COUNT: int = 5

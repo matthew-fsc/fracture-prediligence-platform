@@ -1,18 +1,24 @@
 """Report generation routes — A14 Insight Package Assembly."""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_company_scope
 from app.core.database import get_db
+from app.ontology.models import Company
 from app.analytics.a14_report_generator import generate_report_pdf, REPORT_BUILDERS
 
 router = APIRouter()
 
+CompanyScoped = Annotated[Company, Depends(get_company_scope)]
+
 
 @router.get("/{company_id}/generate/{report_type}")
 def generate_report(
-    company_id: int,
+    company: CompanyScoped,
     report_type: str,
     db: Session = Depends(get_db),
 ):
@@ -23,8 +29,8 @@ def generate_report(
             detail=f"Unknown report type '{report_type}'. Valid: {list(REPORT_BUILDERS.keys())}",
         )
     try:
-        pdf_bytes = generate_report_pdf(report_type, company_id, db)
-        filename  = f"{report_type}_company_{company_id}.pdf"
+        pdf_bytes = generate_report_pdf(report_type, company.id, db)
+        filename  = f"{report_type}_company_{company.id}.pdf"
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",

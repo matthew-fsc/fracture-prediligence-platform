@@ -5,6 +5,7 @@ import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { useCompanyId } from '../context/CompanyContext'
 import { apiUrl } from '../lib/apiClient'
+import { toast } from '../lib/notify'
 
 function useSiblingPath(segment) {
   const { pathname } = useLocation()
@@ -59,6 +60,10 @@ export default function Connectors() {
   const fileRef = useRef()
 
   async function uploadFile(file) {
+    if (companyId == null || companyId < 1) {
+      toast.error('Select or create a client in the header before uploading.')
+      return
+    }
     setUploading(true)
     setError(null)
     const form = new FormData()
@@ -69,8 +74,11 @@ export default function Connectors() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.detail || 'Upload failed')
       setJobs(prev => [json, ...prev])
+      toast.success('File uploaded — pipeline started')
     } catch (e) {
-      setError(e.message)
+      const msg = e.message || 'Upload failed'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setUploading(false)
     }
@@ -111,6 +119,11 @@ export default function Connectors() {
         ))}
       </div>
 
+      <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-200/90" role="status">
+        <strong className="text-amber-100">Integrations below are illustrative.</strong>{' '}
+        Native QuickBooks, HubSpot, Plaid, and similar connectors are not wired yet — data enters via manual CSV/Excel upload only.
+      </div>
+
       {/* Category filter */}
       <div className="flex items-center gap-2">
         {CATEGORIES.map(cat => (
@@ -122,10 +135,11 @@ export default function Connectors() {
         ))}
       </div>
 
-      {/* Connector grid */}
+      {/* Connector grid (demo UI — not live OAuth) */}
+      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Sample connectors (coming soon)</p>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {filtered.map(c => (
-          <div key={c.type} className={cn('rounded-xl border bg-card p-4',
+          <div key={c.type} className={cn('rounded-xl border bg-card p-4 opacity-90',
             c.status === 'connected' ? 'border-emerald-500/20' : 'border-border')}>
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -136,8 +150,8 @@ export default function Connectors() {
                 </div>
               </div>
               <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase',
-                c.status === 'connected' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400' : 'border-border bg-muted text-muted-foreground')}>
-                {c.status}
+                c.status === 'connected' ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' : 'border-border bg-muted text-muted-foreground')}>
+                {c.status === 'connected' ? 'demo' : 'soon'}
               </span>
             </div>
             {c.status === 'connected' ? (
@@ -246,8 +260,16 @@ export default function Connectors() {
       )}
 
       {jobs.length === 0 && !uploading && (
-        <div className="text-center py-8 text-muted-foreground text-sm">
-          No files ingested yet. Upload a QuickBooks P&amp;L export to start.
+        <div className="rounded-xl border border-border bg-card p-8 text-center space-y-3">
+          <p className="text-muted-foreground text-sm">No ingestion jobs yet.</p>
+          <p className="text-xs text-muted-foreground">Upload a QuickBooks P&amp;L export or other CSV above to start the pipeline.</p>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            Upload a file
+          </button>
         </div>
       )}
     </div>

@@ -18,7 +18,7 @@ const FEATURES = [
   'Founding rate locked for life at $179/mo',
 ]
 
-export default function ConversionModal({ isOpen, onClose, prefillEmail = '' }) {
+export default function ConversionModal({ isOpen, onClose, prefillEmail = '', slug = null }) {
   const [spotsRemaining, setSpotsRemaining] = useState(null)
 
   useEffect(() => {
@@ -36,6 +36,18 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '' }) 
     `&body=${encodeURIComponent(
       'Hi Matthew,\n\nI\'d like to request a Founding Advisor license for the Pre-Diligence Platform.\n\nFirm: \nName: \nAny questions: \n'
     )}`
+
+  async function handleRequestClick(e) {
+    e.preventDefault()
+    if (slug) {
+      try {
+        await apiClient.post(`/api/demo/${slug}/mark-converted`)
+      } catch {
+        /* non-blocking */
+      }
+    }
+    window.location.href = mailtoHref
+  }
 
   return (
     <>
@@ -137,15 +149,16 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '' }) 
           </div>
         </div>
 
-        {/* Primary CTA — mailto */}
+        {/* Primary CTA — records conversion for personalized links, then mailto */}
         <a
           href={mailtoHref}
+          onClick={handleRequestClick}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             width: '100%', background: COLORS.gold, color: COLORS.bg,
             fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 15,
             padding: '14px 20px', borderRadius: 8, textDecoration: 'none',
-            marginBottom: 12, boxSizing: 'border-box',
+            marginBottom: 12, boxSizing: 'border-box', cursor: 'pointer',
           }}
         >
           <Mail size={16} />

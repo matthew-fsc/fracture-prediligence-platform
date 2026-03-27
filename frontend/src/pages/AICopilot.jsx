@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User, Loader } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Send, Bot, User, Loader, AlertTriangle } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import { useCompanyId } from '../context/CompanyContext'
-import { apiUrl } from '../lib/apiClient'
+import { apiClient } from '../lib/apiClient'
 
 const SUGGESTED_QUESTIONS = [
   'What is our DRS score and what does it mean for valuation?',
@@ -63,15 +64,19 @@ export default function AICopilot() {
   ])
   const [input, setInput]     = useState('')
   const [loading, setLoading] = useState(false)
-  const [scores, setScores]   = useState(null)
   const bottomRef = useRef(null)
 
-  useEffect(() => {
-    fetch(apiUrl(`/api/analytics/scores/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
-      .then(d => setScores(d))
-      .catch(() => {})
-  }, [companyId])
+  const companyReady = companyId != null && companyId > 0
+
+  const scoresQuery = useQuery({
+    queryKey: ['analytics-scores', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/scores/${companyId}`),
+    enabled: companyReady,
+  })
+
+  const scores = scoresQuery.data
+  const scoresLoading = companyReady && scoresQuery.isPending
+  const scoresError = scoresQuery.isError ? scoresQuery.error?.message : null
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -108,14 +113,57 @@ export default function AICopilot() {
     )
   }
 
+  const hasAnalytics = scores != null && (scores.drs != null || scores.enterprise_value != null)
+
+  if (!companyReady) {
+    return (
+      <div className="flex flex-col h-[calc(100vh-120px)]">
+        <PageHeader
+          section="Intelligence"
+          title="AI Copilot"
+          subtitle="Ask questions about your diligence data, scores, gaps, and buyer risks"
+          badge="No client selected"
+        />
+        <p className="text-sm text-muted-foreground mt-4">
+          Select or create a client in the header to load company-specific analytics.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-120px)]">
       <PageHeader
         section="Intelligence"
         title="AI Copilot"
         subtitle="Ask questions about your diligence data, scores, gaps, and buyer risks"
-        badge={scores ? `DRS ${scores.drs?.base}/100 loaded` : 'No data loaded'}
+        badge={scoresLoading ? 'Loading scores…' : scoresError ? 'Scores unavailable' : hasAnalytics ? `DRS ${scores.drs?.base ?? '—'}/100 loaded` : 'No analytics loaded'}
       />
+
+      {scoresError && (
+        <div
+          className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+          role="alert"
+        >
+          <span className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            {scoresError}
+          </span>
+          <button
+            type="button"
+            onClick={() => scoresQuery.refetch()}
+            className="text-xs font-semibold px-3 py-2 rounded-lg border border-border self-start sm:self-auto hover:bg-muted/40"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!scoresLoading && !scoresError && !hasAnalytics && (
+        <div className="mb-4 rounded-xl border border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground" role="status">
+          Load financial data in <strong className="text-card-foreground">Data Sources</strong> first — answers will be more specific once DRS and EV are available.
+        </div>
+      )}
 
       {/* Suggested questions */}
       <div className="flex flex-wrap gap-2 mb-4">
@@ -161,18 +209,21 @@ export default function AICopilot() {
 
       {/* Input */}
       <div className="flex items-end gap-2">
+        <label htmlFor="copilot-input" className="sr-only">Message to AI Copilot</label>
         <textarea
+          id="copilot-input"
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKey}
           placeholder="Ask about your DRS, EV, gaps, buyers…"
           rows={2}
-          className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-xs text-card-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground"
+          className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-xs text-card-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
         />
         <button
           onClick={() => sendMessage()}
           disabled={!input.trim() || loading}
-          className="p-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-40"
+          className="p-2.5 min-h-[44px] min-w-[44px] bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Send message"
         >
           <Send className="w-4 h-4" />
         </button>

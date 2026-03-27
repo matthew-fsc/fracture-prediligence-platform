@@ -63,5 +63,15 @@ def track_section_view(db: Session, slug: str, section: str):
     db.commit()
 
 
+def mark_demo_converted(db: Session, slug: str) -> None:
+    """Set converted=True when a visitor takes the conversion CTA (e.g. requests Founding license)."""
+    link = db.query(DemoLink).filter(DemoLink.slug == slug).first()
+    if not link:
+        return
+    link.converted = True
+    link.last_visited_at = datetime.utcnow()
+    db.commit()
+
+
 def list_demo_links(db: Session):
     return db.query(DemoLink).order_by(DemoLink.created_at.desc()).all()

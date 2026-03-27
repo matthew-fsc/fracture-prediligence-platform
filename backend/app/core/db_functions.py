@@ -163,6 +163,25 @@ def get_spots_remaining(db: Session) -> int:
         return _SPOTS_TOTAL
 
 
+def try_decrement_founding_spot(db: Session) -> bool:
+    """
+    Decrement spots_remaining if > 0. Call after a founding-tier payment succeeds (e.g. Stripe webhook).
+    Returns True if a spot was consumed. For strict concurrency, run against Postgres with row locks.
+    """
+    setting = db.query(AppSetting).filter(AppSetting.key == _SPOTS_SETTING_KEY).first()
+    if setting is None:
+        return False
+    try:
+        n = int(setting.value)
+    except (ValueError, TypeError):
+        n = 0
+    if n <= 0:
+        return False
+    setting.value = str(n - 1)
+    db.commit()
+    return True
+
+
 def _ensure_spots_setting(db: Session) -> None:
     """Seed the spots_remaining setting if it doesn't exist."""
     if not db.query(AppSetting).filter(AppSetting.key == _SPOTS_SETTING_KEY).first():

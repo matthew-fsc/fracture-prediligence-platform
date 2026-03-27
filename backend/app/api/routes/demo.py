@@ -388,6 +388,13 @@ def track_section(slug: str, body: dict, db: Session = Depends(get_db)):
     return {"status": "ok"}
 
 
+@router.post("/demo/{slug}/mark-converted")
+def mark_demo_converted(slug: str, db: Session = Depends(get_db)):
+    """Record that the visitor took a conversion action (e.g. requested Founding license)."""
+    demo_service.mark_demo_converted(db, slug)
+    return {"status": "ok"}
+
+
 @router.get("/admin/demos")
 def list_demo_links(
     db: Session = Depends(get_db),

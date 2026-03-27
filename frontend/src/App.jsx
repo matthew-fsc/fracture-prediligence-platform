@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import AppShell from './components/layout/AppShell'
 import DemoShell from './components/layout/DemoShell'
 import ProtectedRoute from './components/auth/ProtectedRoute'
@@ -87,6 +87,17 @@ export default function App() {
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/sign-in/*" element={<SignInPage />} />
         <Route path="/sign-up/*" element={<SignUpPage />} />
+
+        {/* Lowercase aliases → dashboard routes (bookmarks, external redirects) */}
+        <Route path="/home" element={<Navigate to="/Home" replace />} />
+        <Route path="/companyworkspace" element={<Navigate to="/CompanyWorkspace" replace />} />
+        <Route path="/connectors" element={<Navigate to="/Connectors" replace />} />
+        <Route path="/datamapping" element={<Navigate to="/DataMapping" replace />} />
+        <Route path="/dataquality" element={<Navigate to="/DataQuality" replace />} />
+        <Route path="/valuation" element={<Navigate to="/Valuation" replace />} />
+        <Route path="/valuegap" element={<Navigate to="/ValueGap" replace />} />
+        <Route path="/buyerlens" element={<Navigate to="/BuyerLens" replace />} />
+        <Route path="/aicopilot" element={<Navigate to="/AICopilot" replace />} />
 
         {/* ---------------------------------------------------------------- */}
         {/* Post-payment onboarding (auth required)                           */}

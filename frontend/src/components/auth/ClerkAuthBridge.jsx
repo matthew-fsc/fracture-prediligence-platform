@@ -7,12 +7,16 @@ import { setAuthTokenGetter } from '../../lib/apiClient'
  * Must render only inside ClerkProvider.
  */
 export default function ClerkAuthBridge({ children }) {
-  const { getToken } = useAuth()
+  const { getToken, isLoaded } = useAuth()
 
   useEffect(() => {
+    if (!isLoaded) {
+      setAuthTokenGetter(null)
+      return
+    }
     setAuthTokenGetter(() => getToken())
     return () => setAuthTokenGetter(null)
-  }, [getToken])
+  }, [getToken, isLoaded])
 
   return children
 }

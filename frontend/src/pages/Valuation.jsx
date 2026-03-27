@@ -1,11 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
 import {
   TrendingUp, DollarSign, Zap, BarChart2, AlertTriangle,
   ExternalLink, Edit2, Check, X, Plus, Trash2, ChevronDown, ChevronRight,
 } from 'lucide-react'
-import { apiUrl } from '../lib/apiClient'
+import { apiClient } from '../lib/apiClient'
+import { toast } from '../lib/notify'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useCompanyId } from '../context/CompanyContext'
@@ -161,17 +163,26 @@ function AddbackRow({ ab, onRecastUpdate }) {
   const ch = CHALLENGE_META[ab.challenge] ?? CHALLENGE_META.MEDIUM
 
   async function handleSave(body) {
-    const res = await fetch(apiUrl(`/api/analytics/addbacks/${companyId}/${ab.addback_key}`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...body, addback_key: ab.addback_key }),
-    })
-    if (res.ok) { onRecastUpdate(await res.json()); setOpen(false) }
+    try {
+      const data = await apiClient.post(`/api/analytics/addbacks/${companyId}/${ab.addback_key}`, {
+        ...body,
+        addback_key: ab.addback_key,
+      })
+      onRecastUpdate(data)
+      setOpen(false)
+    } catch (e) {
+      toast.error(e?.message || 'Could not save addback')
+    }
   }
 
   async function handleDelete() {
-    const res = await fetch(apiUrl(`/api/analytics/addbacks/${companyId}/${ab.addback_key}`), { method: 'DELETE' })
-    if (res.ok) { onRecastUpdate(await res.json()); setOpen(false) }
+    try {
+      const data = await apiClient.del(`/api/analytics/addbacks/${companyId}/${ab.addback_key}`)
+      onRecastUpdate(data)
+      setOpen(false)
+    } catch (e) {
+      toast.error(e?.message || 'Could not delete addback')
+    }
   }
 
   return (
@@ -229,26 +240,56 @@ function AddbackRow({ ab, onRecastUpdate }) {
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function Valuation() {
   const companyId = useCompanyId()
-  const [scores,  setScores]  = useState(null)
-  const [metrics, setMetrics] = useState(null)
-  const [recast,  setRecast]  = useState(null)
+  const queryClient = useQueryClient()
   const [addingCustom, setAddingCustom] = useState(false)
 
-  const loadRecast = useCallback(() =>
-    fetch(apiUrl(`/api/analytics/ebitda-recast/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setRecast(d) })
-      .catch(() => {}), [companyId])
+  const companyReady = companyId != null && companyId > 0
 
-  useEffect(() => {
-    fetch(apiUrl(`/api/analytics/scores/${companyId}`))
-      .then(r => r.ok ? r.json() : null).then(setScores).catch(() => {})
-    fetch(apiUrl(`/api/analytics/metrics/${companyId}`))
-      .then(r => r.ok ? r.json() : null).then(setMetrics).catch(() => {})
-    loadRecast()
-  }, [companyId, loadRecast])
+  const scoresQuery = useQuery({
+    queryKey: ['analytics-scores', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/scores/${companyId}`),
+    enabled: companyReady,
+  })
+  const metricsQuery = useQuery({
+    queryKey: ['analytics-metrics', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/metrics/${companyId}`),
+    enabled: companyReady,
+  })
+  const recastQuery = useQuery({
+    queryKey: ['ebitda-recast', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/ebitda-recast/${companyId}`),
+    enabled: companyReady,
+  })
 
-  if (!scores || !metrics || !recast) {
+  const scores = scoresQuery.data
+  const metrics = metricsQuery.data
+  const recast = recastQuery.data
+
+  const loading = scoresQuery.isPending || metricsQuery.isPending || recastQuery.isPending
+  const pageError =
+    scoresQuery.isError && scoresQuery.error?.message
+      ? scoresQuery.error.message
+      : metricsQuery.isError && metricsQuery.error?.message
+        ? metricsQuery.error.message
+          : recastQuery.isError && recastQuery.error?.message
+          ? recastQuery.error.message
+          : null
+
+  if (!companyReady) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="EBITDA / EV Calculation Engine"
+          subtitle="Reported EBITDA → Addback Schedule → Defensible EBITDA → Enterprise Value"
+        />
+        <p className="text-sm text-muted-foreground">
+          Select or create a client in the header to load valuation data.
+        </p>
+      </div>
+    )
+  }
+
+  if (loading) {
     return (
       <div className="space-y-5 max-w-[1400px]">
         <Skeleton className="h-8 w-72" />
@@ -260,6 +301,23 @@ export default function Valuation() {
           ))}
         </div>
         <Skeleton className="h-64 w-full rounded-xl" />
+      </div>
+    )
+  }
+
+  if (!scores || !metrics || !recast) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        {pageError && (
+          <div
+            className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400 flex items-center gap-2"
+            role="alert"
+          >
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            {pageError}
+          </div>
+        )}
+        <p className="text-sm text-muted-foreground">Valuation data could not be loaded.</p>
       </div>
     )
   }
@@ -298,12 +356,17 @@ export default function Valuation() {
 
   async function handleCustomSave(body) {
     const key = `custom_${Date.now()}`
-    const res = await fetch(apiUrl(`/api/analytics/addbacks/${companyId}/${key}`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...body, is_custom: true }),
-    })
-    if (res.ok) { setRecast(await res.json()); setAddingCustom(false) }
+    try {
+      const data = await apiClient.post(`/api/analytics/addbacks/${companyId}/${key}`, { ...body, is_custom: true })
+      queryClient.setQueryData(['ebitda-recast', companyId], data)
+      setAddingCustom(false)
+    } catch (e) {
+      toast.error(e?.message || 'Could not add addback')
+    }
+  }
+
+  function updateRecastCache(data) {
+    queryClient.setQueryData(['ebitda-recast', companyId], data)
   }
 
   const colorMap = {
@@ -425,7 +488,7 @@ export default function Valuation() {
                 </tr>
               </thead>
               {recast.addback_schedule.map(ab => (
-                <AddbackRow key={ab.addback_key} ab={ab} onRecastUpdate={setRecast} />
+                <AddbackRow key={ab.addback_key} ab={ab} onRecastUpdate={updateRecastCache} />
               ))}
               {/* Totals */}
               <tbody>

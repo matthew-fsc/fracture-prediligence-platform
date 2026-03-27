@@ -1,0 +1,23 @@
+/** Routes for the header command palette (jump to page). */
+export const COMMAND_PALETTE_ROUTES = [
+  { label: 'Home', href: '/Home' },
+  { label: 'Company Workspace', href: '/CompanyWorkspace' },
+  { label: 'Advisory Workflow', href: '/AdvisoryWorkflow' },
+  { label: 'Readiness Score', href: '/Readiness' },
+  { label: 'Qualitative Inputs', href: '/QualitativeInputs' },
+  { label: 'Business Quality', href: '/BusinessQuality' },
+  { label: 'Buyer Risk Profile', href: '/BuyerLens' },
+  { label: 'Valuation', href: '/Valuation' },
+  { label: 'Value Gap', href: '/ValueGap' },
+  { label: 'Initiative Impact', href: '/InitiativeImpact' },
+  { label: 'Scenario Simulator', href: '/ScenarioSimulator' },
+  { label: 'Risk Heatmap', href: '/RiskHeatmap' },
+  { label: 'Data Sources', href: '/Connectors' },
+  { label: 'Field Mapping', href: '/DataMapping' },
+  { label: 'Data Quality', href: '/DataQuality' },
+  { label: 'Data Room', href: '/DataRoom' },
+  { label: 'Reports', href: '/Reports' },
+  { label: 'AI Copilot', href: '/AICopilot' },
+  { label: 'Admin', href: '/Admin' },
+  { label: 'Account settings', href: '/settings' },
+]

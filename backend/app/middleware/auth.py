@@ -15,6 +15,7 @@ Environment variables:
     SECRET_KEY      — fallback HS256 secret for local dev (when CLERK_JWKS_URL is empty)
 """
 
+import logging
 import time
 from typing import Optional
 
@@ -34,6 +35,8 @@ _jwks_keys: list = []
 _jwks_fetched_at: float = 0.0
 _JWKS_TTL: float = settings.AUTH_JWKS_TTL_SECONDS
 
+logger = logging.getLogger(__name__)
+
 security = HTTPBearer(auto_error=False)
 
 
@@ -51,8 +54,18 @@ async def _get_jwks_keys() -> list:
             data = resp.json()
             _jwks_keys = data.get("keys", [])
             _jwks_fetched_at = now
-    except Exception:
-        pass  # Return stale cache on network errors
+    except Exception as exc:
+        if _jwks_keys:
+            logger.warning(
+                "Clerk JWKS refresh failed (%s); using cached keys until cache TTL expires.",
+                exc,
+            )
+        else:
+            logger.warning(
+                "Clerk JWKS fetch failed and no cached keys are available (%s). "
+                "JWT verification will fail until JWKS is reachable.",
+                exc,
+            )
     return _jwks_keys
 
 

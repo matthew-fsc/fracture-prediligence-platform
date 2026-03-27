@@ -6,6 +6,7 @@ export const DemoContext = createContext({
   spotsRemaining: null,
   slug: null,
   trackSection: () => {},
+  openConversionModal: () => {},
 })
 
 export const useDemoData = () => useContext(DemoContext)

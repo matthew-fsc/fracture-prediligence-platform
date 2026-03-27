@@ -34,7 +34,22 @@ function Nav() {
         </div>
 
         {/* Right nav */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 sm:gap-6">
+          <Link
+            to="/sign-in"
+            style={{
+              color: COLORS.offWhite,
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: 14,
+              fontWeight: 500,
+              textDecoration: 'none',
+              padding: '8px 14px',
+              borderRadius: 8,
+              border: `1px solid ${COLORS.border}`,
+            }}
+          >
+            Log in
+          </Link>
           <Link
             to="/demo"
             style={{ color: COLORS.gold, fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 500, textDecoration: 'none' }}
@@ -99,23 +114,50 @@ function Hero() {
           SMB clients for diligence — before buyers find the gaps.
         </p>
 
-        {/* CTA */}
-        <Link
-          to="/demo"
+        {/* CTAs */}
+        <div
           style={{
-            background: COLORS.gold,
-            color: COLORS.bg,
-            fontFamily: "'DM Sans', sans-serif",
-            fontWeight: 600,
-            fontSize: 15,
-            padding: '14px 32px',
-            borderRadius: 8,
-            textDecoration: 'none',
-            display: 'inline-block',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 16,
+            justifyContent: 'center',
+            alignItems: 'center',
           }}
         >
-          See Live Demo →
-        </Link>
+          <Link
+            to="/demo"
+            style={{
+              background: COLORS.gold,
+              color: COLORS.bg,
+              fontFamily: "'DM Sans', sans-serif",
+              fontWeight: 600,
+              fontSize: 15,
+              padding: '14px 32px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              display: 'inline-block',
+            }}
+          >
+            See Live Demo →
+          </Link>
+          <Link
+            to="/sign-in"
+            style={{
+              background: 'transparent',
+              color: COLORS.offWhite,
+              fontFamily: "'DM Sans', sans-serif",
+              fontWeight: 600,
+              fontSize: 15,
+              padding: '14px 28px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              display: 'inline-block',
+              border: `1px solid ${COLORS.border}`,
+            }}
+          >
+            Log in to platform
+          </Link>
+        </div>
       </div>
     </section>
   )
@@ -578,8 +620,9 @@ function Footer() {
         </p>
 
         {/* Row 2 — links */}
-        <div style={{ display: 'flex', gap: 24, marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 24, marginBottom: 20, flexWrap: 'wrap' }}>
           {[
+            { label: 'Log in', to: '/sign-in' },
             { label: 'Demo', to: '/demo' },
             { label: 'Contact', to: 'mailto:matthew@fracturesystems.com' },
           ].map(({ label, to }) => (

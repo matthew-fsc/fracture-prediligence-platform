@@ -44,16 +44,87 @@ async function mergeAuthHeaders(headers = {}) {
   return h
 }
 
+/**
+ * Typed error from failed API responses. `message` is user-facing (FastAPI `detail` when JSON).
+ */
+export class ApiError extends Error {
+  /**
+   * @param {string} message
+   * @param {number} status HTTP status
+   * @param {unknown} [raw] original parsed or text body
+   */
+  constructor(message, status, raw = null) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.raw = raw
+  }
+}
+
+/**
+ * @param {unknown} err
+ * @returns {err is ApiError}
+ */
+export function isApiError(err) {
+  return err instanceof ApiError
+}
+
+/**
+ * Parse FastAPI-style JSON error bodies into a single message.
+ * @param {string} text response body
+ * @param {number} status
+ */
+export function messageFromErrorBody(text, status) {
+  if (!text?.trim()) return `Request failed (${status})`
+  try {
+    const j = JSON.parse(text)
+    if (typeof j.detail === 'string') return j.detail
+    if (Array.isArray(j.detail)) {
+      return j.detail
+        .map((d) => (typeof d === 'string' ? d : d?.msg ?? JSON.stringify(d)))
+        .join('; ')
+    }
+    if (j.message && typeof j.message === 'string') return j.message
+  } catch {
+    /* not JSON */
+  }
+  return text.length > 500 ? `${text.slice(0, 500)}…` : text
+}
+
+/**
+ * @param {Response} response
+ * @returns {Promise<ApiError>}
+ */
+export async function errorFromResponse(response) {
+  const text = await response.text()
+  const msg = messageFromErrorBody(text, response.status)
+  return new ApiError(msg, response.status, text)
+}
+
 export async function apiRequest(path, options = {}) {
   const { headers: optHeaders, ...rest } = options
   const headers = await mergeAuthHeaders(optHeaders)
-  const response = await fetch(apiUrl(path), { ...rest, headers })
+  let response
+  try {
+    response = await fetch(apiUrl(path), { ...rest, headers })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Network error'
+    throw new ApiError(msg, 0, e)
+  }
   if (!response.ok) {
-    const text = await response.text()
-    throw new Error(text || `Request failed: ${response.status}`)
+    throw await errorFromResponse(response)
   }
   const ct = response.headers.get('content-type') || ''
-  return ct.includes('application/json') ? response.json() : response.text()
+  if (ct.includes('application/json')) {
+    const text = await response.text()
+    if (!text.trim()) return null
+    try {
+      return JSON.parse(text)
+    } catch {
+      return text
+    }
+  }
+  return response.text()
 }
 
 export const apiClient = {

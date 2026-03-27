@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Outlet, useSearchParams } from 'react-router-dom'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Outlet, useSearchParams, Link } from 'react-router-dom'
 import DemoSidebar from './DemoSidebar'
 import ConversionModal from '../demo/ConversionModal'
 import { DemoContext } from '../../context/DemoContext'
-import { Bell, Search, Share2, Check } from 'lucide-react'
+import { Bell, Search, Share2, Check, ArrowLeft } from 'lucide-react'
 import { usePageTitle } from '../../hooks/usePageTitle'
 import { apiClient } from '../../lib/apiClient'
 
@@ -12,7 +12,9 @@ import { apiClient } from '../../lib/apiClient'
 // ---------------------------------------------------------------------------
 function DemoHeader({ demoData, slug, personalized }) {
   const drs = demoData?.drs?.base
+  const tier = demoData?.drs?.tier
   const ev = demoData?.enterprise_value?.midpoint
+  const companyName = demoData?.company?.name ?? 'Demo Company'
   const [copied, setCopied] = useState(false)
 
   const handleShare = useCallback(() => {
@@ -26,6 +28,13 @@ function DemoHeader({ demoData, slug, personalized }) {
     <header className="h-14 border-b border-border bg-card/60 backdrop-blur-sm flex items-center justify-between px-4 flex-shrink-0">
       {/* Left */}
       <div className="flex items-center gap-3">
+        <Link
+          to="/Home"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Dashboard
+        </Link>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-card-foreground">
           <span
             style={{
@@ -41,10 +50,12 @@ function DemoHeader({ demoData, slug, personalized }) {
           >
             DEMO
           </span>
-          <span className="text-muted-foreground max-w-[160px] truncate">ABC Company Inc</span>
+          <span className="text-muted-foreground max-w-[160px] truncate">{companyName}</span>
         </div>
         {drs != null && (
-          <span className="text-xs text-muted-foreground font-medium">{drs}/100 Readiness</span>
+          <span className="text-xs text-muted-foreground font-medium">
+            {drs}/100 Readiness{tier ? ` · ${tier}` : ''}
+          </span>
         )}
         {ev != null && (
           <span className="text-xs font-semibold text-primary">
@@ -144,8 +155,22 @@ export default function DemoShell({ slug = null }) {
 
   const prefillEmail = personalized?.recipient_email ?? ''
 
+  const openConversionModal = useCallback(() => setModalOpen(true), [])
+
+  const demoCtx = useMemo(
+    () => ({
+      demoData,
+      personalized,
+      spotsRemaining,
+      slug,
+      trackSection,
+      openConversionModal,
+    }),
+    [demoData, personalized, spotsRemaining, slug, trackSection, openConversionModal],
+  )
+
   return (
-    <DemoContext.Provider value={{ demoData, personalized, spotsRemaining, slug, trackSection }}>
+    <DemoContext.Provider value={demoCtx}>
       <div className="dark flex h-screen overflow-hidden bg-background">
         {/* Sidebar — fixed full height */}
         <DemoSidebar basePrefix={basePrefix} />
@@ -180,6 +205,7 @@ export default function DemoShell({ slug = null }) {
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
           prefillEmail={prefillEmail}
+          slug={slug}
         />
       </div>
     </DemoContext.Provider>

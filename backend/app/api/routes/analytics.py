@@ -3,9 +3,10 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Annotated, Optional
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_company_scope
 from app.core.database import get_db
 from app.analytics.a1_metric_computation import compute_metrics
 from app.analytics.a2_ebitda_recast import compute_ebitda_recast, ChallengeLikelihood
@@ -22,10 +23,12 @@ from app.analytics.a11_value_gap import compute_value_gap
 from app.analytics.a13_buyer_questions import generate_buyer_questions
 from app.core.config import settings
 from app.core.scoring_rules import SCORING_RULES, SCORING_RULES_VERSION
-from app.ontology.models import AdvisorOverride, QualitativeInputs, AddbackOverride
+from app.ontology.models import AdvisorOverride, QualitativeInputs, AddbackOverride, Company
 from app.services.analytics_service import compute_category_modules
 
 router = APIRouter()
+
+CompanyScoped = Annotated[Company, Depends(get_company_scope)]
 
 VALID_CATEGORIES = {
     "revenue_quality", "financial_integrity", "operational_independence",
@@ -125,30 +128,30 @@ class QualitativeRequest(BaseModel):
 
 
 @router.get("/metrics/{company_id}")
-def get_metrics(company_id: int, db: Session = Depends(get_db)):
+def get_metrics(company: CompanyScoped, db: Session = Depends(get_db)):
     """A1: Raw metric registry — totals, counts, and computed ratios."""
-    metrics = compute_metrics(company_id, db)
+    metrics = compute_metrics(company.id, db)
     return metrics
 
 
 @router.get("/market-benchmarks/{company_id}")
-def get_market_benchmarks(company_id: int, db: Session = Depends(get_db)):
+def get_market_benchmarks(company: CompanyScoped, db: Session = Depends(get_db)):
     """Peer medians and segment label for the company's industry × EBITDA band (curated + provenance)."""
     try:
-        return build_benchmarks_payload(db, company_id)
+        return build_benchmarks_payload(db, company.id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/scores/{company_id}")
-def get_all_scores(company_id: int, db: Session = Depends(get_db)):
+def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
     """
     A3–A8: Compute all six DRS category scores from the ontology.
     Applies advisor overrides (P1) and qualitative inputs (P2) when present.
     Returns raw scores, adjusted scores, DRS composite (A9), and enterprise value (A10).
     """
     try:
-        modules = compute_category_modules(company_id, db)
+        modules = compute_category_modules(company.id, db)
         rev = modules["revenue_quality"]
         ops = modules["operational_independence"]
         cust = modules["customer_risk"]
@@ -158,7 +161,7 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
 
         # --- P2: Apply qualitative inputs to ops and growth where available ---
         qual = db.query(QualitativeInputs).filter(
-            QualitativeInputs.company_id == company_id
+            QualitativeInputs.company_id == company.id
         ).first()
 
         ops_raw = ops.composite
@@ -191,7 +194,7 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
 
             a7_fields = [qual.pipeline_value, qual.market_positioning, qual.repeatability_pct]
             if all(v is not None for v in a7_fields):
-                metrics_for_qual = compute_metrics(company_id, db)
+                metrics_for_qual = compute_metrics(company.id, db)
                 ttm_rev = float(metrics_for_qual.total_revenue_ttm)
                 s_pipe  = _qual_pipeline_score(float(qual.pipeline_value), ttm_rev)
                 s_mkt   = _qual_market_pos_score(qual.market_positioning)
@@ -241,7 +244,7 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
 
         # --- P1: Load advisor overrides ---
         overrides_rows = db.query(AdvisorOverride).filter(
-            AdvisorOverride.company_id == company_id
+            AdvisorOverride.company_id == company.id
         ).all()
         override_map = {o.category: o for o in overrides_rows}
 
@@ -334,9 +337,9 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
         drs = compute_drs(cat)
 
         from decimal import Decimal as _Decimal
-        metrics = compute_metrics(company_id, db)
+        metrics = compute_metrics(company.id, db)
         ebitda_dec = _Decimal(str(round(float(metrics.ebitda_ttm), 2)))
-        mctx = get_market_multiple_context(db, company_id, float(ebitda_dec))
+        mctx = get_market_multiple_context(db, company.id, float(ebitda_dec))
         ev = compute_enterprise_value(ebitda_dec, drs.tier, market_context=mctx)
         valuation_summary = format_ev_valuation_summary(ev)
 
@@ -344,7 +347,7 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
         has_overrides = bool(override_map)
 
         return {
-            "company_id": company_id,
+            "company_id": company.id,
             "drs": {
                 "base":           drs.base_drs,
                 "conservative":   drs.conservative_drs,
@@ -382,53 +385,53 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/revenue-quality/{company_id}")
-def get_revenue_quality(company_id: int, db: Session = Depends(get_db)):
+def get_revenue_quality(company: CompanyScoped, db: Session = Depends(get_db)):
     """A3: Revenue quality sub-scores and composite."""
-    return compute_revenue_quality(company_id, db).to_dict()
+    return compute_revenue_quality(company.id, db).to_dict()
 
 
 @router.get("/operational-independence/{company_id}")
-def get_operational_independence(company_id: int, db: Session = Depends(get_db)):
+def get_operational_independence(company: CompanyScoped, db: Session = Depends(get_db)):
     """A4: Operational independence sub-scores."""
-    return compute_operational_independence(company_id, db).to_dict()
+    return compute_operational_independence(company.id, db).to_dict()
 
 
 @router.get("/customer-risk/{company_id}")
-def get_customer_risk(company_id: int, db: Session = Depends(get_db)):
+def get_customer_risk(company: CompanyScoped, db: Session = Depends(get_db)):
     """A5: Customer risk sub-scores."""
-    return compute_customer_risk(company_id, db).to_dict()
+    return compute_customer_risk(company.id, db).to_dict()
 
 
 @router.get("/management-team/{company_id}")
-def get_management_team(company_id: int, db: Session = Depends(get_db)):
+def get_management_team(company: CompanyScoped, db: Session = Depends(get_db)):
     """A6: Management and team sub-scores."""
-    return compute_management_team(company_id, db).to_dict()
+    return compute_management_team(company.id, db).to_dict()
 
 
 @router.get("/growth-drivers/{company_id}")
-def get_growth_drivers(company_id: int, db: Session = Depends(get_db)):
+def get_growth_drivers(company: CompanyScoped, db: Session = Depends(get_db)):
     """A7: Growth drivers sub-scores."""
-    return compute_growth_drivers(company_id, db).to_dict()
+    return compute_growth_drivers(company.id, db).to_dict()
 
 
 @router.get("/financial-integrity/{company_id}")
-def get_financial_integrity(company_id: int, db: Session = Depends(get_db)):
+def get_financial_integrity(company: CompanyScoped, db: Session = Depends(get_db)):
     """A8: Financial integrity sub-scores."""
-    return compute_financial_integrity(company_id, db).to_dict()
+    return compute_financial_integrity(company.id, db).to_dict()
 
 
 @router.get("/value-gap/{company_id}")
-def get_value_gap(company_id: int, db: Session = Depends(get_db)):
+def get_value_gap(company: CompanyScoped, db: Session = Depends(get_db)):
     """A11: Value gap analysis — current EV vs potential EV if gaps resolved."""
     try:
-        modules = compute_category_modules(company_id, db)
+        modules = compute_category_modules(company.id, db)
         rev = modules["revenue_quality"]
         ops = modules["operational_independence"]
         cust = modules["customer_risk"]
         mgmt = modules["management_team"]
         growth = modules["growth_drivers"]
         fin = modules["financial_integrity"]
-        metrics = compute_metrics(company_id, db)
+        metrics = compute_metrics(company.id, db)
 
         cat_scores = {
             "revenue_quality":          rev.composite,
@@ -441,17 +444,17 @@ def get_value_gap(company_id: int, db: Session = Depends(get_db)):
         from decimal import Decimal as _D
         ebitda = float(metrics.ebitda_ttm)
 
-        result = compute_value_gap(company_id, cat_scores, ebitda)
+        result = compute_value_gap(company.id, cat_scores, ebitda)
         return result.to_dict()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/buyer-questions/{company_id}")
-def get_buyer_questions(company_id: int, db: Session = Depends(get_db)):
+def get_buyer_questions(company: CompanyScoped, db: Session = Depends(get_db)):
     """A13: Generate prioritized buyer due diligence questions from DRS weaknesses."""
     try:
-        modules = compute_category_modules(company_id, db)
+        modules = compute_category_modules(company.id, db)
         rev = modules["revenue_quality"]
         ops = modules["operational_independence"]
         cust = modules["customer_risk"]
@@ -469,7 +472,7 @@ def get_buyer_questions(company_id: int, db: Session = Depends(get_db)):
         }
         questions = generate_buyer_questions(cat_scores)
         return {
-            "company_id": company_id,
+            "company_id": company.id,
             "total":      len(questions),
             "questions":  [q.to_dict() for q in questions],
         }
@@ -638,16 +641,16 @@ def _build_recast_payload(company_id: int, db: Session) -> dict:
 
 
 @router.get("/ebitda-recast/{company_id}")
-def get_ebitda_recast(company_id: int, db: Session = Depends(get_db)):
+def get_ebitda_recast(company: CompanyScoped, db: Session = Depends(get_db)):
     """A2: Defensible EBITDA recast — conservative / base / aggressive with advisor override support."""
     try:
-        return _build_recast_payload(company_id, db)
+        return _build_recast_payload(company.id, db)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/drs/{company_id}")
-def compute_drs_score(company_id: int, scores: dict, db: Session = Depends(get_db)):
+def compute_drs_score(company: CompanyScoped, scores: dict, db: Session = Depends(get_db)):
     """A9: Compute DRS from manually submitted category scores."""
     try:
         cat = CategoryScores(**scores)
@@ -668,10 +671,10 @@ def compute_drs_score(company_id: int, scores: dict, db: Session = Depends(get_d
 # ---------------------------------------------------------------------------
 
 @router.get("/overrides/{company_id}")
-def get_overrides(company_id: int, db: Session = Depends(get_db)):
-    rows = db.query(AdvisorOverride).filter(AdvisorOverride.company_id == company_id).all()
+def get_overrides(company: CompanyScoped, db: Session = Depends(get_db)):
+    rows = db.query(AdvisorOverride).filter(AdvisorOverride.company_id == company.id).all()
     return {
-        "company_id": company_id,
+        "company_id": company.id,
         "overrides": [
             {
                 "category":   o.category,
@@ -687,7 +690,8 @@ def get_overrides(company_id: int, db: Session = Depends(get_db)):
 
 @router.post("/overrides/{company_id}/{category}")
 def upsert_override(
-    company_id: int, category: str,
+    company: CompanyScoped,
+    category: str,
     body: OverrideRequest,
     db: Session = Depends(get_db),
 ):
@@ -698,7 +702,7 @@ def upsert_override(
     adj = max(-20.0, min(20.0, body.adjustment))
 
     existing = db.query(AdvisorOverride).filter(
-        AdvisorOverride.company_id == company_id,
+        AdvisorOverride.company_id == company.id,
         AdvisorOverride.category == category,
     ).first()
 
@@ -709,7 +713,7 @@ def upsert_override(
         existing.updated_at = datetime.utcnow()
     else:
         db.add(AdvisorOverride(
-            company_id=company_id, category=category,
+            company_id=company.id, category=category,
             adjustment=adj, rationale=body.rationale.strip(),
             advisor_id=body.advisor_id,
         ))
@@ -718,9 +722,9 @@ def upsert_override(
 
 
 @router.delete("/overrides/{company_id}/{category}")
-def delete_override(company_id: int, category: str, db: Session = Depends(get_db)):
+def delete_override(company: CompanyScoped, category: str, db: Session = Depends(get_db)):
     deleted = db.query(AdvisorOverride).filter(
-        AdvisorOverride.company_id == company_id,
+        AdvisorOverride.company_id == company.id,
         AdvisorOverride.category == category,
     ).delete()
     db.commit()
@@ -746,7 +750,8 @@ VALID_CHALLENGES = {"LOW", "MEDIUM", "HIGH", "NOT_DEFENSIBLE"}
 
 @router.post("/addbacks/{company_id}/{addback_key}")
 def upsert_addback_override(
-    company_id: int, addback_key: str,
+    company: CompanyScoped,
+    addback_key: str,
     body: AddbackOverrideRequest,
     db: Session = Depends(get_db),
 ):
@@ -755,7 +760,7 @@ def upsert_addback_override(
         raise HTTPException(400, f"challenge must be one of {VALID_CHALLENGES}")
 
     existing = db.query(AddbackOverride).filter(
-        AddbackOverride.company_id == company_id,
+        AddbackOverride.company_id == company.id,
         AddbackOverride.addback_key == addback_key,
     ).first()
 
@@ -772,7 +777,7 @@ def upsert_addback_override(
         existing.updated_at  = datetime.utcnow()
     else:
         db.add(AddbackOverride(
-            company_id=company_id, addback_key=addback_key,
+            company_id=company.id, addback_key=addback_key,
             description=body.description, amount=body.amount,
             challenge=body.challenge, category=body.category,
             documented=body.documented, notes=body.notes,
@@ -780,18 +785,18 @@ def upsert_addback_override(
             is_custom=body.is_custom,
         ))
     db.commit()
-    return _build_recast_payload(company_id, db)
+    return _build_recast_payload(company.id, db)
 
 
 @router.delete("/addbacks/{company_id}/{addback_key}")
-def delete_addback_override(company_id: int, addback_key: str, db: Session = Depends(get_db)):
+def delete_addback_override(company: CompanyScoped, addback_key: str, db: Session = Depends(get_db)):
     """Remove an advisor override for an addback line (reverts to system default)."""
     deleted = db.query(AddbackOverride).filter(
-        AddbackOverride.company_id == company_id,
+        AddbackOverride.company_id == company.id,
         AddbackOverride.addback_key == addback_key,
     ).delete()
     db.commit()
-    return _build_recast_payload(company_id, db)
+    return _build_recast_payload(company.id, db)
 
 
 # ---------------------------------------------------------------------------
@@ -799,14 +804,14 @@ def delete_addback_override(company_id: int, addback_key: str, db: Session = Dep
 # ---------------------------------------------------------------------------
 
 @router.get("/qualitative/{company_id}")
-def get_qualitative(company_id: int, db: Session = Depends(get_db)):
+def get_qualitative(company: CompanyScoped, db: Session = Depends(get_db)):
     row = db.query(QualitativeInputs).filter(
-        QualitativeInputs.company_id == company_id
+        QualitativeInputs.company_id == company.id
     ).first()
     if not row:
-        return {"company_id": company_id, "inputs": None}
+        return {"company_id": company.id, "inputs": None}
     return {
-        "company_id": company_id,
+        "company_id": company.id,
         "inputs": {
             "owner_hours_per_week":  float(row.owner_hours_per_week) if row.owner_hours_per_week is not None else None,
             "sop_pct":               float(row.sop_pct)               if row.sop_pct               is not None else None,
@@ -825,9 +830,9 @@ def get_qualitative(company_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/qualitative/{company_id}")
-def save_qualitative(company_id: int, body: QualitativeRequest, db: Session = Depends(get_db)):
+def save_qualitative(company: CompanyScoped, body: QualitativeRequest, db: Session = Depends(get_db)):
     row = db.query(QualitativeInputs).filter(
-        QualitativeInputs.company_id == company_id
+        QualitativeInputs.company_id == company.id
     ).first()
     data = body.model_dump(exclude_unset=False)
     if row:
@@ -835,6 +840,6 @@ def save_qualitative(company_id: int, body: QualitativeRequest, db: Session = De
             setattr(row, k, v)
         row.updated_at = datetime.utcnow()
     else:
-        db.add(QualitativeInputs(company_id=company_id, **data))
+        db.add(QualitativeInputs(company_id=company.id, **data))
     db.commit()
-    return {"status": "saved", "company_id": company_id}
+    return {"status": "saved", "company_id": company.id}

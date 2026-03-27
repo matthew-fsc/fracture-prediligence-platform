@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, CheckCircle, AlertCircle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
+import { Skeleton } from '../components/ui/Skeleton'
 import { cn } from '../lib/utils'
 import { useCompanyId } from '../context/CompanyContext'
-import { apiUrl } from '../lib/apiClient'
+import { apiClient } from '../lib/apiClient'
+import { toast } from '../lib/notify'
+import { withCompanyQuery } from '../lib/navLinks'
 
 function useSiblingPath(segment) {
   const { pathname } = useLocation()
@@ -41,47 +45,93 @@ function methodBadge(m) {
 
 export default function DataMapping() {
   const companyId = useCompanyId()
+  const qc = useQueryClient()
   const dataSourcesPath = useSiblingPath('data-sources')
-  const [jobs, setJobs]         = useState([])
-  const [selected, setSelected] = useState(null)
+  const connectorsPath = withCompanyQuery('/Connectors', companyId)
+  const [selectedJobId, setSelectedJobId] = useState(null)
   const [mappings, setMappings] = useState([])
   const [overrides, setOverrides] = useState({})
   const [saving, setSaving]     = useState(false)
   const [saved, setSaved]       = useState(false)
 
-  useEffect(() => {
-    fetch(apiUrl(`/api/ingestion/jobs/${companyId}`))
-      .then(r => r.json())
-      .then(data => { setJobs(data); if (data.length > 0) loadJob(data[0].job_id) })
-      .catch(() => {})
-  }, [companyId])
+  const companyReady = companyId != null && companyId > 0
 
-  async function loadJob(jobId) {
-    try {
-      const res = await fetch(apiUrl(`/api/ingestion/jobs/${companyId}/${jobId}`))
-      const job = await res.json()
-      setSelected(job)
-      setMappings(job.mappings?.mappings ?? [])
-    } catch {}
-  }
+  const {
+    data: jobs = [],
+    isLoading: jobsLoading,
+    isError: jobsError,
+    error: jobsErr,
+    refetch: refetchJobs,
+  } = useQuery({
+    queryKey: ['ingestion-jobs', companyId],
+    queryFn: () => apiClient.get(`/api/ingestion/jobs/${companyId}`),
+    enabled: companyReady,
+  })
+
+  useEffect(() => {
+    if (!jobs.length) {
+      setSelectedJobId(null)
+      return
+    }
+    setSelectedJobId((prev) => {
+      const ids = jobs.map((j) => j.job_id)
+      if (prev && ids.includes(prev)) return prev
+      return jobs[0].job_id
+    })
+  }, [jobs])
+
+  const {
+    data: selected,
+    isLoading: jobLoading,
+  } = useQuery({
+    queryKey: ['ingestion-job', companyId, selectedJobId],
+    queryFn: () => apiClient.get(`/api/ingestion/jobs/${companyId}/${selectedJobId}`),
+    enabled: companyReady && !!selectedJobId,
+  })
+
+  useEffect(() => {
+    if (!selected) {
+      setMappings([])
+      return
+    }
+    setMappings(selected.mappings?.mappings ?? [])
+    setOverrides({})
+  }, [selected])
 
   async function saveOverrides() {
     if (!selected || Object.keys(overrides).length === 0) return
     setSaving(true)
     try {
-      await fetch(apiUrl(`/api/ingestion/jobs/${companyId}/${selected.job_id}/mappings`), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(overrides),
-      })
+      await apiClient.patch(
+        `/api/ingestion/jobs/${companyId}/${selected.job_id}/mappings`,
+        overrides,
+      )
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
-    } catch {}
+      await qc.invalidateQueries({ queryKey: ['ingestion-job', companyId, selected.job_id] })
+      toast.success('Mappings saved')
+    } catch (e) {
+      toast.error(e?.message || 'Could not save mappings')
+    }
     setSaving(false)
   }
 
   const reviewRequired = mappings.filter(m => m.requires_review)
   const autoMapped     = mappings.filter(m => !m.requires_review && m.ontology_field)
+
+  if (!companyReady) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="Field Mapping"
+          subtitle="Review and approve column → ontology field assignments. Override low-confidence mappings before committing."
+        />
+        <p className="text-sm text-muted-foreground">
+          Select or create a client in the header to edit field mappings.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5 max-w-[1400px]">
@@ -95,13 +145,40 @@ export default function DataMapping() {
         ) : null}
       />
 
-      {jobs.length === 0 && (
-        <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground text-sm">
-          No ingestion jobs found. Upload a file in <Link to={dataSourcesPath} className="text-primary">Data Sources</Link> first.
+      {jobsError && (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400 flex items-center justify-between gap-3" role="alert">
+          <span>{jobsErr?.message || 'Could not load jobs'}</span>
+          <button
+            type="button"
+            onClick={() => refetchJobs()}
+            className="text-xs font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          >
+            Retry
+          </button>
         </div>
       )}
 
-      {jobs.length > 0 && (
+      {jobsLoading && (
+        <div className="space-y-3">
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
+      )}
+
+      {!jobsLoading && !jobsError && jobs.length === 0 && (
+        <div className="rounded-xl border border-border bg-card p-8 text-center space-y-3">
+          <p className="text-muted-foreground text-sm">No ingestion jobs found.</p>
+          <p className="text-xs text-muted-foreground">Upload a file first, then return here to review column mappings.</p>
+          <Link
+            to={connectorsPath}
+            className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            Go to Data Sources
+          </Link>
+        </div>
+      )}
+
+      {!jobsLoading && !jobsError && jobs.length > 0 && (
         <div className="grid grid-cols-4 gap-4">
           {/* Job selector */}
           <div className="col-span-1">
@@ -110,7 +187,7 @@ export default function DataMapping() {
               {jobs.map(job => (
                 <button
                   key={job.job_id}
-                  onClick={() => loadJob(job.job_id)}
+                  onClick={() => setSelectedJobId(job.job_id)}
                   className={cn('w-full text-left px-3 py-2.5 rounded-lg border transition-colors',
                     selected?.job_id === job.job_id
                       ? 'border-primary/20 bg-primary/5 text-foreground'
@@ -125,7 +202,13 @@ export default function DataMapping() {
 
           {/* Mappings table */}
           <div className="col-span-3">
-            {selected && (
+            {jobLoading && selectedJobId && (
+              <div className="space-y-3">
+                <Skeleton className="h-24 w-full rounded-xl" />
+                <Skeleton className="h-56 w-full rounded-xl" />
+              </div>
+            )}
+            {!jobLoading && selected && (
               <>
                 {/* Summary */}
                 <div className="grid grid-cols-3 gap-3 mb-4">
@@ -176,7 +259,8 @@ export default function DataMapping() {
                             <select
                               value={overrides[m.source_column] ?? m.ontology_field ?? ''}
                               onChange={e => setOverrides(prev => ({ ...prev, [m.source_column]: e.target.value }))}
-                              className="bg-muted border border-border rounded px-2 py-1 text-xs text-card-foreground focus:outline-none focus:ring-1 focus:ring-primary w-full max-w-xs"
+                              aria-label={`Map column ${m.source_column}`}
+                              className="bg-muted border border-border rounded px-2 py-1 text-xs text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring w-full max-w-xs"
                             >
                               <option value="">— unassigned —</option>
                               {ONTOLOGY_FIELDS.map(f => <option key={f} value={f}>{f}</option>)}

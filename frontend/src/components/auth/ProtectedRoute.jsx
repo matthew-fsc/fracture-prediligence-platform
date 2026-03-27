@@ -61,6 +61,14 @@ function ClerkGuard({ children }) {
 export default function ProtectedRoute({ children }) {
   const hasKey = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY)
   if (!hasKey && import.meta.env.PROD) return <NoClerkNotice />
-  if (!hasKey) return children
+  if (!hasKey) {
+    if (import.meta.env.DEV) {
+      console.warn(
+        '[Prediligence] VITE_CLERK_PUBLISHABLE_KEY is not set — dashboard routes are not authenticated. ' +
+          'Set the key for staging/production builds.',
+      )
+    }
+    return children
+  }
   return <ClerkGuard>{children}</ClerkGuard>
 }

@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
-import { Target, ChevronDown, ChevronRight, Clock } from 'lucide-react'
+import { Target, ChevronDown, ChevronRight, Clock, AlertTriangle } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { valueCreationLevers } from '../lib/mockData'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useCompanyId } from '../context/CompanyContext'
-import { apiUrl } from '../lib/apiClient'
+import { apiClient } from '../lib/apiClient'
 
 const catColors = {
   operations:             { bg: 'bg-red-500/10',     text: 'text-red-400',     border: 'border-red-500/20'     },
@@ -81,21 +82,43 @@ function DriverCard({ d, rank }) {
 
 export default function ValueGap() {
   const companyId = useCompanyId()
-  const [liveData, setLiveData] = useState(null)
-  const [gapData, setGapData] = useState(null)
 
-  useEffect(() => {
-    fetch(apiUrl(`/api/analytics/scores/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
-      .then(setLiveData)
-      .catch(() => {})
-    fetch(apiUrl(`/api/analytics/value-gap/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
-      .then(setGapData)
-      .catch(() => {})
-  }, [companyId])
+  const companyReady = companyId != null && companyId > 0
 
-  if (liveData === null || gapData === null) {
+  const liveQuery = useQuery({
+    queryKey: ['analytics-scores', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/scores/${companyId}`),
+    enabled: companyReady,
+  })
+  const gapQuery = useQuery({
+    queryKey: ['analytics-value-gap', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/value-gap/${companyId}`),
+    enabled: companyReady,
+  })
+
+  const liveData = liveQuery.data ?? null
+  const gapData = gapQuery.data ?? null
+  const loading = liveQuery.isPending || gapQuery.isPending
+  const pageError =
+    liveQuery.isError ? liveQuery.error?.message
+      : gapQuery.isError ? gapQuery.error?.message
+        : null
+
+  if (!companyReady) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="Value Gap Analysis"
+          subtitle="The difference between what the business is worth today and what it could be worth with targeted improvements"
+        />
+        <p className="text-sm text-muted-foreground">
+          Select or create a client in the header to load value gap data.
+        </p>
+      </div>
+    )
+  }
+
+  if (loading) {
     return (
       <div className="space-y-5 max-w-[1400px]">
         <Skeleton className="h-8 w-64" />
@@ -113,6 +136,34 @@ export default function ValueGap() {
           <div className="col-span-12 lg:col-span-7 space-y-3">
             {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (pageError || liveData == null || gapData == null) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="Value Gap Analysis"
+          subtitle="The difference between what the business is worth today and what it could be worth with targeted improvements"
+        />
+        <div
+          className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-6 text-center text-sm text-red-400 flex flex-col items-center gap-3"
+          role="alert"
+        >
+          <AlertTriangle className="w-8 h-8 opacity-80" />
+          <p>{pageError || 'Value gap data could not be loaded.'}</p>
+          <button
+            type="button"
+            onClick={() => {
+              liveQuery.refetch()
+              gapQuery.refetch()
+            }}
+            className="text-xs font-semibold px-3 py-2 rounded-lg border border-border bg-card hover:bg-muted/50"
+          >
+            Retry
+          </button>
         </div>
       </div>
     )

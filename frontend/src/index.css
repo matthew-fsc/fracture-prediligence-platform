@@ -99,6 +99,14 @@
     overscroll-behavior: none;
   }
 
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
   /* Dark scrollbars — webkit (Chrome, Edge, Safari) */
   ::-webkit-scrollbar {
     width: 6px;

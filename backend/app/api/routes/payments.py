@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.db_functions import get_user_subscription
+from app.core.db_functions import get_spots_remaining, get_user_subscription
 from app.core.config import settings
 from app.middleware.auth import CurrentUser, get_current_user
 
@@ -50,12 +50,18 @@ class CheckoutRequest(BaseModel):
 async def create_checkout(
     body: CheckoutRequest,
     user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """Create a Stripe Checkout session for the requested tier."""
     if not stripe.api_key:
         raise HTTPException(status_code=503, detail="Stripe not configured — add STRIPE_SECRET_KEY to .env")
 
     tier = body.tier.lower()
+    if tier == "founding" and get_spots_remaining(db) <= 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Founding tier is sold out — no spots remaining.",
+        )
     price_id = PRICE_IDS.get(tier)
     if not price_id:
         raise HTTPException(
@@ -81,6 +87,16 @@ async def create_checkout(
 
     except stripe.StripeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/me")
+def get_me(
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Current user id plus subscription summary for the dashboard header."""
+    sub = get_user_subscription(db, user.user_id)
+    return {"user_id": user.user_id, "subscription": sub}
 
 
 @router.get("/user/subscription")

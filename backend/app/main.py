@@ -42,14 +42,31 @@ def _bootstrap_db():
                     conn.execute(text(f'ALTER TABLE qualitative_inputs ADD COLUMN {col} {col_type}'))
             conn.commit()
 
+    if 'companies' in inspector.get_table_names():
+        co_cols = {c['name'] for c in inspector.get_columns('companies')}
+        if 'owner_user_id' not in co_cols:
+            with engine.connect() as conn:
+                conn.execute(text('ALTER TABLE companies ADD COLUMN owner_user_id VARCHAR(256)'))
+                conn.commit()
+            logger.info('Added companies.owner_user_id column (additive migration).')
+
     db = SessionLocal()
     try:
         from app.ontology.models import Company
         from app.core.db_functions import _ensure_spots_setting
         from app.analytics.market_benchmarks import seed_curated_benchmarks_if_empty
 
-        if not db.query(Company).filter(Company.id == 1).first():
+        c1 = db.query(Company).filter(Company.id == 1).first()
+        if not c1:
             db.add(Company(id=1, name="Demo Company"))
+            db.commit()
+            c1 = db.query(Company).filter(Company.id == 1).first()
+        if (
+            c1
+            and c1.owner_user_id is None
+            and settings.SEED_COMPANY_1_OWNER_USER_ID
+        ):
+            c1.owner_user_id = settings.SEED_COMPANY_1_OWNER_USER_ID
             db.commit()
 
         _ensure_spots_setting(db)
