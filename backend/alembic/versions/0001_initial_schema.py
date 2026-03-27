@@ -138,7 +138,7 @@ def upgrade() -> None:
         "ingestion_jobs",
         sa.Column("id",               sa.Integer,      primary_key=True),
         sa.Column("company_id",       sa.Integer,      sa.ForeignKey("companies.id"), nullable=False),
-        sa.Column("ingestion_id",     sa.String(128),  unique=True, index=True, nullable=False),
+        sa.Column("ingestion_id",     sa.String(128),  nullable=False),
         sa.Column("filename",         sa.String(512),  nullable=False),
         sa.Column("source_type",      sa.String(64)),
         sa.Column("file_path",        sa.String(1024)),
@@ -156,6 +156,15 @@ def upgrade() -> None:
         sa.Column("created_at",       sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("updated_at",       sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("completed_at",     sa.DateTime),
+        if_not_exists=True,
+    )
+
+    # ── ingestion_jobs indexes ─────────────────────────────────────────────
+    op.create_index(
+        "ix_ingestion_jobs_ingestion_id",
+        "ingestion_jobs",
+        ["ingestion_id"],
+        unique=True,
         if_not_exists=True,
     )
 
