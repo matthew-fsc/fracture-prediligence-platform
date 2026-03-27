@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   Zap, House, Building, Workflow, Grid3x3, BarChart2,
   Eye, TrendingUp, Target, Activity, Plug, ArrowRightLeft,
-  Folder, FileText, Bot, Settings, ChevronLeft,
+  Folder, FileText, Bot, Settings, ChevronLeft, ClipboardList,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
@@ -18,8 +18,9 @@ const groups = [
   {
     label: 'Intelligence',
     items: [
-      { label: 'Readiness Score',    href: '/Readiness',        icon: Grid3x3 },
-      { label: 'Business Quality',   href: '/BusinessQuality',  icon: BarChart2 },
+      { label: 'Readiness Score',    href: '/Readiness',           icon: Grid3x3 },
+      { label: 'Qualitative Inputs', href: '/QualitativeInputs',   icon: ClipboardList },
+      { label: 'Business Quality',   href: '/BusinessQuality',     icon: BarChart2 },
       { label: 'Buyer Risk Profile', href: '/BuyerLens',        icon: Eye },
       { label: 'Valuation',          href: '/Valuation',        icon: TrendingUp },
     ],

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Bell, Building2, ChevronDown, Search, LogOut } from 'lucide-react'
-import { kpis } from '../../lib/mockData'
-import { fmtM } from '../../lib/utils'
+import { fmtM, cn } from '../../lib/utils'
 import { useUser, useClerk } from '@clerk/clerk-react'
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
@@ -103,8 +102,15 @@ function UserSection() {
 // Header
 // ---------------------------------------------------------------------------
 export default function Header({ liveScores }) {
-  const drs = liveScores?.drs?.base ?? kpis.drs
+  const loading = liveScores === null
+  const drs = liveScores?.drs?.base
   const ev  = liveScores?.enterprise_value?.midpoint ?? null
+  const tier = liveScores?.drs?.tier ?? null
+
+  const drsColor = drs == null ? 'text-muted-foreground'
+    : drs >= 75 ? 'text-emerald-400'
+    : drs >= 55 ? 'text-amber-400'
+    : 'text-red-400'
 
   return (
     <header className="h-14 border-b border-border bg-card/60 backdrop-blur-sm flex items-center justify-between px-4 sticky top-0 z-40 flex-shrink-0">
@@ -112,13 +118,18 @@ export default function Header({ liveScores }) {
       <div className="flex items-center gap-3">
         <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border hover:bg-muted/50 transition-colors text-xs font-medium text-card-foreground">
           <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="max-w-[140px] truncate">Meridian Consulting Group</span>
+          <span className="max-w-[140px] truncate">ABC Company Inc</span>
           <ChevronDown className="w-3 h-3 text-muted-foreground" />
         </button>
-        <span className="text-xs text-muted-foreground font-medium">{drs}/100 Readiness</span>
-        {ev !== null && ev > 0
+        <span className={cn('text-xs font-semibold', drsColor)}>
+          {loading ? '—' : `${Math.round(drs)}/100`}
+          <span className="text-muted-foreground font-normal ml-1">Readiness{tier ? ` · ${tier}` : ''}</span>
+        </span>
+        {!loading && ev !== null && ev > 0
           ? <span className="text-xs font-semibold text-primary">{fmtM(ev)} EV</span>
-          : <span className="text-xs font-semibold text-primary">No EV data</span>
+          : !loading
+          ? <span className="text-xs text-muted-foreground">—</span>
+          : null
         }
       </div>
 

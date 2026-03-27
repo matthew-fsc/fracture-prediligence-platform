@@ -20,11 +20,11 @@ const WORKFLOW_STAGES = [
 ]
 
 const STAGE_PROGRESS = [
-  { stage: 1, status: 'completed',   pct: 100, note: 'Meridian Consulting Group profile complete' },
-  { stage: 2, status: 'completed',   pct: 100, note: 'EV $14.1M–$19.7M · DRS 75.3' },
-  { stage: 3, status: 'completed',   pct: 100, note: '4 sources · 1,948 records ingested' },
-  { stage: 4, status: 'in_progress', pct: 60,  note: 'DRS 75.3 — Management & Growth need work' },
-  { stage: 5, status: 'in_progress', pct: 40,  note: '4 open diligence flags identified' },
+  { stage: 1, status: 'completed',   pct: 100, note: 'ABC Company Inc profile complete — Field Services, CA, S-Corp, est. 2009' },
+  { stage: 2, status: 'completed',   pct: 100, note: 'EV $2.0M–$2.8M · DRS 50.4 · HIGH_RISK tier' },
+  { stage: 3, status: 'completed',   pct: 100, note: '3 years · 796 revenue records · $8.8M 3yr total' },
+  { stage: 4, status: 'in_progress', pct: 50,  note: 'DRS 50.4 — Customer concentration & key person are primary blockers' },
+  { stage: 5, status: 'in_progress', pct: 30,  note: '5 critical diligence flags — COMPANY 1 concentration, no contracts' },
   { stage: 6, status: 'not_started', pct: 0,   note: null },
   { stage: 7, status: 'not_started', pct: 0,   note: null },
   { stage: 8, status: 'not_started', pct: 0,   note: null },

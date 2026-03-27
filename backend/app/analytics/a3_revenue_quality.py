@@ -26,18 +26,50 @@ from app.ontology.models import RevenueStream, Contract
 # ── Sub-score helpers ─────────────────────────────────────────────────────────
 
 def _recurring_rate_score(revenue_rows: list) -> tuple[float, float]:
-    """Returns (score_0_100, recurring_pct)."""
+    """Returns (score_0_100, recurring_pct).
+
+    Explicit tagging (recurring_flag / RECURRING / SUBSCRIPTION) is used when
+    meaningful coverage exists (>=5% of revenue is explicitly tagged).
+    Otherwise, behavioral detection kicks in: revenue from customers who appear
+    in 3+ distinct calendar months is treated as recurring.  This handles
+    QuickBooks imports where recurring project/retainer lines land as PROJECT or
+    TRANSACTIONAL types despite being de-facto recurring.
+    """
     if not revenue_rows:
         return 50.0, 0.0
-    total = sum(float(r.revenue_gross) for r in revenue_rows if r.revenue_gross)
-    recurring = sum(
-        float(r.revenue_gross) for r in revenue_rows
-        if r.recurring_flag or r.revenue_type in ("RECURRING", "SUBSCRIPTION")
-    )
+
+    total = sum(float(r.revenue_gross or 0) for r in revenue_rows)
     if total == 0:
         return 50.0, 0.0
-    pct = recurring / total
-    # Linear: 0%→0, 50%→60, 75%→80, 90%→95, 100%→100
+
+    # --- Explicit tagging ---
+    explicit_recurring = sum(
+        float(r.revenue_gross or 0) for r in revenue_rows
+        if r.recurring_flag or r.revenue_type in ("RECURRING", "SUBSCRIPTION")
+    )
+    explicit_pct = explicit_recurring / total
+
+    if explicit_pct >= 0.05:
+        # Sufficient explicit tagging — use it directly
+        pct = explicit_pct
+    else:
+        # Sparse tagging — fall back to behavioral detection:
+        # customers with revenue in >=3 distinct months are recurring
+        cust_months: dict = {}
+        cust_revenue: dict = {}
+        for r in revenue_rows:
+            if r.customer_id and r.revenue_period:
+                month = r.revenue_period.strftime("%Y-%m")
+                cust_months.setdefault(r.customer_id, set()).add(month)
+                cust_revenue[r.customer_id] = (
+                    cust_revenue.get(r.customer_id, 0.0) + float(r.revenue_gross or 0)
+                )
+        behavioral_recurring = sum(
+            v for k, v in cust_revenue.items() if len(cust_months[k]) >= 3
+        )
+        pct = behavioral_recurring / total
+
+    # Scoring bands: 0%→0, 50%→60, 75%→80, 90%→95, 100%→100
     if pct >= 0.90:
         score = 95 + (pct - 0.90) / 0.10 * 5
     elif pct >= 0.75:
@@ -103,7 +135,15 @@ def _contract_durability_score(revenue_rows: list, contracts: list) -> tuple[flo
 
 
 def _cagr_consistency_score(revenue_rows: list) -> tuple[float, float]:
-    """Returns (score_0_100, coefficient_of_variation_pct)."""
+    """Returns (score_0_100, coefficient_of_variation_pct).
+
+    Handles the common QuickBooks export pattern where annual summary rows are
+    dumped into Jan-1 of each year alongside true monthly transaction rows.
+    Detection: if any month exceeds 3× the median of all months in the series,
+    treat it as an annual aggregate and normalize it to 1/12 of its value before
+    computing CV.  This prevents a small number of lump-sum rows from
+    artificially inflating variance.
+    """
     if not revenue_rows:
         return 50.0, 0.0
 
@@ -117,14 +157,39 @@ def _cagr_consistency_score(revenue_rows: list) -> tuple[float, float]:
     if len(monthly) < 3:
         return 50.0, 0.0
 
-    values = [monthly[k] for k in sorted(monthly.keys())]
+    values_raw = [monthly[k] for k in sorted(monthly.keys())]
+
+    # Detect annual-dump outliers: months > 3× median — normalize to monthly avg
+    sorted_vals = sorted(values_raw)
+    median = sorted_vals[len(sorted_vals) // 2]
+    threshold = median * 3 if median > 0 else float("inf")
+
+    values = []
+    for v in values_raw:
+        values.append(v / 12.0 if v > threshold else v)
+
     mean = sum(values) / len(values)
     if mean == 0:
         return 50.0, 0.0
 
     variance = sum((v - mean) ** 2 for v in values) / len(values)
     std_dev = sqrt(variance)
-    cv = (std_dev / mean) * 100  # coefficient of variation %
+    cv = (std_dev / mean) * 100
+
+    # If monthly CV is still very high (>80%), the monthly series is too noisy
+    # (mixed annual-dump and transactional data) — fall back to annual granularity.
+    if cv > 80:
+        annual: dict[int, float] = {}
+        for r in revenue_rows:
+            if r.revenue_period:
+                yr = r.revenue_period.year
+                annual[yr] = annual.get(yr, 0.0) + float(r.revenue_gross or 0)
+        if len(annual) >= 2:
+            ann_vals = [annual[k] for k in sorted(annual.keys())]
+            ann_mean = sum(ann_vals) / len(ann_vals)
+            if ann_mean > 0:
+                ann_var = sum((v - ann_mean) ** 2 for v in ann_vals) / len(ann_vals)
+                cv = (sqrt(ann_var) / ann_mean) * 100
 
     # Low CV = consistent = high score
     if cv <= 10:

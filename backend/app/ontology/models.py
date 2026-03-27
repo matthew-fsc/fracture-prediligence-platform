@@ -223,3 +223,62 @@ class AppSetting(Base):
 
     key:        Mapped[str] = mapped_column(String(128), primary_key=True)
     value:      Mapped[str] = mapped_column(Text)
+
+
+# ---------------------------------------------------------------------------
+# Advisor override layer (Blueprint II §A9 override audit trail)
+# ---------------------------------------------------------------------------
+
+class AdvisorOverride(Base):
+    __tablename__ = "advisor_overrides"
+
+    id:          Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:  Mapped[int]            = mapped_column(ForeignKey("companies.id"), index=True)
+    category:    Mapped[str]            = mapped_column(String(64))   # e.g. "revenue_quality"
+    adjustment:  Mapped[float]          = mapped_column(Numeric(6, 2))  # -20 to +20
+    rationale:   Mapped[str]            = mapped_column(Text)
+    advisor_id:  Mapped[Optional[str]]  = mapped_column(String(256), nullable=True)
+    created_at:  Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at:  Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Qualitative inputs (Blueprint II §A4 / A7 sub-scores from advisor interview)
+# ---------------------------------------------------------------------------
+
+class QualitativeInputs(Base):
+    __tablename__ = "qualitative_inputs"
+
+    id:                    Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:            Mapped[int]            = mapped_column(ForeignKey("companies.id"), unique=True, index=True)
+    owner_hours_per_week:  Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # 0–80
+    sop_pct:               Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # 0–100
+    automation_pct:        Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # 0–100
+    mgmt_qualified:        Mapped[Optional[int]]   = mapped_column(Integer, nullable=True)          # qualified managers
+    mgmt_total_functions:  Mapped[Optional[int]]   = mapped_column(Integer, nullable=True)          # total core functions
+    pipeline_value:        Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)  # $ qualified pipeline
+    market_positioning:    Mapped[Optional[str]]   = mapped_column(String(32), nullable=True)       # defined|moderate|undifferentiated
+    repeatability_pct:     Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # 0–100
+    updated_at:            Mapped[datetime]        = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Addback overrides (advisor challenge-rate edits + custom addbacks)
+# ---------------------------------------------------------------------------
+
+class AddbackOverride(Base):
+    __tablename__ = "addback_overrides"
+
+    id:           Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:   Mapped[int]            = mapped_column(ForeignKey("companies.id"), index=True)
+    addback_key:  Mapped[str]            = mapped_column(String(128))   # e.g. "owner_comp", "custom_abc"
+    description:  Mapped[str]            = mapped_column(String(256))
+    amount:       Mapped[float]          = mapped_column(Numeric(14, 2))
+    challenge:    Mapped[str]            = mapped_column(String(32))    # LOW|MEDIUM|HIGH|NOT_DEFENSIBLE
+    category:     Mapped[str]            = mapped_column(String(64))
+    documented:   Mapped[bool]           = mapped_column(Boolean, default=False)
+    notes:        Mapped[Optional[str]]  = mapped_column(Text, nullable=True)
+    rationale:    Mapped[Optional[str]]  = mapped_column(Text, nullable=True)   # advisor's reason for override
+    advisor_id:   Mapped[Optional[str]]  = mapped_column(String(256), nullable=True)
+    is_custom:    Mapped[bool]           = mapped_column(Boolean, default=False)  # True = advisor-added line
+    updated_at:   Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

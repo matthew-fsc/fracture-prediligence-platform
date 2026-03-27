@@ -79,7 +79,7 @@ def _score_color(score: float) -> tuple[int, int, int]:
 class _BasePDF(FPDF):
     """Shared header/footer for all report types."""
 
-    _company_name = "Meridian Consulting Group"
+    _company_name = "ABC Company Inc"
     _report_title = "Advisory Report"
     _report_date  = ""
 
@@ -531,7 +531,7 @@ REPORT_BUILDERS = {
 
 
 def generate_report_pdf(report_type: str, company_id: int, db: Session,
-                         company_name: str = "Meridian Consulting Group") -> bytes:
+                         company_name: str = "ABC Company Inc") -> bytes:
     """
     Generate a PDF report and return its bytes.
     Raises KeyError for unknown report_type.

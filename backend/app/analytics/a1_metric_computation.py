@@ -187,7 +187,8 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
 
     owner_comp = sum(e.amount for e in expenses if e.category in (ExpenseCategory.OWNER, ExpenseCategory.PERSONAL))
     employees_q = db.query(Employee).filter(Employee.company_id == company_id, Employee.is_owner == True, Employee.status == EmployeeStatus.ACTIVE).all()
-    owner_salary = sum(e.comp_annual or 0 for e in employees_q)
+    # Use OWNER expenses as authoritative when present (avoids double-counting with comp_annual)
+    owner_salary = Decimal(0) if owner_comp > 0 else sum(e.comp_annual or 0 for e in employees_q)
     m.owner_compensation_total = owner_comp + Decimal(str(owner_salary))
 
     # --- Employees ---

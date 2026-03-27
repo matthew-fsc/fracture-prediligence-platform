@@ -30,6 +30,9 @@ import DemoScenarioSimulator from './pages/ScenarioSimulator'
 import DemoDataRoom from './pages/DataRoom'
 import DemoReports from './pages/Reports'
 import DemoRiskHeatmap from './pages/RiskHeatmap'
+import DemoConnectors from './pages/Connectors'
+import DemoDataMapping from './pages/DataMapping'
+import DemoQualitativeInputs from './pages/QualitativeInputs'
 
 // Dashboard pages
 import Home from './pages/Home'
@@ -50,6 +53,7 @@ import DataRoom from './pages/DataRoom'
 import Reports from './pages/Reports'
 import AICopilot from './pages/AICopilot'
 import Admin from './pages/Admin'
+import QualitativeInputs from './pages/QualitativeInputs'
 
 // Admin pages
 import AdminDemos from './pages/admin/AdminDemos'
@@ -111,6 +115,9 @@ export default function App() {
           <Route path="scenario-simulator" element={<DemoScenarioSimulator />} />
           <Route path="data-room"          element={<DemoDataRoom />} />
           <Route path="reports"            element={<DemoReports />} />
+          <Route path="data-sources"       element={<DemoConnectors />} />
+          <Route path="field-mapping"      element={<DemoDataMapping />} />
+          <Route path="qualitative-inputs" element={<DemoQualitativeInputs />} />
         </Route>
         <Route path="/demo/:slug" element={<DemoShellWithSlug />}>
           <Route index element={<DemoHome2 />} />
@@ -127,6 +134,9 @@ export default function App() {
           <Route path="scenario-simulator" element={<DemoScenarioSimulator />} />
           <Route path="data-room"          element={<DemoDataRoom />} />
           <Route path="reports"            element={<DemoReports />} />
+          <Route path="data-sources"       element={<DemoConnectors />} />
+          <Route path="field-mapping"      element={<DemoDataMapping />} />
+          <Route path="qualitative-inputs" element={<DemoQualitativeInputs />} />
         </Route>
 
         {/* ---------------------------------------------------------------- */}
@@ -163,6 +173,7 @@ export default function App() {
           <Route path="Reports"           element={<Reports />} />
           <Route path="AICopilot"         element={<AICopilot />} />
           <Route path="Admin"             element={<Admin />} />
+          <Route path="QualitativeInputs" element={<QualitativeInputs />} />
         </Route>
 
         {/* ---------------------------------------------------------------- */}

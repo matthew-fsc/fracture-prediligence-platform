@@ -18,7 +18,7 @@ MULTIPLE_TABLE: dict[DRSTier, tuple[float, float]] = {
     DRSTier.INVESTMENT:     (5.0, 7.0),
     DRSTier.CONDITIONAL:    (3.5, 5.0),
     DRSTier.HIGH_RISK:      (2.5, 3.5),
-    DRSTier.PRE_DILIGENCE:  (1.5, 2.5),
+    DRSTier.PRE_DILIGENCE:  (2.5, 3.0),
 }
 
 

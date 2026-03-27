@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { cn } from '../lib/utils'
-import { fmtM } from '../lib/utils'
+import { cn, fmtM } from '../lib/utils'
 import { Target, CheckCircle, Circle, Clock } from 'lucide-react'
 import { valueCreationLevers, kpis as mockKpis } from '../lib/mockData'
 

@@ -1,7 +1,14 @@
 import { useState, useRef } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { Upload, AlertCircle, FileText, RefreshCw, ChevronRight, CheckCircle, Circle, Database } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
+
+function useSiblingPath(segment) {
+  const { pathname } = useLocation()
+  // Replace the last path segment (or append if at demo root)
+  return pathname.replace(/\/[^/]*$/, '') + '/' + segment
+}
 
 const COMPANY_ID = 1
 
@@ -41,6 +48,7 @@ function phaseLabel(phase, status) {
 }
 
 export default function Connectors() {
+  const fieldMappingPath = useSiblingPath('field-mapping')
   const [jobs, setJobs]             = useState([])
   const [uploading, setUploading]   = useState(false)
   const [dragOver, setDragOver]     = useState(false)
@@ -227,9 +235,9 @@ export default function Connectors() {
               </div>
               <p className="text-[11px] text-primary mt-1">{phaseLabel(job.phase, job.status)}</p>
               {job.status === 'AWAITING_REVIEW' && (
-                <a href="/DataMapping" className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary font-medium">
+                <Link to={fieldMappingPath} className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary font-medium">
                   Review column mappings <ChevronRight className="w-3 h-3" />
-                </a>
+                </Link>
               )}
             </div>
           ))}

@@ -41,7 +41,7 @@ function DemoHeader({ demoData, slug, personalized }) {
           >
             DEMO
           </span>
-          <span className="text-muted-foreground max-w-[160px] truncate">Meridian Consulting Group</span>
+          <span className="text-muted-foreground max-w-[160px] truncate">ABC Company Inc</span>
         </div>
         {drs != null && (
           <span className="text-xs text-muted-foreground font-medium">{drs}/100 Readiness</span>

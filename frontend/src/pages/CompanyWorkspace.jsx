@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import SectionHeader from '../components/ui/SectionHeader'
-import { cn } from '../lib/utils'
-import { fmtM } from '../lib/utils'
+import { cn, fmtM } from '../lib/utils'
 import { company, valueCreationLevers, marketBenchmarks } from '../lib/mockData'
 // Note: company (name/initials/founded/industry) still from mockData until company API exists
 import { ArrowRight, TrendingUp } from 'lucide-react'
@@ -27,6 +26,7 @@ export default function CompanyWorkspace() {
   const [liveScores, setLiveScores] = useState(null)
   const [metrics, setMetrics]       = useState(null)
   const [bqData, setBqData]         = useState(null)
+  const [gapData, setGapData]       = useState(null)
 
   useEffect(() => {
     fetch(`/api/analytics/scores/${COMPANY_ID}`)
@@ -41,6 +41,10 @@ export default function CompanyWorkspace() {
       .then(r => r.ok ? r.json() : null)
       .then(setBqData)
       .catch(() => {})
+    fetch(`/api/analytics/value-gap/${COMPANY_ID}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setGapData)
+      .catch(() => {})
   }, [])
 
   const ev = liveScores?.enterprise_value ?? {}
@@ -48,9 +52,11 @@ export default function CompanyWorkspace() {
     drs:            liveScores?.drs?.base ?? 0,
     tier:           liveScores?.drs?.tier ?? '—',
     ebitda:         ev.ebitda_base        ?? metrics?.ebitda_ttm ?? 0,
-    currentEV:      ev.midpoint           ?? 0,
-    potentialEV:    ev.ceiling            ?? 0,
-    valueGap:       Math.max(0, (ev.ceiling ?? 0) - (ev.midpoint ?? 0)),
+    currentEV:      ev.midpoint                                          ?? 0,
+    potentialEV:    gapData?.potential_ev_midpoint ?? ev.ceiling          ?? 0,
+    // Derive gap as potentialEV − currentEV so the three cards always add up correctly
+    // (gapData and scores use different EBITDA bases; reading gap from gapData directly causes mismatch)
+    get valueGap() { return Math.max(0, this.potentialEV - this.currentEV) },
     ebitdaMultiple: ev.multiple_used      ?? '—',
     ttmRevenue:     metrics?.total_revenue_ttm ?? 0,
     drsPercentile:  liveScores?.drs?.base >= 85 ? 90 : liveScores?.drs?.base >= 70 ? 62 : 40,
@@ -176,7 +182,7 @@ export default function CompanyWorkspace() {
           const custItems = [
             { label: 'Customers',      value: metrics ? String(metrics.total_customer_count) : '—',  sub: 'active base' },
             { label: 'Avg Tenure',     value: metrics ? `${metrics.avg_customer_tenure_years.toFixed(1)}yr` : '—', sub: 'retention signal' },
-            { label: 'Recurring Rev',  value: metrics ? `${metrics.recurring_revenue_pct.toFixed(0)}%` : '—', sub: 'of TTM revenue' },
+            { label: 'Recurring Rev',  value: (() => { const v = liveScores?.category_scores?.revenue_quality?.sub_scores?.recurring_rate?.value ?? metrics?.recurring_revenue_pct; return v != null ? `${parseFloat(v).toFixed(0)}%` : '—' })(), sub: 'of TTM revenue' },
             { label: 'Concentration',  value: custScores.concentration?.score != null ? `${custScores.concentration.score.toFixed(0)}` : '—', sub: 'HHI score /100' },
           ]
           return (

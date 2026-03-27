@@ -4,6 +4,9 @@
 
 title Rebuild Frontend
 
+:: Ensure node is on PATH regardless of shell state
+set PATH=C:\Users\mtbaj\AppData\Local\Programs\nodejs;%PATH%
+
 cd /d "%~dp0frontend"
 echo Rebuilding frontend...
 call npm run build

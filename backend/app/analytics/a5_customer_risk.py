@@ -31,6 +31,7 @@ class CustomerRiskScore:
     churn_score: float
     tenure_score: float
     top_customer_pct: float
+    top_customer_name: str
     active_customer_count: int
     inactive_pct: float
     avg_tenure_years: float
@@ -41,6 +42,8 @@ class CustomerRiskScore:
         return {
             "company_id": self.company_id,
             "composite":  self.composite,
+            "top_customer_name": self.top_customer_name,
+            "top_customer_pct":  self.top_customer_pct,
             "sub_scores": {
                 "concentration":    {"score": self.concentration_score,   "value": self.top_customer_pct,     "label": f"Top customer {self.top_customer_pct:.0f}% of revenue"},
                 "diversification":  {"score": self.diversification_score, "value": self.active_customer_count, "label": f"{self.active_customer_count} active customers, {self.industry_count} industries"},
@@ -68,25 +71,43 @@ def compute_customer_risk(company_id: int, db: Session) -> CustomerRiskScore:
             company_id=company_id, composite=50.0,
             concentration_score=50.0, diversification_score=50.0,
             churn_score=50.0, tenure_score=50.0,
-            top_customer_pct=0.0, active_customer_count=0,
-            inactive_pct=0.0, avg_tenure_years=0.0, industry_count=0,
+            top_customer_pct=0.0, top_customer_name="Unknown",
+            active_customer_count=0, inactive_pct=0.0,
+            avg_tenure_years=0.0, industry_count=0,
             data_confidence="LOW",
         )
 
     active = [c for c in customers if c.is_active]
     inactive_pct = (1 - len(active) / len(customers)) * 100 if customers else 0.0
 
-    # 1. Top-customer revenue concentration
+    # 1. Top-customer revenue concentration — use TTM window for current-state accuracy
+    max_date = max((r.revenue_period for r in revenue if r.revenue_period), default=None)
+    if max_date:
+        from datetime import timedelta
+        ttm_start = max_date - timedelta(days=365)
+        ttm_revenue = [r for r in revenue if r.revenue_period and r.revenue_period >= ttm_start]
+    else:
+        ttm_revenue = revenue
+
     cust_rev: dict[int, float] = {}
     total_rev = 0.0
-    for r in revenue:
+    for r in ttm_revenue:
         if r.customer_id:
             cust_rev[r.customer_id] = cust_rev.get(r.customer_id, 0) + float(r.revenue_gross or 0)
         total_rev += float(r.revenue_gross or 0)
 
     top_pct = 0.0
+    top_cust_id = None
     if cust_rev and total_rev > 0:
-        top_pct = max(cust_rev.values()) / total_rev * 100
+        top_cust_id = max(cust_rev, key=cust_rev.get)
+        top_pct = cust_rev[top_cust_id] / total_rev * 100
+
+    # Resolve top customer name
+    top_cust_name = "Unknown"
+    if top_cust_id:
+        cust_obj = next((c for c in customers if c.id == top_cust_id), None)
+        if cust_obj:
+            top_cust_name = cust_obj.name
 
     if top_pct >= 50:
         s_conc = 10 + max(0, (50 - top_pct))
@@ -163,6 +184,7 @@ def compute_customer_risk(company_id: int, db: Session) -> CustomerRiskScore:
         churn_score=round(s_churn, 1),
         tenure_score=round(s_tenure, 1),
         top_customer_pct=round(top_pct, 1),
+        top_customer_name=top_cust_name,
         active_customer_count=n_active,
         inactive_pct=round(inactive_pct, 1),
         avg_tenure_years=round(avg_tenure, 2),

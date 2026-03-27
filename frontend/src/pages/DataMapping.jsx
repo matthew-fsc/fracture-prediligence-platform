@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { ArrowRight, CheckCircle, AlertCircle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
+
+function useSiblingPath(segment) {
+  const { pathname } = useLocation()
+  return pathname.replace(/\/[^/]*$/, '') + '/' + segment
+}
 
 const COMPANY_ID = 1
 
@@ -34,6 +40,7 @@ function methodBadge(m) {
 }
 
 export default function DataMapping() {
+  const dataSourcesPath = useSiblingPath('data-sources')
   const [jobs, setJobs]         = useState([])
   const [selected, setSelected] = useState(null)
   const [mappings, setMappings] = useState([])
@@ -89,7 +96,7 @@ export default function DataMapping() {
 
       {jobs.length === 0 && (
         <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground text-sm">
-          No ingestion jobs found. Upload a file in <a href="/Connectors" className="text-primary">Data Sources</a> first.
+          No ingestion jobs found. Upload a file in <Link to={dataSourcesPath} className="text-primary">Data Sources</Link> first.
         </div>
       )}
 

@@ -43,6 +43,7 @@ export default function Home() {
   const navigate = useNavigate()
   const [liveData, setLiveData] = useState(null)
   const [bqData, setBqData] = useState(null)
+  const [gapData, setGapData] = useState(null)
 
   useEffect(() => {
     fetch(`/api/analytics/scores/${COMPANY_ID}`)
@@ -53,12 +54,15 @@ export default function Home() {
       .then(r => r.ok ? r.json() : null)
       .then(setBqData)
       .catch(() => {})
+    fetch(`/api/analytics/value-gap/${COMPANY_ID}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setGapData)
+      .catch(() => {})
   }, [])
 
   const drs      = liveData?.drs?.base ?? 0
   const currentEV = liveData?.enterprise_value?.midpoint ?? 0
-  const ceilingEV = liveData?.enterprise_value?.ceiling ?? 0
-  const valueGap  = Math.max(0, ceilingEV - currentEV)
+  const valueGap  = gapData?.total_value_gap ?? Math.max(0, (liveData?.enterprise_value?.ceiling ?? 0) - currentEV)
 
   const criticalCount = bqData?.questions?.filter(q => q.severity === 'CRITICAL').length ?? 0
   const highCount     = bqData?.questions?.filter(q => q.severity === 'HIGH').length ?? 0
@@ -92,10 +96,10 @@ export default function Home() {
           ))
         ) : (
           [
-            { label: 'Active Engagements', value: '1',                   sub: 'Meridian Group',         color: 'blue'    },
-            { label: 'Readiness Score',    value: `${drs}/100`,           sub: 'Investment Grade',       color: 'amber'   },
+            { label: 'Active Engagements', value: '1',                   sub: 'ABC Company Inc',        color: 'blue'    },
+            { label: 'Readiness Score',    value: `${drs}/100`,           sub: 'High Risk Tier',         color: 'amber'   },
             { label: 'Open Blockers',      value: String(blockerCount),   sub: `${criticalCount} critical flags`, color: 'red' },
-            { label: 'Value Opportunity',  value: `+${fmtM(valueGap)}`,  sub: 'ceiling vs midpoint',    color: 'emerald' },
+            { label: 'Value Opportunity',  value: `+${fmtM(valueGap)}`,  sub: 'if all gaps resolved',   color: 'emerald' },
           ].map(c => (
             <div key={c.label} className={cn('rounded-xl border p-3', colorCfg[c.color])}>
               <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{c.label}</p>

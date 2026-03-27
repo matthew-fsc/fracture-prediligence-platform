@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { FileText, Download, RefreshCw, CheckCircle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
-import { cn } from '../lib/utils'
-import { fmtM } from '../lib/utils'
+import { cn, fmtM } from '../lib/utils'
 
 const COMPANY_ID = 1
 

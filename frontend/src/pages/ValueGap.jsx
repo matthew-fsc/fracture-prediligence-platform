@@ -112,10 +112,13 @@ export default function ValueGap() {
 
   const ev = liveData?.enterprise_value
   const currentEV = ev?.midpoint ?? 0
-  const ceilingEV = ev?.ceiling ?? 0
   const floorEV = ev?.floor ?? 0
-  const valueGap = Math.max(0, ceilingEV - currentEV)
+  // Use A11 potential EV (all gaps resolved) as ceiling; fall back to tier ceiling
+  const ceilingEV = gapData?.potential_ev_midpoint ?? ev?.ceiling ?? 0
+  const valueGap = gapData?.total_value_gap ?? Math.max(0, ceilingEV - currentEV)
   const ebitda = ev?.ebitda_base ?? 0
+  const ceilingMultiple = ceilingEV > 0 && ebitda > 0 ? (ceilingEV / ebitda).toFixed(1) : '—'
+  const progressPct = ceilingEV > floorEV ? Math.round((currentEV - floorEV) / (ceilingEV - floorEV) * 100) : 50
 
   // Use live gap data if available, fall back to mock valueCreationLevers
   const drivers = gapData?.gaps
@@ -166,7 +169,7 @@ export default function ValueGap() {
           <div className="space-y-1.5 text-xs border-t border-border pt-3">
             <div className="flex justify-between"><span className="text-muted-foreground">EBITDA (TTM)</span><span className="font-bold text-card-foreground">{fmtM(ebitda)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Implied Multiple</span><span className="font-bold text-blue-400">{ev?.multiple_used ?? '6.0×'}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">DRS Tier</span><span className="text-muted-foreground text-[10px]">{liveData?.drs?.tier ?? 'Investment Grade'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">DRS Tier</span><span className="text-muted-foreground text-[10px]">{liveData?.drs?.tier ?? 'High Risk'}</span></div>
           </div>
         </div>
 
@@ -180,7 +183,7 @@ export default function ValueGap() {
             <span className="text-emerald-400 font-bold">{fmtM(ceilingEV)}</span>
           </div>
           <div className="w-full h-1.5 bg-muted rounded-full mt-1">
-            <div className="h-1.5 bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full" style={{ width: '72%' }} />
+            <div className="h-1.5 bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full" style={{ width: `${progressPct}%` }} />
           </div>
         </div>
 
@@ -188,8 +191,8 @@ export default function ValueGap() {
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Potential Enterprise Value</p>
           <p className="text-3xl font-bold text-emerald-400">{fmtM(ceilingEV)}</p>
           <div className="space-y-1.5 text-xs border-t border-border pt-3">
-            <div className="flex justify-between"><span className="text-muted-foreground">Target EBITDA</span><span className="font-bold text-card-foreground">{fmtM(ebitda * 1.15)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Target Multiple</span><span className="font-bold text-emerald-400">7.0×</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">EBITDA (base)</span><span className="font-bold text-card-foreground">{fmtM(ebitda)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Ceiling Multiple</span><span className="font-bold text-emerald-400">{ceilingMultiple}×</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">All initiatives complete</span><span className="text-muted-foreground text-[10px]">18–24 months</span></div>
           </div>
         </div>

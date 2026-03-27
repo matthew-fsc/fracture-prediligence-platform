@@ -3,10 +3,18 @@ import {
   Zap, House, Building, Workflow, Grid3x3, BarChart2,
   Eye, TrendingUp, Target, Activity,
   Folder, FileText, ChevronLeft, ShieldAlert,
+  UploadCloud, GitMerge,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 const groups = [
+  {
+    label: 'Ingestion',
+    items: [
+      { label: 'Data Upload',    path: 'data-sources',  icon: UploadCloud },
+      { label: 'Field Mapping',  path: 'field-mapping', icon: GitMerge },
+    ],
+  },
   {
     label: 'Workspace',
     items: [
