@@ -34,6 +34,19 @@ export function CompanyProvider({ children }) {
 
   const setCompanyId = useCallback(
     (id) => {
+      if (id === null || id === undefined || id === '') {
+        setCompanyIdState(null)
+        localStorage.removeItem(STORAGE_KEY)
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('company')
+            return next
+          },
+          { replace: true },
+        )
+        return
+      }
       const n = parseCompanyId(id)
       if (n == null) return
       setCompanyIdState(n)

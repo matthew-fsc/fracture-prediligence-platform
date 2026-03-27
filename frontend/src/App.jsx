@@ -14,9 +14,6 @@ import OnboardingPage from './pages/OnboardingPage'
 import SignInPage from './pages/auth/SignInPage'
 import SignUpPage from './pages/auth/SignUpPage'
 
-// Demo pages
-import DemoHome from './pages/demo/DemoHome'
-
 // Demo-accessible pages (same components, no auth required in demo shell)
 import DemoHome2 from './pages/Home'
 import DemoCompanyWorkspace from './pages/CompanyWorkspace'

@@ -19,12 +19,14 @@ FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
 
 def _bootstrap_db():
-    """Create all tables and seed demo company + app settings if not present."""
+    """Seed and additive fixes. Schema in production/staging must come from Alembic — not create_all."""
     # Import all models so Base knows about them
     import app.ontology.models           # noqa: F401
     import app.ontology.ingestion_models  # noqa: F401
 
-    Base.metadata.create_all(bind=engine)
+    # In production, create_all races Alembic (duplicate tables). Dev-only convenience for local DBs.
+    if settings.APP_ENV.lower() == "development":
+        Base.metadata.create_all(bind=engine)
 
     # Additive column migrations — safe to run on every startup
     from sqlalchemy import text, inspect as sa_inspect
@@ -82,7 +84,14 @@ async def lifespan(app: FastAPI):
         logger.warning(
             "SECRET_KEY is still the default; set a strong random SECRET_KEY in production."
         )
-    _bootstrap_db()
+    # Do not fail process startup if DB is unreachable — Railway/load balancers need /health (liveness)
+    # while Postgres is provisioning or DATABASE_URL is wrong. Use /health/ready for DB readiness.
+    try:
+        _bootstrap_db()
+    except Exception:
+        logger.exception(
+            "Database bootstrap failed; API is up but /health/ready will report unavailable until DB works."
+        )
     yield
 
 

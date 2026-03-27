@@ -33,7 +33,7 @@ RUN chmod +x /app/backend/docker-entrypoint.sh
 
 ENV PYTHONPATH=/app/backend
 WORKDIR /app/backend
-ENV PORT=8000
+# Do not set PORT here — Railway (and other hosts) inject PORT at runtime; uvicorn must bind to that value.
 EXPOSE 8000
 
 ENTRYPOINT ["/app/backend/docker-entrypoint.sh"]

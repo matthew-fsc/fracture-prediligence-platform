@@ -6,7 +6,7 @@ import {
   ArrowRight, Activity, ListChecks, Bot, ChevronRight,
   Zap, Clock, Loader2,
 } from 'lucide-react'
-import { apiUrl, apiClient } from '../lib/apiClient'
+import { apiClient } from '../lib/apiClient'
 import { cn, fmtM } from '../lib/utils'
 import { recentActivity } from '../lib/mockData'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -41,11 +41,11 @@ const quickActions = [
   { label: 'Open AI Copilot',           path: '/AICopilot',        color: 'text-primary' },
 ]
 
-function WorkspaceLoading({ label = 'Loading workspace…' }) {
+function workspaceLoadingUi(message = 'Loading workspace…') {
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3 text-muted-foreground">
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      <p className="text-sm">{label}</p>
+      <p className="text-sm">{message}</p>
     </div>
   )
 }
@@ -74,9 +74,9 @@ export default function Home() {
     setBqData(null)
     setGapData(null)
     Promise.all([
-      fetch(apiUrl(`/api/analytics/scores/${companyId}`)).then((r) => (r.ok ? r.json() : null)),
-      fetch(apiUrl(`/api/analytics/buyer-questions/${companyId}`)).then((r) => (r.ok ? r.json() : null)),
-      fetch(apiUrl(`/api/analytics/value-gap/${companyId}`)).then((r) => (r.ok ? r.json() : null)),
+      apiClient.get(`/api/analytics/scores/${companyId}`).catch(() => null),
+      apiClient.get(`/api/analytics/buyer-questions/${companyId}`).catch(() => null),
+      apiClient.get(`/api/analytics/value-gap/${companyId}`).catch(() => null),
     ])
       .then(([scores, buyer, gap]) => {
         if (cancelled) return
@@ -98,7 +98,7 @@ export default function Home() {
 
   if (companyId == null) {
     if (companiesLoading) {
-      return <WorkspaceLoading />
+      return workspaceLoadingUi()
     }
     if (companies.length === 0) {
       return (
@@ -110,7 +110,7 @@ export default function Home() {
         </div>
       )
     }
-    return <WorkspaceLoading label="Preparing workspace…" />
+    return workspaceLoadingUi('Preparing workspace…')
   }
 
   const drs       = liveData?.drs?.base ?? 0
@@ -133,7 +133,7 @@ export default function Home() {
         <div>
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">{dateStr}</p>
           <h1 className="text-2xl font-bold text-foreground">{greeting}, Advisor</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Here's your advisory intelligence briefing</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Here&apos;s your advisory intelligence briefing</p>
         </div>
 
       </div>

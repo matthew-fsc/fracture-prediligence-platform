@@ -43,9 +43,10 @@ Health: `GET /health` (liveness), `GET /health/ready` (DB).
 ## Same-origin — Railway
 
 1. **New Project → Deploy from GitHub**, repo root; uses `railway.toml` + `Dockerfile`.
-2. Add **PostgreSQL** or external DB; set `DATABASE_URL`.
+2. Add **PostgreSQL** (or provision an external DB) and wire **`DATABASE_URL`** into this service (Railway: reference the plugin variable, e.g. `${{ Postgres.DATABASE_URL }}`). The default in code points at `localhost` and will not work in the container until this is set.
 3. Under **Variables**, add the same vars as in `backend/.env.example`, plus **`VITE_CLERK_PUBLISHABLE_KEY`** (and optional `VITE_API_BASE_URL`) so the Docker build receives them.
 4. Deploy; set `CORS_ORIGINS` / `FRONTEND_URL` to the generated public URL or custom domain.
+5. **Healthcheck:** Railway probes `GET /health` (liveness). `/health/ready` checks the database; if the deploy fails with “healthcheck failed” but the build succeeded, open **Deploy Logs** for DB connection errors and confirm `DATABASE_URL` and network access to Postgres.
 
 ---
 

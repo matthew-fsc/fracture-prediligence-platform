@@ -20,9 +20,18 @@ export default function CompanySwitcher({ displayName }) {
   })
 
   useEffect(() => {
-    if (isLoading || !companies.length) return
-    const ids = companies.map((c) => c.id)
-    if (!ids.includes(companyId)) setCompanyId(ids[0])
+    if (isLoading) return
+    const ids = (companies ?? [])
+      .map((c) => Number(c.id))
+      .filter((n) => Number.isFinite(n) && n >= 1)
+    if (ids.length === 0) {
+      if (companyId != null) setCompanyId(null)
+      return
+    }
+    const active = companyId == null ? null : Number(companyId)
+    if (active == null || !ids.includes(active)) {
+      setCompanyId(ids[0])
+    }
   }, [companies, companyId, isLoading, setCompanyId])
 
   useEffect(() => {
