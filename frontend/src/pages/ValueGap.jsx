@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { valueCreationLevers } from '../lib/mockData'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useCompanyId } from '../context/CompanyContext'
+import { apiUrl } from '../lib/apiClient'
 
 const catColors = {
   operations:             { bg: 'bg-red-500/10',     text: 'text-red-400',     border: 'border-red-500/20'     },
@@ -84,11 +85,11 @@ export default function ValueGap() {
   const [gapData, setGapData] = useState(null)
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${companyId}`)
+    fetch(apiUrl(`/api/analytics/scores/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(setLiveData)
       .catch(() => {})
-    fetch(`/api/analytics/value-gap/${companyId}`)
+    fetch(apiUrl(`/api/analytics/value-gap/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(setGapData)
       .catch(() => {})

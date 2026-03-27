@@ -3,6 +3,7 @@ import { cn, fmtM } from '../lib/utils'
 import { Target, CheckCircle, Circle, Clock } from 'lucide-react'
 import { valueCreationLevers } from '../lib/mockData'
 import { useCompanyId } from '../context/CompanyContext'
+import { apiUrl } from '../lib/apiClient'
 
 // Static initiative library for gap categories (live API fallback)
 const INITIATIVES_BY_CAT = {
@@ -64,7 +65,7 @@ export default function InitiativeImpact() {
   const [gapData, setGapData] = useState(null)
 
   useEffect(() => {
-    fetch(`/api/analytics/value-gap/${companyId}`)
+    fetch(apiUrl(`/api/analytics/value-gap/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(setGapData)
       .catch(() => {})

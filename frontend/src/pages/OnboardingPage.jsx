@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { Cloud, CheckCircle, Circle } from 'lucide-react'
 import { useCompanyId } from '../context/CompanyContext'
+import { apiUrl } from '../lib/apiClient'
 
 const COLORS = {
   bg: '#0A1628',
@@ -377,7 +378,7 @@ function Step3({ onNext, onSkip }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await fetch(`/api/analytics/qualitative/${companyId}`, {
+      await fetch(apiUrl(`/api/analytics/qualitative/${companyId}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -4,6 +4,7 @@ import { Upload, AlertCircle, FileText, RefreshCw, ChevronRight, CheckCircle, Ci
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { useCompanyId } from '../context/CompanyContext'
+import { apiUrl } from '../lib/apiClient'
 
 function useSiblingPath(segment) {
   const { pathname } = useLocation()
@@ -64,7 +65,7 @@ export default function Connectors() {
     form.append('file', file)
     form.append('source_type', sourceType)
     try {
-      const res = await fetch(`/api/ingestion/upload/${companyId}`, { method: 'POST', body: form })
+      const res = await fetch(apiUrl(`/api/ingestion/upload/${companyId}`), { method: 'POST', body: form })
       const json = await res.json()
       if (!res.ok) throw new Error(json.detail || 'Upload failed')
       setJobs(prev => [json, ...prev])

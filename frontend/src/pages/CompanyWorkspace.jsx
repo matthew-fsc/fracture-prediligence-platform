@@ -4,6 +4,7 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
 import { company, valueCreationLevers } from '../lib/mockData'
+import { apiUrl } from '../lib/apiClient'
 
 // Map API category keys → display category for color coding
 const CAT_PRIORITY_TO_SEVERITY = (p) => p === 1 ? 'critical' : p <= 3 ? 'high' : 'medium'
@@ -53,23 +54,23 @@ export default function CompanyWorkspace() {
   const [marketBench, setMarketBench] = useState(undefined)
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${companyId}`)
+    fetch(apiUrl(`/api/analytics/scores/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(setLiveScores)
       .catch(() => {})
-    fetch(`/api/analytics/metrics/${companyId}`)
+    fetch(apiUrl(`/api/analytics/metrics/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(setMetrics)
       .catch(() => {})
-    fetch(`/api/analytics/buyer-questions/${companyId}`)
+    fetch(apiUrl(`/api/analytics/buyer-questions/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(setBqData)
       .catch(() => {})
-    fetch(`/api/analytics/value-gap/${companyId}`)
+    fetch(apiUrl(`/api/analytics/value-gap/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(setGapData)
       .catch(() => {})
-    fetch(`/api/analytics/market-benchmarks/${companyId}`)
+    fetch(apiUrl(`/api/analytics/market-benchmarks/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(setMarketBench)
       .catch(() => { setMarketBench(null) })

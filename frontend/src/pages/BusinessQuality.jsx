@@ -8,6 +8,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell
 } from 'recharts'
+import { apiUrl } from '../lib/apiClient'
 import { useCompanyId } from '../context/CompanyContext'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -61,11 +62,11 @@ export default function BusinessQuality() {
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${companyId}`)
+    fetch(apiUrl(`/api/analytics/scores/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(setScores)
       .catch(() => {})
-    fetch(`/api/analytics/metrics/${companyId}`)
+    fetch(apiUrl(`/api/analytics/metrics/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(setMetrics)
       .catch(() => {})

@@ -1,0 +1,20 @@
+# Optional: deploy same-origin Docker image to Fly.io (manual trigger).
+# Repository secrets: FLY_API_TOKEN (https://fly.io/docs/flyctl/tokens/)
+
+name: Deploy Fly.io
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

@@ -1,14 +1,19 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from app.api.routes import ingestion, analytics, companies, reports, demo
 from app.api.routes import payments, webhooks
 from app.core.config import settings
 from app.core.database import engine, SessionLocal, Base
+
+logger = logging.getLogger(__name__)
 
 FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
@@ -56,6 +61,10 @@ def _bootstrap_db():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.APP_ENV.lower() == "production" and settings.SECRET_KEY == "change-me-in-production":
+        logger.warning(
+            "SECRET_KEY is still the default; set a strong random SECRET_KEY in production."
+        )
     _bootstrap_db()
     yield
 
@@ -86,7 +95,24 @@ app.include_router(webhooks.router,   prefix="/api",            tags=["webhooks"
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "prediligence-platform"}
+    """Liveness: process is up (use for load balancer probes that should not hit the DB)."""
+    return {
+        "status": "ok",
+        "service": "prediligence-platform",
+        "env": settings.APP_ENV,
+    }
+
+
+@app.get("/health/ready")
+def health_ready():
+    """Readiness: DB accepts connections. Returns 503 if the database is unreachable."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "connected", "env": settings.APP_ENV}
+    except Exception:
+        logger.exception("readiness check failed")
+        raise HTTPException(status_code=503, detail="database_unavailable")
 
 
 # ── Serve React SPA ──────────────────────────────────────────────────────────

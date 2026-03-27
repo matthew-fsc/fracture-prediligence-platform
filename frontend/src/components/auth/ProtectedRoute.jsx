@@ -33,8 +33,8 @@ function NoClerkNotice() {
         Auth not configured
       </h2>
       <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, lineHeight: 1.6, maxWidth: 380, margin: '0 0 24px 0' }}>
-        Add <code style={{ color: COLORS.gold }}>VITE_CLERK_PUBLISHABLE_KEY</code> to{' '}
-        <code style={{ color: COLORS.gold }}>frontend/.env</code> to enable sign-in.
+        Set <code style={{ color: COLORS.gold }}>VITE_CLERK_PUBLISHABLE_KEY</code> for the production Clerk instance at build time (e.g. in your hosting provider’s env or{' '}
+        <code style={{ color: COLORS.gold }}>frontend/.env</code> locally), then rebuild the SPA.
       </p>
       <a href="/demo" style={{ color: COLORS.gold, fontFamily: "'DM Sans', sans-serif", fontSize: 14, textDecoration: 'none', border: `1px solid ${COLORS.gold}`, borderRadius: 6, padding: '8px 20px' }}>
         View Demo instead →
@@ -55,11 +55,12 @@ function ClerkGuard({ children }) {
 
 // ---------------------------------------------------------------------------
 // ProtectedRoute — public API
-// When no Clerk key is configured, render children directly (dev passthrough).
-// NoClerkNotice is reserved for when auth is partially configured but broken.
+// Development: no publishable key → passthrough so local work continues.
+// Production: missing key → block with NoClerkNotice (do not ship without Clerk).
 // ---------------------------------------------------------------------------
 export default function ProtectedRoute({ children }) {
   const hasKey = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY)
-  if (!hasKey) return children  // dev passthrough — no Clerk configured
+  if (!hasKey && import.meta.env.PROD) return <NoClerkNotice />
+  if (!hasKey) return children
   return <ClerkGuard>{children}</ClerkGuard>
 }

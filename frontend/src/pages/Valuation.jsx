@@ -5,6 +5,7 @@ import {
   TrendingUp, DollarSign, Zap, BarChart2, AlertTriangle,
   ExternalLink, Edit2, Check, X, Plus, Trash2, ChevronDown, ChevronRight,
 } from 'lucide-react'
+import { apiUrl } from '../lib/apiClient'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useCompanyId } from '../context/CompanyContext'
@@ -160,7 +161,7 @@ function AddbackRow({ ab, onRecastUpdate }) {
   const ch = CHALLENGE_META[ab.challenge] ?? CHALLENGE_META.MEDIUM
 
   async function handleSave(body) {
-    const res = await fetch(`/api/analytics/addbacks/${companyId}/${ab.addback_key}`, {
+    const res = await fetch(apiUrl(`/api/analytics/addbacks/${companyId}/${ab.addback_key}`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...body, addback_key: ab.addback_key }),
@@ -169,7 +170,7 @@ function AddbackRow({ ab, onRecastUpdate }) {
   }
 
   async function handleDelete() {
-    const res = await fetch(`/api/analytics/addbacks/${companyId}/${ab.addback_key}`, { method: 'DELETE' })
+    const res = await fetch(apiUrl(`/api/analytics/addbacks/${companyId}/${ab.addback_key}`), { method: 'DELETE' })
     if (res.ok) { onRecastUpdate(await res.json()); setOpen(false) }
   }
 
@@ -234,15 +235,15 @@ export default function Valuation() {
   const [addingCustom, setAddingCustom] = useState(false)
 
   const loadRecast = useCallback(() =>
-    fetch(`/api/analytics/ebitda-recast/${companyId}`)
+    fetch(apiUrl(`/api/analytics/ebitda-recast/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setRecast(d) })
       .catch(() => {}), [companyId])
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${companyId}`)
+    fetch(apiUrl(`/api/analytics/scores/${companyId}`))
       .then(r => r.ok ? r.json() : null).then(setScores).catch(() => {})
-    fetch(`/api/analytics/metrics/${companyId}`)
+    fetch(apiUrl(`/api/analytics/metrics/${companyId}`))
       .then(r => r.ok ? r.json() : null).then(setMetrics).catch(() => {})
     loadRecast()
   }, [companyId, loadRecast])
@@ -297,7 +298,7 @@ export default function Valuation() {
 
   async function handleCustomSave(body) {
     const key = `custom_${Date.now()}`
-    const res = await fetch(`/api/analytics/addbacks/${companyId}/${key}`, {
+    const res = await fetch(apiUrl(`/api/analytics/addbacks/${companyId}/${key}`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...body, is_custom: true }),

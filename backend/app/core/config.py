@@ -3,6 +3,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    """APP_ENV=production enables stricter auth (Clerk JWKS required; no HS256 dev fallback)."""
+    APP_ENV: str = "development"
+
     DATABASE_URL: str = "postgresql://postgres:password@localhost:5432/prediligence"
     SECRET_KEY: str = "change-me-in-production"
     ALGORITHM: str = "HS256"

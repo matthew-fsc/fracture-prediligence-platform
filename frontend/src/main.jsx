@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { ClerkProvider } from '@clerk/clerk-react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import ClerkAuthBridge from './components/auth/ClerkAuthBridge.jsx'
 import App from './App.jsx'
 import './index.css'
 
@@ -29,7 +30,9 @@ if (PUBLISHABLE_KEY) {
   root.render(
     <React.StrictMode>
       <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignInUrl="/Home" afterSignUpUrl="/dashboard/onboarding">
-        {appTree}
+        <ClerkAuthBridge>
+          {appTree}
+        </ClerkAuthBridge>
       </ClerkProvider>
     </React.StrictMode>,
   )

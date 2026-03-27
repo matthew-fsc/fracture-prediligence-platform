@@ -1,0 +1,12 @@
+# Railway — deploy from Dockerfile at repo root.
+# Create project → connect repo → add PostgreSQL → set env vars in UI.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Send, Bot, User, Loader } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 import { useCompanyId } from '../context/CompanyContext'
+import { apiUrl } from '../lib/apiClient'
 
 const SUGGESTED_QUESTIONS = [
   'What is our DRS score and what does it mean for valuation?',
@@ -66,7 +67,7 @@ export default function AICopilot() {
   const bottomRef = useRef(null)
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${companyId}`)
+    fetch(apiUrl(`/api/analytics/scores/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(d => setScores(d))
       .catch(() => {})

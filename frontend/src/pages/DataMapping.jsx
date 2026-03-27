@@ -4,6 +4,7 @@ import { ArrowRight, CheckCircle, AlertCircle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { useCompanyId } from '../context/CompanyContext'
+import { apiUrl } from '../lib/apiClient'
 
 function useSiblingPath(segment) {
   const { pathname } = useLocation()
@@ -49,7 +50,7 @@ export default function DataMapping() {
   const [saved, setSaved]       = useState(false)
 
   useEffect(() => {
-    fetch(`/api/ingestion/jobs/${companyId}`)
+    fetch(apiUrl(`/api/ingestion/jobs/${companyId}`))
       .then(r => r.json())
       .then(data => { setJobs(data); if (data.length > 0) loadJob(data[0].job_id) })
       .catch(() => {})
@@ -57,7 +58,7 @@ export default function DataMapping() {
 
   async function loadJob(jobId) {
     try {
-      const res = await fetch(`/api/ingestion/jobs/${companyId}/${jobId}`)
+      const res = await fetch(apiUrl(`/api/ingestion/jobs/${companyId}/${jobId}`))
       const job = await res.json()
       setSelected(job)
       setMappings(job.mappings?.mappings ?? [])
@@ -68,7 +69,7 @@ export default function DataMapping() {
     if (!selected || Object.keys(overrides).length === 0) return
     setSaving(true)
     try {
-      await fetch(`/api/ingestion/jobs/${companyId}/${selected.job_id}/mappings`, {
+      await fetch(apiUrl(`/api/ingestion/jobs/${companyId}/${selected.job_id}/mappings`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(overrides),

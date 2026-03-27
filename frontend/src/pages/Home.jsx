@@ -5,6 +5,7 @@ import {
   ArrowRight, Activity, ListChecks, Bot, ChevronRight,
   Zap, Clock
 } from 'lucide-react'
+import { apiUrl } from '../lib/apiClient'
 import { cn, fmtM } from '../lib/utils'
 import { recentActivity } from '../lib/mockData'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -47,15 +48,15 @@ export default function Home() {
   const [gapData, setGapData] = useState(null)
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${companyId}`)
+    fetch(apiUrl(`/api/analytics/scores/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(setLiveData)
       .catch(() => {})
-    fetch(`/api/analytics/buyer-questions/${companyId}`)
+    fetch(apiUrl(`/api/analytics/buyer-questions/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(setBqData)
       .catch(() => {})
-    fetch(`/api/analytics/value-gap/${companyId}`)
+    fetch(apiUrl(`/api/analytics/value-gap/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(setGapData)
       .catch(() => {})

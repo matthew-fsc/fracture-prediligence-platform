@@ -3,6 +3,7 @@ import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { CheckCircle, Circle, Save, ClipboardList } from 'lucide-react'
 import { useCompanyId } from '../context/CompanyContext'
+import { apiUrl } from '../lib/apiClient'
 
 const MARKET_OPTIONS = [
   { value: 'defined',          label: 'Defined ICP + clear differentiation + repeatable sales motion', score: 80 },
@@ -16,8 +17,8 @@ export default function QualitativeInputs() {
     owner_hours_per_week: '',
     sop_pct: 50,
     automation_pct: 30,
-    mgmt_qualified: '',
-    mgmt_total_functions: '',
+    mgmt_qualified: 0,
+    mgmt_total_functions: 4,
     pipeline_value: '',
     market_positioning: '',
     repeatability_pct: 50,
@@ -30,7 +31,7 @@ export default function QualitativeInputs() {
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/analytics/qualitative/${companyId}`)
+    fetch(apiUrl(`/api/analytics/qualitative/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d?.inputs) {
@@ -38,8 +39,8 @@ export default function QualitativeInputs() {
             owner_hours_per_week:   d.inputs.owner_hours_per_week ?? '',
             sop_pct:                d.inputs.sop_pct ?? 50,
             automation_pct:         d.inputs.automation_pct ?? 30,
-            mgmt_qualified:         d.inputs.mgmt_qualified ?? '',
-            mgmt_total_functions:   d.inputs.mgmt_total_functions ?? '',
+            mgmt_qualified:         d.inputs.mgmt_qualified ?? 0,
+            mgmt_total_functions:   d.inputs.mgmt_total_functions ?? 4,
             pipeline_value:         d.inputs.pipeline_value ?? '',
             market_positioning:     d.inputs.market_positioning ?? '',
             repeatability_pct:      d.inputs.repeatability_pct ?? 50,
@@ -55,8 +56,7 @@ export default function QualitativeInputs() {
 
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setSaved(false) }
 
-  const a4Complete = form.owner_hours_per_week !== '' && form.sop_pct !== '' &&
-    form.automation_pct !== '' && form.mgmt_qualified !== '' && form.mgmt_total_functions !== ''
+  const a4Complete = form.owner_hours_per_week !== ''
   // Sliders default to numeric values, so only the explicit-choice field gates completion
   const a3Complete = form.customer_contract_type !== ''
   const a7Complete = form.pipeline_value !== '' && form.market_positioning !== '' && form.repeatability_pct !== ''
@@ -78,7 +78,7 @@ export default function QualitativeInputs() {
         customer_contract_type: form.customer_contract_type || null,
         key_person_revenue_pct: Number(form.key_person_revenue_pct),
       }
-      await fetch(`/api/analytics/qualitative/${companyId}`, {
+      await fetch(apiUrl(`/api/analytics/qualitative/${companyId}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -428,22 +428,24 @@ export default function QualitativeInputs() {
       </div>
 
       {/* Save button */}
-      <div className="flex items-center gap-3">
-        <button onClick={handleSave} disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity">
-          <Save className="w-4 h-4" />
-          {saving ? 'Saving…' : 'Save Qualitative Inputs'}
-        </button>
-        {saved && (
-          <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-semibold">
-            <CheckCircle className="w-4 h-4" />
-            Saved — DRS will recompute on next page load
-          </div>
-        )}
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <button onClick={handleSave} disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity">
+            <Save className="w-4 h-4" />
+            {saving ? 'Saving…' : 'Save Qualitative Inputs'}
+          </button>
+          {saved && (
+            <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-semibold">
+              <CheckCircle className="w-4 h-4" />
+              Saved — DRS will recompute on next page load
+            </div>
+          )}
+        </div>
         {!allComplete && (
           <p className="text-[10px] text-muted-foreground">
             {[!a3Complete && 'Revenue Contracts', !a4Complete && 'Operational Independence', !a7Complete && 'Growth Drivers']
-              .filter(Boolean).join(' · ')} {' '}incomplete — finish to activate full qualitative scoring
+              .filter(Boolean).join(' · ')} incomplete — finish to activate full qualitative scoring
           </p>
         )}
       </div>

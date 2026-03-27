@@ -4,6 +4,7 @@ import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useCompanyId } from '../context/CompanyContext'
+import { apiUrl } from '../lib/apiClient'
 
 const CATEGORY_LABELS = {
   revenue_quality:          'Revenue Quality',
@@ -47,7 +48,7 @@ export default function BuyerLens() {
   useEffect(() => {
     setLoading(true)
     setError(null)
-    fetch(`/api/analytics/buyer-questions/${companyId}`)
+    fetch(apiUrl(`/api/analytics/buyer-questions/${companyId}`))
       .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
       .then(d => { setData(d); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })

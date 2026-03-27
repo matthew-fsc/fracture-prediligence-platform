@@ -3,6 +3,7 @@ import { FileText, Download, RefreshCw, CheckCircle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
 import { useCompanyId } from '../context/CompanyContext'
+import { apiUrl } from '../lib/apiClient'
 
 const REPORT_TEMPLATES = [
   {
@@ -62,7 +63,7 @@ export default function Reports() {
   const [scoreData, setScoreData]   = useState(null)
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${companyId}`)
+    fetch(apiUrl(`/api/analytics/scores/${companyId}`))
       .then(r => r.ok ? r.json() : null)
       .then(d => setScoreData(d))
       .catch(() => {})
@@ -71,7 +72,7 @@ export default function Reports() {
   async function generateReport(templateId) {
     setGenerating(templateId)
     try {
-      const res = await fetch(`/api/reports/${companyId}/generate/${templateId}`)
+      const res = await fetch(apiUrl(`/api/reports/${companyId}/generate/${templateId}`))
       if (!res.ok) throw new Error(await res.text())
       const blob = await res.blob()
       const url  = URL.createObjectURL(blob)

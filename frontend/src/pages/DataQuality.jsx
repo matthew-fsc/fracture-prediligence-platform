@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { useCompanyId } from '../context/CompanyContext'
+import { apiUrl } from '../lib/apiClient'
 
 function CheckIcon({ result }) {
   if (result === 'PASS')       return <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
@@ -16,7 +17,7 @@ export default function DataQuality() {
   const [selected, setSelected] = useState(null)
 
   useEffect(() => {
-    fetch(`/api/ingestion/jobs/${companyId}`)
+    fetch(apiUrl(`/api/ingestion/jobs/${companyId}`))
       .then(r => r.json())
       .then(data => { setJobs(data); if (data.length > 0) loadJob(data[0].job_id) })
       .catch(() => {})
@@ -24,7 +25,7 @@ export default function DataQuality() {
 
   async function loadJob(id) {
     try {
-      const res = await fetch(`/api/ingestion/jobs/${companyId}/${id}`)
+      const res = await fetch(apiUrl(`/api/ingestion/jobs/${companyId}/${id}`))
       setSelected(await res.json())
     } catch {}
   }

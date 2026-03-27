@@ -96,7 +96,12 @@ async def get_current_user(
                 options={"verify_aud": False},
             )
         else:
-            # Local dev HS256 fallback (SECRET_KEY)
+            if settings.APP_ENV.lower() == "production":
+                raise HTTPException(
+                    status_code=503,
+                    detail="Clerk JWKS is not configured (set CLERK_JWKS_URL in production)",
+                )
+            # Local dev HS256 fallback (SECRET_KEY) when CLERK_JWKS_URL is unset
             payload = jwt.decode(
                 token,
                 SECRET_KEY,
