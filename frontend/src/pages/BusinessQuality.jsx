@@ -8,8 +8,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell
 } from 'recharts'
-
-const COMPANY_ID = 1
+import { useCompanyId } from '../context/CompanyContext'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -56,20 +55,21 @@ function MetricPanel({ label, displayValue, benchmark, percentile, status, trend
 }
 
 export default function BusinessQuality() {
+  const companyId = useCompanyId()
   const [scores, setScores] = useState(null)
   const [metrics, setMetrics] = useState(null)
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${COMPANY_ID}`)
+    fetch(`/api/analytics/scores/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(setScores)
       .catch(() => {})
-    fetch(`/api/analytics/metrics/${COMPANY_ID}`)
+    fetch(`/api/analytics/metrics/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(setMetrics)
       .catch(() => {})
-  }, [])
+  }, [companyId])
 
   if (scores === null || metrics === null) {
     return (

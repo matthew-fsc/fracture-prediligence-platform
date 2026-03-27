@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Bot, User, Loader } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
-
-const COMPANY_ID = 1
+import { useCompanyId } from '../context/CompanyContext'
 
 const SUGGESTED_QUESTIONS = [
   'What is our DRS score and what does it mean for valuation?',
@@ -54,6 +53,7 @@ function buildLocalAnswer(question, scores) {
 }
 
 export default function AICopilot() {
+  const companyId = useCompanyId()
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -66,11 +66,11 @@ export default function AICopilot() {
   const bottomRef = useRef(null)
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${COMPANY_ID}`)
+    fetch(`/api/analytics/scores/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => setScores(d))
       .catch(() => {})
-  }, [])
+  }, [companyId])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })

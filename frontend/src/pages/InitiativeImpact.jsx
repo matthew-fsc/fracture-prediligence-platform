@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import { cn, fmtM } from '../lib/utils'
 import { Target, CheckCircle, Circle, Clock } from 'lucide-react'
-import { valueCreationLevers, kpis as mockKpis } from '../lib/mockData'
-
-const COMPANY_ID = 1
+import { valueCreationLevers } from '../lib/mockData'
+import { useCompanyId } from '../context/CompanyContext'
 
 // Static initiative library for gap categories (live API fallback)
 const INITIATIVES_BY_CAT = {
@@ -60,15 +59,16 @@ function buildMockDrivers() {
 }
 
 export default function InitiativeImpact() {
+  const companyId = useCompanyId()
   const [selected, setSelected] = useState(new Set())
   const [gapData, setGapData] = useState(null)
 
   useEffect(() => {
-    fetch(`/api/analytics/value-gap/${COMPANY_ID}`)
+    fetch(`/api/analytics/value-gap/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(setGapData)
       .catch(() => {})
-  }, [])
+  }, [companyId])
 
   const toggle = (id) => {
     const s = new Set(selected)
@@ -76,20 +76,28 @@ export default function InitiativeImpact() {
     setSelected(s)
   }
 
+  // Scale individual uplifts so they sum to total_value_gap before distributing across sub-initiatives
+  const rawUpliftSum = gapData?.gaps?.reduce((s, g) => s + g.ev_uplift, 0) ?? 0
+  const gapTotal     = gapData?.total_value_gap ?? rawUpliftSum
+  const upliftScale  = rawUpliftSum > 0 ? gapTotal / rawUpliftSum : 1
+
   // Build driver list: from live gap data or mock
   const DRIVERS = gapData?.gaps
-    ? gapData.gaps.flatMap((g, gi) =>
-        (INITIATIVES_BY_CAT[g.category] ?? []).map((init, ii) => ({
+    ? gapData.gaps.flatMap((g) => {
+        const inits = INITIATIVES_BY_CAT[g.category] ?? []
+        const scaledUplift = g.ev_uplift * upliftScale
+        const n = inits.length || 1
+        return inits.map((init) => ({
           initiative: init.title,
-          detail: init.description,
-          valueMin: (g.ev_uplift * 0.6) / (INITIATIVES_BY_CAT[g.category]?.length || 1),
-          valueMax: g.ev_uplift / (INITIATIVES_BY_CAT[g.category]?.length || 1),
-          timeline: init.timeline,
-          severity: g.priority <= 1 ? 'critical' : 'high',
-          category: g.category,
-          months: 9,
+          detail:    init.description,
+          valueMin:  Math.round(scaledUplift * 0.75 / n),
+          valueMax:  Math.round(scaledUplift / n),
+          timeline:  init.timeline,
+          severity:  g.priority === 1 ? 'critical' : g.priority <= 3 ? 'high' : 'medium',
+          category:  g.category,
+          months:    g.priority <= 1 ? 18 : g.priority <= 3 ? 12 : 6,
         }))
-      )
+      })
     : buildMockDrivers()
 
   const active = DRIVERS.filter((_, i) => selected.has(i))
@@ -217,7 +225,7 @@ export default function InitiativeImpact() {
             <div className="space-y-2 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Current Enterprise Value</span>
-                <span className="font-bold text-foreground">{fmtM(mockKpis.currentEV)}</span>
+                <span className="font-bold text-foreground">{fmtM((gapData?.current_ev_midpoint ?? 0))}</span>
               </div>
               {selected.size > 0 && (
                 <div className="flex justify-between text-emerald-400">
@@ -229,8 +237,8 @@ export default function InitiativeImpact() {
                 <span className="font-semibold text-foreground">Projected EV</span>
                 <span className="font-bold text-emerald-400 text-sm">
                   {selected.size > 0
-                    ? `${fmtM(mockKpis.currentEV + totalEVMin)}–${fmtM(mockKpis.currentEV + totalEVMax)}`
-                    : fmtM(mockKpis.currentEV)}
+                    ? `${fmtM((gapData?.current_ev_midpoint ?? 0) + totalEVMin)}–${fmtM((gapData?.current_ev_midpoint ?? 0) + totalEVMax)}`
+                    : fmtM((gapData?.current_ev_midpoint ?? 0))}
                 </span>
               </div>
             </div>

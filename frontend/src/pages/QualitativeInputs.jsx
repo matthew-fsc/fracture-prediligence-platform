@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { CheckCircle, Circle, Save, ClipboardList } from 'lucide-react'
-
-const COMPANY_ID = 1
+import { useCompanyId } from '../context/CompanyContext'
 
 const MARKET_OPTIONS = [
   { value: 'defined',          label: 'Defined ICP + clear differentiation + repeatable sales motion', score: 80 },
@@ -12,6 +11,7 @@ const MARKET_OPTIONS = [
 ]
 
 export default function QualitativeInputs() {
+  const companyId = useCompanyId()
   const [form, setForm] = useState({
     owner_hours_per_week: '',
     sop_pct: 50,
@@ -21,53 +21,64 @@ export default function QualitativeInputs() {
     pipeline_value: '',
     market_positioning: '',
     repeatability_pct: 50,
+    contract_pct: 50,
+    customer_contract_type: '',
+    key_person_revenue_pct: 50,
   })
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/analytics/qualitative/${COMPANY_ID}`)
+    fetch(`/api/analytics/qualitative/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d?.inputs) {
           setForm({
-            owner_hours_per_week: d.inputs.owner_hours_per_week ?? '',
-            sop_pct:              d.inputs.sop_pct ?? 50,
-            automation_pct:       d.inputs.automation_pct ?? 30,
-            mgmt_qualified:       d.inputs.mgmt_qualified ?? '',
-            mgmt_total_functions: d.inputs.mgmt_total_functions ?? '',
-            pipeline_value:       d.inputs.pipeline_value ?? '',
-            market_positioning:   d.inputs.market_positioning ?? '',
-            repeatability_pct:    d.inputs.repeatability_pct ?? 50,
+            owner_hours_per_week:   d.inputs.owner_hours_per_week ?? '',
+            sop_pct:                d.inputs.sop_pct ?? 50,
+            automation_pct:         d.inputs.automation_pct ?? 30,
+            mgmt_qualified:         d.inputs.mgmt_qualified ?? '',
+            mgmt_total_functions:   d.inputs.mgmt_total_functions ?? '',
+            pipeline_value:         d.inputs.pipeline_value ?? '',
+            market_positioning:     d.inputs.market_positioning ?? '',
+            repeatability_pct:      d.inputs.repeatability_pct ?? 50,
+            contract_pct:           d.inputs.contract_pct ?? 50,
+            customer_contract_type: d.inputs.customer_contract_type ?? '',
+            key_person_revenue_pct: d.inputs.key_person_revenue_pct ?? 50,
           })
         }
         setLoaded(true)
       })
       .catch(() => setLoaded(true))
-  }, [])
+  }, [companyId])
 
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setSaved(false) }
 
   const a4Complete = form.owner_hours_per_week !== '' && form.sop_pct !== '' &&
     form.automation_pct !== '' && form.mgmt_qualified !== '' && form.mgmt_total_functions !== ''
+  // Sliders default to numeric values, so only the explicit-choice field gates completion
+  const a3Complete = form.customer_contract_type !== ''
   const a7Complete = form.pipeline_value !== '' && form.market_positioning !== '' && form.repeatability_pct !== ''
-  const allComplete = a4Complete && a7Complete
+  const allComplete = a4Complete && a3Complete && a7Complete
 
   const handleSave = async () => {
     setSaving(true)
     try {
       const payload = {
-        owner_hours_per_week:  form.owner_hours_per_week !== '' ? Number(form.owner_hours_per_week) : null,
-        sop_pct:               Number(form.sop_pct),
-        automation_pct:        Number(form.automation_pct),
-        mgmt_qualified:        form.mgmt_qualified !== '' ? Number(form.mgmt_qualified) : null,
-        mgmt_total_functions:  form.mgmt_total_functions !== '' ? Number(form.mgmt_total_functions) : null,
-        pipeline_value:        form.pipeline_value !== '' ? Number(form.pipeline_value) : null,
-        market_positioning:    form.market_positioning || null,
-        repeatability_pct:     Number(form.repeatability_pct),
+        owner_hours_per_week:   form.owner_hours_per_week !== '' ? Number(form.owner_hours_per_week) : null,
+        sop_pct:                Number(form.sop_pct),
+        automation_pct:         Number(form.automation_pct),
+        mgmt_qualified:         form.mgmt_qualified !== '' ? Number(form.mgmt_qualified) : null,
+        mgmt_total_functions:   form.mgmt_total_functions !== '' ? Number(form.mgmt_total_functions) : null,
+        pipeline_value:         form.pipeline_value !== '' ? Number(form.pipeline_value) : null,
+        market_positioning:     form.market_positioning || null,
+        repeatability_pct:      Number(form.repeatability_pct),
+        contract_pct:           Number(form.contract_pct),
+        customer_contract_type: form.customer_contract_type || null,
+        key_person_revenue_pct: Number(form.key_person_revenue_pct),
       }
-      await fetch(`/api/analytics/qualitative/${COMPANY_ID}`, {
+      await fetch(`/api/analytics/qualitative/${companyId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -93,6 +104,7 @@ export default function QualitativeInputs() {
         subtitle="Advisor-sourced data for sub-scores that financial data cannot capture. These inputs feed directly into Operational Independence and Growth Drivers scoring."
         action={
           <div className="flex items-center gap-2">
+            <StatusBadge complete={a3Complete} label="Rev Contracts" />
             <StatusBadge complete={a4Complete} label="Ops Independence" />
             <StatusBadge complete={a7Complete} label="Growth Drivers" />
           </div>
@@ -104,7 +116,114 @@ export default function QualitativeInputs() {
         <p>These questions replace conservative default assumptions used when qualitative data is absent. When all inputs in a section are complete, the DRS automatically recomputes using the qualitative sub-scores. Inputs are saved per engagement.</p>
       </div>
 
-      {/* Section A: Operational Independence */}
+      {/* Section A: Revenue Contracts & Key Person */}
+      <div className="rounded-xl border border-border bg-card p-5 space-y-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-foreground uppercase tracking-wider">Revenue Contracts &amp; Key Person Risk</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Maps to DRS category: Revenue Quality · Captures contract formalization and owner-dependency that financials cannot show</p>
+          </div>
+          <div className={cn('flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border',
+            a3Complete ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/30 bg-amber-500/10 text-amber-400')}>
+            {a3Complete ? <CheckCircle className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
+            {a3Complete ? 'Complete' : 'Incomplete'}
+          </div>
+        </div>
+
+        {/* Contract Coverage */}
+        <div>
+          <label className="block text-xs font-semibold text-foreground mb-1">
+            Contract / MSA Coverage
+          </label>
+          <p className="text-[10px] text-muted-foreground mb-2">
+            What percentage of active customers have a signed contract, MSA, or retainer agreement in place?
+          </p>
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[10px] text-muted-foreground">
+              <span>0% — all handshake / verbal</span>
+              <span className="font-bold text-foreground">{form.contract_pct}%</span>
+              <span>100% — fully contracted</span>
+            </div>
+            <input type="range" min={0} max={100} step={5} value={form.contract_pct}
+              onChange={e => set('contract_pct', e.target.value)}
+              className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary" />
+            {form.contract_pct !== '' && (
+              <p className={cn('text-[10px] font-semibold',
+                Number(form.contract_pct) >= 80 ? 'text-emerald-400' :
+                Number(form.contract_pct) >= 50 ? 'text-amber-400' : 'text-red-400')}>
+                {Number(form.contract_pct) >= 80 ? 'Strong — buyers will view revenue as secured'
+                  : Number(form.contract_pct) >= 50 ? 'Moderate — formalize remaining relationships before sale'
+                  : 'Weak — significant buyer risk; contract formalization is a high-priority initiative'}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Primary Contract Type */}
+        <div>
+          <label className="block text-xs font-semibold text-foreground mb-1">
+            Primary Contract Type
+          </label>
+          <p className="text-[10px] text-muted-foreground mb-2">
+            How is most revenue structured with customers?
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { value: 'msa',      label: 'MSA / Annual Contract',    sub: 'Highest buyer confidence' },
+              { value: 'retainer', label: 'Retainer / Subscription',  sub: 'Recurring — strong signal' },
+              { value: 'project',  label: 'Project-Based',            sub: 'Lower predictability' },
+              { value: 'mix',      label: 'Mix of Above',             sub: 'Document each relationship' },
+            ].map(opt => (
+              <button key={opt.value} onClick={() => set('customer_contract_type', opt.value)}
+                className={cn('text-left rounded-lg border p-3 transition-all',
+                  form.customer_contract_type === opt.value
+                    ? 'border-primary/30 bg-primary/5'
+                    : 'border-border bg-muted/20 hover:bg-muted/40')}>
+                <div className="flex items-center gap-2 mb-0.5">
+                  {form.customer_contract_type === opt.value
+                    ? <CheckCircle className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                    : <Circle className="w-3.5 h-3.5 text-muted-foreground/40 flex-shrink-0" />}
+                  <span className="text-xs font-semibold text-foreground">{opt.label}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground pl-5">{opt.sub}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Key Person Revenue Dependency */}
+        <div>
+          <label className="block text-xs font-semibold text-foreground mb-1">
+            Owner Revenue Dependency
+          </label>
+          <p className="text-[10px] text-muted-foreground mb-2">
+            Approximately what percentage of revenue is attributable to the owner's personal relationships — customers who would follow the owner if they left the business?
+          </p>
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[10px] text-muted-foreground">
+              <span>0% — no personal dependency</span>
+              <span className="font-bold text-foreground">{form.key_person_revenue_pct}%</span>
+              <span>100% — fully owner-dependent</span>
+            </div>
+            <input type="range" min={0} max={100} step={5} value={form.key_person_revenue_pct}
+              onChange={e => set('key_person_revenue_pct', e.target.value)}
+              className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary" />
+            {form.key_person_revenue_pct !== '' && (
+              <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded border inline-block',
+                Number(form.key_person_revenue_pct) <= 20 ? 'border-emerald-500/20 text-emerald-400 bg-emerald-500/10' :
+                Number(form.key_person_revenue_pct) <= 50 ? 'border-amber-500/20 text-amber-400 bg-amber-500/10' :
+                'border-red-500/20 text-red-400 bg-red-500/10')}>
+                {Number(form.key_person_revenue_pct) <= 10 ? 'Low risk — institutionalized relationships'
+                  : Number(form.key_person_revenue_pct) <= 20 ? 'Manageable — introduce key account managers'
+                  : Number(form.key_person_revenue_pct) <= 50 ? 'Moderate risk — transition plan needed'
+                  : 'High risk — major valuation discount; buyer will escrow or reduce offer'}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Section B: Operational Independence */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-5">
         <div className="flex items-center justify-between">
           <div>
@@ -323,9 +442,8 @@ export default function QualitativeInputs() {
         )}
         {!allComplete && (
           <p className="text-[10px] text-muted-foreground">
-            {!a4Complete && !a7Complete ? 'Complete all inputs to activate qualitative scoring' :
-             !a4Complete ? 'Complete Operational Independence inputs to activate that section' :
-             'Complete Growth Drivers inputs to activate that section'}
+            {[!a3Complete && 'Revenue Contracts', !a4Complete && 'Operational Independence', !a7Complete && 'Growth Drivers']
+              .filter(Boolean).join(' · ')} {' '}incomplete — finish to activate full qualitative scoring
           </p>
         )}
       </div>

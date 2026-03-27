@@ -106,10 +106,3 @@ export const recentActivity = [
   { event: 'EV range computed: $2.0M–$2.8M at 2.5×–3.5× EBITDA',   detail: 'HIGH_RISK tier multiples applied. TTM concentration: COMPANY 1 = 49.4%, top-2 = 68.4%', time: 'Mar 27' },
 ]
 
-export const marketBenchmarks = [
-  { metric: 'Revenue Growth',    median: 8,  company: 18.7, direction: 'higher_better', unit: '%' },
-  { metric: 'EBITDA Margin',     median: 22, company: 24.7, direction: 'higher_better', unit: '%' },
-  { metric: 'Payroll Ratio',     median: 55, company: 37.8, direction: 'lower_better',  unit: '%' },
-  { metric: 'Recurring Rev.',    median: 55, company: 35,   direction: 'higher_better', unit: '%' },
-  { metric: 'Top Cust. Conc.',   median: 25, company: 49.4, direction: 'lower_better',  unit: '%' },
-]

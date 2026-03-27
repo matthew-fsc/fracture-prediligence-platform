@@ -14,8 +14,7 @@ import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { AlertCircle, AlertTriangle, Info, ShieldAlert } from 'lucide-react'
 import { Skeleton } from '../components/ui/Skeleton'
-
-const COMPANY_ID = 1
+import { useCompanyId } from '../context/CompanyContext'
 
 const CATEGORY_LABELS = {
   revenue_quality:          'Revenue Quality',
@@ -74,16 +73,18 @@ function RiskDot({ q }) {
 }
 
 export default function RiskHeatmap() {
+  const companyId = useCompanyId()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
 
   useEffect(() => {
-    fetch(`/api/analytics/buyer-questions/${COMPANY_ID}`)
+    setLoading(true)
+    fetch(`/api/analytics/buyer-questions/${companyId}`)
       .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [])
+  }, [companyId])
 
   if (loading) {
     return (

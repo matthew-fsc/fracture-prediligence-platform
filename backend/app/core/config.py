@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     REPORT_TOP_HIGH_COUNT: int = 3
     REPORT_IMMEDIATE_ACTION_COUNT: int = 5
 
+    # Market data (optional — PitchBook-style APIs; keys never exposed to frontend)
+    PITCHBOOK_API_KEY: str = ""
+    PITCHBOOK_API_BASE_URL: str = "https://api.pitchbook.com"
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, value):

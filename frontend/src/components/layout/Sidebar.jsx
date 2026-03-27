@@ -5,6 +5,8 @@ import {
   Folder, FileText, Bot, Settings, ChevronLeft, ClipboardList,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { useCompanyId } from '../../context/CompanyContext'
+import { withCompanyQuery } from '../../lib/navLinks'
 
 const groups = [
   {
@@ -53,6 +55,8 @@ const groups = [
 ]
 
 export default function Sidebar() {
+  const companyId = useCompanyId()
+
   return (
     <aside className="fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col z-50 w-56">
       {/* Brand */}
@@ -83,7 +87,7 @@ export default function Sidebar() {
               {group.items.map(({ label, href, icon: Icon }) => (
                 <NavLink
                   key={href}
-                  to={href}
+                  to={withCompanyQuery(href, companyId)}
                   className={({ isActive }) =>
                     cn(
                       'flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium transition-colors duration-100',

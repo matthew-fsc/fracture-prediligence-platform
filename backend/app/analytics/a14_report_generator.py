@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.analytics.a1_metric_computation import compute_metrics
 from app.analytics.a9_drs_composite import CategoryScores, compute_drs
 from app.analytics.a10_enterprise_value import compute_enterprise_value
+from app.analytics.market_benchmarks import get_market_multiple_context
 from app.analytics.a11_value_gap import compute_value_gap
 from app.analytics.a13_buyer_questions import generate_buyer_questions
 from app.core.config import settings
@@ -193,7 +194,9 @@ def _build_drs_summary(pdf: _BasePDF, company_id: int, db: Session):
     drs = compute_drs(cat)
 
     from decimal import Decimal as _D
-    ev = compute_enterprise_value(_D(str(round(float(metrics.ebitda_ttm), 2))), drs.tier)
+    ebitda_f = float(metrics.ebitda_ttm)
+    mctx = get_market_multiple_context(db, company_id, ebitda_f)
+    ev = compute_enterprise_value(_D(str(round(ebitda_f, 2))), drs.tier, market_context=mctx)
 
     tier_color = _EMERALD if drs.tier.value == "Investment Grade" else _AMBER
 

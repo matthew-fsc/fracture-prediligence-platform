@@ -251,15 +251,19 @@ class QualitativeInputs(Base):
 
     id:                    Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
     company_id:            Mapped[int]            = mapped_column(ForeignKey("companies.id"), unique=True, index=True)
-    owner_hours_per_week:  Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # 0–80
-    sop_pct:               Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # 0–100
-    automation_pct:        Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # 0–100
-    mgmt_qualified:        Mapped[Optional[int]]   = mapped_column(Integer, nullable=True)          # qualified managers
-    mgmt_total_functions:  Mapped[Optional[int]]   = mapped_column(Integer, nullable=True)          # total core functions
-    pipeline_value:        Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)  # $ qualified pipeline
-    market_positioning:    Mapped[Optional[str]]   = mapped_column(String(32), nullable=True)       # defined|moderate|undifferentiated
-    repeatability_pct:     Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # 0–100
-    updated_at:            Mapped[datetime]        = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    owner_hours_per_week:   Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # 0–80
+    sop_pct:                Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # 0–100
+    automation_pct:         Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # 0–100
+    mgmt_qualified:         Mapped[Optional[int]]   = mapped_column(Integer, nullable=True)          # qualified managers
+    mgmt_total_functions:   Mapped[Optional[int]]   = mapped_column(Integer, nullable=True)          # total core functions
+    pipeline_value:         Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)  # $ qualified pipeline
+    market_positioning:     Mapped[Optional[str]]   = mapped_column(String(32), nullable=True)       # defined|moderate|undifferentiated
+    repeatability_pct:      Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # 0–100
+    # Revenue quality qualitative fields
+    contract_pct:           Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # % customers with formal MSA/contract
+    customer_contract_type: Mapped[Optional[str]]   = mapped_column(String(32), nullable=True)       # project|retainer|msa|mix
+    key_person_revenue_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # % revenue tied to owner relationships
+    updated_at:             Mapped[datetime]        = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 # ---------------------------------------------------------------------------
@@ -282,3 +286,54 @@ class AddbackOverride(Base):
     advisor_id:   Mapped[Optional[str]]  = mapped_column(String(256), nullable=True)
     is_custom:    Mapped[bool]           = mapped_column(Boolean, default=False)  # True = advisor-added line
     updated_at:   Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Market benchmarks (IBBA-style curated aggregates, PitchBook aggregates, etc.)
+# ---------------------------------------------------------------------------
+
+class MarketBenchmarkRelease(Base):
+    """Versioned drop of market / peer benchmark data."""
+
+    __tablename__ = "market_benchmark_releases"
+
+    id:           Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source_type:  Mapped[str]            = mapped_column(String(32))   # ibba_curated | pitchbook | internal_curated
+    label:        Mapped[str]            = mapped_column(String(256))
+    as_of_date:   Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    doc_ref:      Mapped[Optional[str]]  = mapped_column(String(256), nullable=True)
+    created_at:   Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class MarketSegmentMetric(Base):
+    """Peer medians and market EBITDA multiple band for one industry × size segment."""
+
+    __tablename__ = "market_segment_metrics"
+
+    id:                            Mapped[int]             = mapped_column(Integer, primary_key=True, autoincrement=True)
+    release_id:                    Mapped[int]             = mapped_column(ForeignKey("market_benchmark_releases.id"), index=True)
+    industry_slug:                 Mapped[str]             = mapped_column(String(64), index=True)
+    industry_display_name:         Mapped[str]             = mapped_column(String(128))
+    ebitda_band_label:             Mapped[str]             = mapped_column(String(64))
+    ebitda_band_min:               Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
+    ebitda_band_max:               Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
+    peer_count:                    Mapped[Optional[int]]   = mapped_column(Integer, nullable=True)
+    revenue_growth_median_pct:     Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    ebitda_margin_median_pct:      Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    payroll_ratio_median_pct:      Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    recurring_rev_median_pct:       Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    top_customer_conc_median_pct:   Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    market_ebitda_multiple_floor:  Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    market_ebitda_multiple_ceiling: Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+
+
+class MarketBenchmarkCache(Base):
+    """Optional server-side cache for external API responses (e.g. PitchBook)."""
+
+    __tablename__ = "market_benchmark_cache"
+
+    id:         Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    cache_key:  Mapped[str]            = mapped_column(String(512), unique=True, index=True)
+    payload_json: Mapped[str]          = mapped_column(Text)
+    expires_at: Mapped[datetime]       = mapped_column(DateTime, index=True)
+    created_at: Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)

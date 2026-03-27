@@ -4,8 +4,7 @@ import { cn, fmtM } from '../lib/utils'
 import { TrendingDown, TrendingUp, Activity, UserMinus, Shield, User } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { apiClient } from '../lib/apiClient'
-
-const COMPANY_ID = 1
+import { useCompanyId } from '../context/CompanyContext'
 
 const colorMap = {
   red: 'border-red-500/30 bg-red-500/5', amber: 'border-amber-500/30 bg-amber-500/5', emerald: 'border-emerald-500/30 bg-emerald-500/5',
@@ -19,6 +18,7 @@ const sevColor = {
 }
 
 export default function ScenarioSimulator() {
+  const companyId = useCompanyId()
   const [base, setBase] = useState(null)
   const [topCustomer, setTopCustomer] = useState({ name: 'Top Customer', pct: 22 })
   const [ownerHours, setOwnerHours] = useState(40)
@@ -41,8 +41,8 @@ export default function ScenarioSimulator() {
 
   useEffect(() => {
     Promise.all([
-      apiClient.get(`/api/analytics/metrics/${COMPANY_ID}`),
-      apiClient.get(`/api/analytics/scores/${COMPANY_ID}`),
+      apiClient.get(`/api/analytics/metrics/${companyId}`),
+      apiClient.get(`/api/analytics/scores/${companyId}`),
     ]).then(([metrics, scores]) => {
       if (!metrics || !scores) return
       const ev = scores.enterprise_value
@@ -68,7 +68,7 @@ export default function ScenarioSimulator() {
         setParams(p => ({ ...p, owner_departure_reduced_hours: Math.max(0, Math.round(h * 0.25)) }))
       }
     }).catch(() => {})
-  }, [])
+  }, [companyId])
 
   const liveBase = base ?? { revenue: 0, ebitda: 0, multiple: 6.0, ev: 0 }
   const p = params

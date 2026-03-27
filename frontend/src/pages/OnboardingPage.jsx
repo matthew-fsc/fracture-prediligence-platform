@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
-import { Cloud } from 'lucide-react'
+import { Cloud, CheckCircle, Circle } from 'lucide-react'
+import { useCompanyId } from '../context/CompanyContext'
 
 const COLORS = {
   bg: '#0A1628',
@@ -90,7 +91,7 @@ const ENTITY_TYPES = [
 function ProgressBar({ step }) {
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 40 }}>
-      {[1, 2, 3].map((n) => (
+      {[1, 2, 3].map((n) => ( // 1=Client, 2=Upload, 3=Interview
         <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div
             style={{
@@ -320,56 +321,212 @@ function Step2({ onNext, onSkip }) {
 }
 
 // ---------------------------------------------------------------------------
-// Step 3 — Invite team member
+// Reusable slider row
 // ---------------------------------------------------------------------------
+function SliderRow({ label, value, onChange, min = 0, max = 100, step = 5, leftLabel, rightLabel }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <label style={LABEL_STYLE}>{label}</label>
+        <span style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700 }}>{value}%</span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(e.target.value)}
+        style={{ width: '100%', accentColor: COLORS.gold, cursor: 'pointer' }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+        <span style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 11 }}>{leftLabel}</span>
+        <span style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 11 }}>{rightLabel}</span>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Step 3 — Advisor Interview (qualitative questionnaire)
+// ---------------------------------------------------------------------------
+const CONTRACT_TYPES = [
+  { value: 'msa',      label: 'MSA / Annual Contract' },
+  { value: 'retainer', label: 'Retainer / Subscription' },
+  { value: 'project',  label: 'Project-Based' },
+  { value: 'mix',      label: 'Mix of the Above' },
+]
+
+const MARKET_OPTS = [
+  { value: 'defined',          label: 'Defined ICP + clear differentiation + repeatable sales motion', score: 80 },
+  { value: 'moderate',         label: 'Moderate — some differentiation, inconsistent execution', score: 45 },
+  { value: 'undifferentiated', label: 'Undifferentiated — competing on price or availability', score: 10 },
+]
+
 function Step3({ onNext, onSkip }) {
-  const [email, setEmail] = useState('')
+  const companyId = useCompanyId()
+  const [form, setForm] = useState({
+    owner_hours_per_week: '',
+    sop_pct: 50,
+    mgmt_qualified: '',
+    mgmt_total_functions: '',
+    contract_pct: 50,
+    customer_contract_type: '',
+    key_person_revenue_pct: 50,
+    pipeline_value: '',
+    market_positioning: '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await fetch(`/api/analytics/qualitative/${companyId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          owner_hours_per_week:   form.owner_hours_per_week !== '' ? Number(form.owner_hours_per_week) : null,
+          sop_pct:                Number(form.sop_pct),
+          mgmt_qualified:         form.mgmt_qualified !== '' ? Number(form.mgmt_qualified) : null,
+          mgmt_total_functions:   form.mgmt_total_functions !== '' ? Number(form.mgmt_total_functions) : null,
+          contract_pct:           Number(form.contract_pct),
+          customer_contract_type: form.customer_contract_type || null,
+          key_person_revenue_pct: Number(form.key_person_revenue_pct),
+          pipeline_value:         form.pipeline_value !== '' ? Number(form.pipeline_value) : null,
+          market_positioning:     form.market_positioning || null,
+        }),
+      })
+    } catch (_) { /* non-blocking */ }
+    setSaving(false)
+    onNext()
+  }
+
+  const SectionTitle = ({ children }) => (
+    <p style={{ color: COLORS.gold, fontFamily: "'DM Sans', sans-serif", fontSize: 10, fontWeight: 700,
+      textTransform: 'uppercase', letterSpacing: '0.1em', margin: '24px 0 14px 0', borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 8 }}>
+      {children}
+    </p>
+  )
 
   return (
     <div>
-      <h2
-        style={{
-          color: COLORS.offWhite,
-          fontFamily: "'Cormorant Garamond', Georgia, serif",
-          fontSize: 30,
-          fontWeight: 600,
-          margin: '0 0 8px 0',
-        }}
-      >
-        Invite a team member{' '}
-        <span style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 16, fontWeight: 400 }}>
-          (optional)
-        </span>
+      <h2 style={{ color: COLORS.offWhite, fontFamily: "'Cormorant Garamond', Georgia, serif",
+        fontSize: 28, fontWeight: 600, margin: '0 0 6px 0' }}>
+        Advisor Interview
       </h2>
-      <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, margin: '0 0 32px 0' }}>
-        Bring in a co-advisor, associate, or client contact.
+      <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13, margin: '0 0 4px 0' }}>
+        These answers feed directly into the Readiness Score for metrics that financials cannot capture.
+      </p>
+      <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 11, margin: '0 0 6px 0' }}>
+        All inputs can be updated later in Qualitative Inputs.
       </p>
 
-      <div style={{ marginBottom: 28 }}>
-        <label style={LABEL_STYLE}>Email address</label>
-        <input
-          type="email"
-          placeholder="colleague@yourfirm.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={INPUT_STYLE}
-        />
+      {/* Scrollable form area */}
+      <div style={{ maxHeight: 400, overflowY: 'auto', paddingRight: 4, marginBottom: 20 }}>
+
+        <SectionTitle>Owner &amp; Operations</SectionTitle>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={LABEL_STYLE}>Owner hours in day-to-day operations (per week)</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input type="number" min={0} max={80} placeholder="e.g. 30"
+              value={form.owner_hours_per_week}
+              onChange={e => set('owner_hours_per_week', e.target.value)}
+              style={{ ...INPUT_STYLE, width: 100 }} />
+            <span style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>hrs/week</span>
+          </div>
+        </div>
+
+        <SliderRow label="SOP Documentation" value={form.sop_pct}
+          onChange={v => set('sop_pct', v)} leftLabel="0% — none" rightLabel="100% — fully documented" />
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={LABEL_STYLE}>Management Depth (qualified managers / total core functions)</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input type="number" min={0} max={10} placeholder="0"
+              value={form.mgmt_qualified}
+              onChange={e => set('mgmt_qualified', e.target.value)}
+              style={{ ...INPUT_STYLE, width: 70, textAlign: 'center' }} />
+            <span style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>/</span>
+            <input type="number" min={1} max={10} placeholder="4"
+              value={form.mgmt_total_functions}
+              onChange={e => set('mgmt_total_functions', e.target.value)}
+              style={{ ...INPUT_STYLE, width: 70, textAlign: 'center' }} />
+            <span style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>functions</span>
+          </div>
+        </div>
+
+        <SectionTitle>Revenue Contracts &amp; Key Person</SectionTitle>
+
+        <SliderRow label="% customers with formal contract or MSA" value={form.contract_pct}
+          onChange={v => set('contract_pct', v)} leftLabel="0% — verbal only" rightLabel="100% — fully contracted" />
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={LABEL_STYLE}>Primary contract type</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {CONTRACT_TYPES.map(opt => (
+              <button key={opt.value} type="button"
+                onClick={() => set('customer_contract_type', opt.value)}
+                style={{
+                  background: form.customer_contract_type === opt.value ? 'rgba(201,151,58,0.12)' : COLORS.bg,
+                  border: `1px solid ${form.customer_contract_type === opt.value ? COLORS.gold : COLORS.border}`,
+                  borderRadius: 8, padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}>
+                {form.customer_contract_type === opt.value
+                  ? <CheckCircle size={14} color={COLORS.gold} />
+                  : <Circle size={14} color={COLORS.muted} />}
+                <span style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }}>{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <SliderRow label="% revenue tied to owner's personal relationships" value={form.key_person_revenue_pct}
+          onChange={v => set('key_person_revenue_pct', v)} leftLabel="0% — institutionalized" rightLabel="100% — fully owner-dependent" />
+
+        <SectionTitle>Growth</SectionTitle>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={LABEL_STYLE}>Qualified sales pipeline ($)</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14 }}>$</span>
+            <input type="number" min={0} placeholder="e.g. 500000"
+              value={form.pipeline_value}
+              onChange={e => set('pipeline_value', e.target.value)}
+              style={{ ...INPUT_STYLE, width: '100%' }} />
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 8 }}>
+          <label style={LABEL_STYLE}>Market positioning</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {MARKET_OPTS.map(opt => (
+              <button key={opt.value} type="button"
+                onClick={() => set('market_positioning', opt.value)}
+                style={{
+                  background: form.market_positioning === opt.value ? 'rgba(201,151,58,0.12)' : COLORS.bg,
+                  border: `1px solid ${form.market_positioning === opt.value ? COLORS.gold : COLORS.border}`,
+                  borderRadius: 8, padding: '10px 14px', cursor: 'pointer', textAlign: 'left',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                }}>
+                {form.market_positioning === opt.value
+                  ? <CheckCircle size={14} color={COLORS.gold} />
+                  : <Circle size={14} color={COLORS.muted} />}
+                <span style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontSize: 12, flex: 1 }}>{opt.label}</span>
+                <span style={{ color: opt.score >= 70 ? '#4ABEA4' : opt.score >= 40 ? COLORS.gold : '#EF4444',
+                  fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                  {opt.score} pts
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
       </div>
 
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button
-          onClick={() => onNext(email)}
-          disabled={!email.trim()}
-          style={{
-            ...BTN_PRIMARY,
-            opacity: email.trim() ? 1 : 0.5,
-            cursor: email.trim() ? 'pointer' : 'not-allowed',
-          }}
-        >
-          Send Invite →
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <button onClick={handleSave} disabled={saving} style={{ ...BTN_PRIMARY, opacity: saving ? 0.7 : 1 }}>
+          {saving ? 'Saving…' : 'Save & Continue →'}
         </button>
         <button onClick={onSkip} style={BTN_GHOST}>
-          Skip — I'll set up solo →
+          Skip — complete later →
         </button>
       </div>
     </div>
@@ -442,11 +599,12 @@ export default function OnboardingPage() {
       <div
         style={{
           width: '100%',
-          maxWidth: 520,
+          maxWidth: step === 3 ? 640 : 520,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           marginBottom: 48,
+          transition: 'max-width 0.3s ease',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -482,15 +640,16 @@ export default function OnboardingPage() {
         </span>
       </div>
 
-      {/* Card */}
+      {/* Card — wider on step 3 to accommodate questionnaire */}
       <div
         style={{
           width: '100%',
-          maxWidth: 520,
+          maxWidth: step === 3 ? 640 : 520,
           background: COLORS.card,
           border: `1px solid ${COLORS.border}`,
           borderRadius: 16,
           padding: '40px 36px',
+          transition: 'max-width 0.3s ease',
         }}
       >
         {done ? (
@@ -531,7 +690,7 @@ export default function OnboardingPage() {
             textAlign: 'center',
           }}
         >
-          Step {step} of 3 · You can always finish this later from Settings
+          Step {step} of 3 · {step === 3 ? 'Interview answers can be updated later in Qualitative Inputs' : 'You can always finish this later from Settings'}
         </p>
       )}
     </div>

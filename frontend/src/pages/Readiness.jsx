@@ -5,8 +5,7 @@ import { AlertTriangle, ChevronDown, ChevronRight, Edit2, Check, X, Info } from 
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import { Skeleton } from '../components/ui/Skeleton'
 import { apiClient } from '../lib/apiClient'
-
-const COMPANY_ID = 1
+import { useCompanyId } from '../context/CompanyContext'
 
 const DEFAULT_CATEGORY_META = {
   revenue_quality:          { label: 'Revenue Quality',          weight: 25, abbr: 'Revenue' },
@@ -115,6 +114,7 @@ function SubScoreRow({ subKey, sub, meta }) {
 
 // ── Override panel ───────────────────────────────────────────────────────────
 function OverridePanel({ catKey, rawScore, adjScore, override, onSave, onDelete }) {
+  const companyId = useCompanyId()
   const [editing, setEditing] = useState(false)
   const [adj, setAdj]         = useState(override?.adjustment ?? 0)
   const [rationale, setRationale] = useState(override?.rationale ?? '')
@@ -124,14 +124,14 @@ function OverridePanel({ catKey, rawScore, adjScore, override, onSave, onDelete 
     if (!rationale.trim()) return
     setSaving(true)
     try {
-      await apiClient.post(`/api/analytics/overrides/${COMPANY_ID}/${catKey}`, { adjustment: adj, rationale })
+      await apiClient.post(`/api/analytics/overrides/${companyId}/${catKey}`, { adjustment: adj, rationale })
       onSave()
       setEditing(false)
     } finally { setSaving(false) }
   }
 
   const handleDelete = async () => {
-    await apiClient.del(`/api/analytics/overrides/${COMPANY_ID}/${catKey}`)
+    await apiClient.del(`/api/analytics/overrides/${companyId}/${catKey}`)
     onDelete()
     setEditing(false)
     setAdj(0)
@@ -299,6 +299,7 @@ function CategoryCard({ item, catData, override, onOverrideSaved }) {
 }
 
 export default function Readiness() {
+  const companyId = useCompanyId()
   const [data, setData] = useState(null)
   const [overrides, setOverrides] = useState({})
   const [refresh, setRefresh] = useState(0)
@@ -306,10 +307,10 @@ export default function Readiness() {
   const reload = () => setRefresh(r => r + 1)
 
   useEffect(() => {
-    apiClient.get(`/api/analytics/scores/${COMPANY_ID}`)
+    apiClient.get(`/api/analytics/scores/${companyId}`)
       .then(setData)
       .catch(() => {})
-    apiClient.get(`/api/analytics/overrides/${COMPANY_ID}`)
+    apiClient.get(`/api/analytics/overrides/${companyId}`)
       .then(d => {
         if (!d) return
         const map = {}
@@ -317,7 +318,7 @@ export default function Readiness() {
         setOverrides(map)
       })
       .catch(() => {})
-  }, [refresh])
+  }, [refresh, companyId])
 
   if (data === null) {
     return (

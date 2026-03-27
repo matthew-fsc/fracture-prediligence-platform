@@ -3,13 +3,12 @@ import { Link, useLocation } from 'react-router-dom'
 import { ArrowRight, CheckCircle, AlertCircle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
+import { useCompanyId } from '../context/CompanyContext'
 
 function useSiblingPath(segment) {
   const { pathname } = useLocation()
   return pathname.replace(/\/[^/]*$/, '') + '/' + segment
 }
-
-const COMPANY_ID = 1
 
 const ONTOLOGY_FIELDS = [
   'REVENUE_GROSS','REVENUE_TYPE','REVENUE_RECURRING_FLAG','REVENUE_PERIOD','REVENUE_CUSTOMER_ID','REVENUE_DESCRIPTION',
@@ -40,6 +39,7 @@ function methodBadge(m) {
 }
 
 export default function DataMapping() {
+  const companyId = useCompanyId()
   const dataSourcesPath = useSiblingPath('data-sources')
   const [jobs, setJobs]         = useState([])
   const [selected, setSelected] = useState(null)
@@ -49,15 +49,15 @@ export default function DataMapping() {
   const [saved, setSaved]       = useState(false)
 
   useEffect(() => {
-    fetch(`/api/ingestion/jobs/${COMPANY_ID}`)
+    fetch(`/api/ingestion/jobs/${companyId}`)
       .then(r => r.json())
       .then(data => { setJobs(data); if (data.length > 0) loadJob(data[0].job_id) })
       .catch(() => {})
-  }, [])
+  }, [companyId])
 
   async function loadJob(jobId) {
     try {
-      const res = await fetch(`/api/ingestion/jobs/${COMPANY_ID}/${jobId}`)
+      const res = await fetch(`/api/ingestion/jobs/${companyId}/${jobId}`)
       const job = await res.json()
       setSelected(job)
       setMappings(job.mappings?.mappings ?? [])
@@ -68,7 +68,7 @@ export default function DataMapping() {
     if (!selected || Object.keys(overrides).length === 0) return
     setSaving(true)
     try {
-      await fetch(`/api/ingestion/jobs/${COMPANY_ID}/${selected.job_id}/mappings`, {
+      await fetch(`/api/ingestion/jobs/${companyId}/${selected.job_id}/mappings`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(overrides),

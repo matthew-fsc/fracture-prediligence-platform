@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Outlet, useSearchParams } from 'react-router-dom'
 import DemoSidebar from './DemoSidebar'
-import DemoBanner from '../demo/DemoBanner'
 import ConversionModal from '../demo/ConversionModal'
 import { DemoContext } from '../../context/DemoContext'
 import { Bell, Search, Share2, Check } from 'lucide-react'
@@ -96,7 +95,6 @@ export default function DemoShell({ slug = null }) {
   const [personalized, setPersonalized] = useState(null)
   const [spotsRemaining, setSpotsRemaining] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
-  const [bannerDismissed, setBannerDismissed] = useState(false)
   const [searchParams] = useSearchParams()
 
   const basePrefix = slug ? `/demo/${slug}` : '/demo'
@@ -167,15 +165,6 @@ export default function DemoShell({ slug = null }) {
                 {' '}— you're viewing a private demo prepared for you.
               </p>
             </div>
-          )}
-
-          {/* Spots banner — dismissible */}
-          {!bannerDismissed && (
-            <DemoBanner
-              onClaim={() => setModalOpen(true)}
-              onDismiss={() => setBannerDismissed(true)}
-              spotsRemaining={spotsRemaining}
-            />
           )}
 
           {/* Header */}

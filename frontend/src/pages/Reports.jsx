@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { FileText, Download, RefreshCw, CheckCircle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
-
-const COMPANY_ID = 1
+import { useCompanyId } from '../context/CompanyContext'
 
 const REPORT_TEMPLATES = [
   {
@@ -57,21 +56,22 @@ const colorMap = {
 }
 
 export default function Reports() {
+  const companyId = useCompanyId()
   const [generating, setGenerating] = useState(null)
   const [generated, setGenerated]   = useState({})
   const [scoreData, setScoreData]   = useState(null)
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${COMPANY_ID}`)
+    fetch(`/api/analytics/scores/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => setScoreData(d))
       .catch(() => {})
-  }, [])
+  }, [companyId])
 
   async function generateReport(templateId) {
     setGenerating(templateId)
     try {
-      const res = await fetch(`/api/reports/${COMPANY_ID}/generate/${templateId}`)
+      const res = await fetch(`/api/reports/${companyId}/generate/${templateId}`)
       if (!res.ok) throw new Error(await res.text())
       const blob = await res.blob()
       const url  = URL.createObjectURL(blob)

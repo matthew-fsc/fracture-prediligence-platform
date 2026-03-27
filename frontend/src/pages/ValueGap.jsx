@@ -5,15 +5,21 @@ import { Target, ChevronDown, ChevronRight, Clock } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { valueCreationLevers } from '../lib/mockData'
 import { Skeleton } from '../components/ui/Skeleton'
-
-const COMPANY_ID = 1
+import { useCompanyId } from '../context/CompanyContext'
 
 const catColors = {
-  operations:    { bg: 'bg-red-500/10',     text: 'text-red-400',     border: 'border-red-500/20'     },
-  revenue:       { bg: 'bg-blue-500/10',    text: 'text-blue-400',    border: 'border-blue-500/20'    },
-  margin:        { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
-  documentation: { bg: 'bg-purple-500/10', text: 'text-purple-400',  border: 'border-purple-500/20'  },
-  customer:      { bg: 'bg-amber-500/10',  text: 'text-amber-400',   border: 'border-amber-500/20'   },
+  operations:             { bg: 'bg-red-500/10',     text: 'text-red-400',     border: 'border-red-500/20'     },
+  revenue:                { bg: 'bg-blue-500/10',    text: 'text-blue-400',    border: 'border-blue-500/20'    },
+  margin:                 { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
+  documentation:          { bg: 'bg-purple-500/10', text: 'text-purple-400',  border: 'border-purple-500/20'  },
+  customer:               { bg: 'bg-amber-500/10',  text: 'text-amber-400',   border: 'border-amber-500/20'   },
+  // API category keys
+  revenue_quality:        { bg: 'bg-blue-500/10',    text: 'text-blue-400',    border: 'border-blue-500/20'    },
+  financial_integrity:    { bg: 'bg-purple-500/10', text: 'text-purple-400',  border: 'border-purple-500/20'  },
+  operational_independence:{ bg: 'bg-red-500/10',   text: 'text-red-400',     border: 'border-red-500/20'     },
+  customer_risk:          { bg: 'bg-amber-500/10',  text: 'text-amber-400',   border: 'border-amber-500/20'   },
+  management_team:        { bg: 'bg-emerald-500/10',text: 'text-emerald-400', border: 'border-emerald-500/20' },
+  growth_drivers:         { bg: 'bg-blue-500/10',   text: 'text-blue-400',    border: 'border-blue-500/20'    },
 }
 
 function DriverCard({ d, rank }) {
@@ -73,19 +79,20 @@ function DriverCard({ d, rank }) {
 }
 
 export default function ValueGap() {
+  const companyId = useCompanyId()
   const [liveData, setLiveData] = useState(null)
   const [gapData, setGapData] = useState(null)
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${COMPANY_ID}`)
+    fetch(`/api/analytics/scores/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(setLiveData)
       .catch(() => {})
-    fetch(`/api/analytics/value-gap/${COMPANY_ID}`)
+    fetch(`/api/analytics/value-gap/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(setGapData)
       .catch(() => {})
-  }, [])
+  }, [companyId])
 
   if (liveData === null || gapData === null) {
     return (
@@ -115,27 +122,33 @@ export default function ValueGap() {
   const floorEV = ev?.floor ?? 0
   // Use A11 potential EV (all gaps resolved) as ceiling; fall back to tier ceiling
   const ceilingEV = gapData?.potential_ev_midpoint ?? ev?.ceiling ?? 0
-  const valueGap = gapData?.total_value_gap ?? Math.max(0, ceilingEV - currentEV)
+  // Always derive gap from potentialEV - currentEV to match CompanyWorkspace
+  // (total_value_gap from the endpoint uses a different EBITDA basis causing mismatch)
+  const valueGap = Math.max(0, ceilingEV - currentEV)
   const ebitda = ev?.ebitda_base ?? 0
   const ceilingMultiple = ceilingEV > 0 && ebitda > 0 ? (ceilingEV / ebitda).toFixed(1) : '—'
   const progressPct = ceilingEV > floorEV ? Math.round((currentEV - floorEV) / (ceilingEV - floorEV) * 100) : 50
 
-  // Use live gap data if available, fall back to mock valueCreationLevers
+  // Scale individual uplifts proportionally so they sum to total_value_gap
+  const rawUpliftSum = gapData?.gaps?.reduce((s, g) => s + g.ev_uplift, 0) ?? 0
+  const gapTotal     = gapData?.total_value_gap ?? rawUpliftSum
+  const upliftScale  = rawUpliftSum > 0 ? gapTotal / rawUpliftSum : 1
+
   const drivers = gapData?.gaps
-    ? gapData.gaps.map((g, i) => ({
+    ? gapData.gaps.map(g => ({
         initiative: g.label,
-        detail: `Score ${g.current_score} → ${g.target_score}`,
-        valueMin: g.ev_uplift * 0.7,
-        valueMax: g.ev_uplift,
-        ev_uplift: g.ev_uplift,
-        timeline: '9mo',
-        severity: g.priority <= 1 ? 'critical' : g.priority <= 2 ? 'high' : 'medium',
-        category: i === 0 ? 'operations' : i === 1 ? 'revenue' : i === 2 ? 'margin' : 'documentation',
-        months: 9,
+        detail:    `Score ${g.current_score.toFixed(0)} → ${g.target_score}/100 · ${g.score_gap.toFixed(0)}-point gap`,
+        valueMin:  Math.round(g.ev_uplift * upliftScale * 0.75),
+        valueMax:  Math.round(g.ev_uplift * upliftScale),
+        ev_uplift: Math.round(g.ev_uplift * upliftScale),
+        timeline:  g.priority <= 1 ? '18–24mo' : g.priority <= 3 ? '6–12mo' : '3–6mo',
+        severity:  g.priority === 1 ? 'critical' : g.priority <= 2 ? 'high' : 'medium',
+        category:  g.category,
+        months:    g.priority <= 1 ? 18 : g.priority <= 3 ? 12 : 6,
       }))
     : valueCreationLevers.map(d => ({
         ...d,
-        category: d.rank <= 2 ? 'operations' : d.rank === 3 ? 'margin' : d.rank === 4 ? 'revenue' : 'documentation',
+        category: d.rank <= 2 ? 'operational_independence' : d.rank === 3 ? 'management_team' : d.rank === 4 ? 'revenue_quality' : 'financial_integrity',
         months: parseInt(d.timeline) || 9,
       }))
 

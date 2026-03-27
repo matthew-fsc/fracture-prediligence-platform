@@ -7,8 +7,8 @@ import {
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { Skeleton } from '../components/ui/Skeleton'
+import { useCompanyId } from '../context/CompanyContext'
 
-const COMPANY_ID = 1
 const MARKET_RATE = 120000
 
 // ── Challenge badge ────────────────────────────────────────────────────────
@@ -155,11 +155,12 @@ function AddbackEditor({ addback, onSave, onDelete, onClose, isNew = false }) {
 
 // ── Single addback row ─────────────────────────────────────────────────────
 function AddbackRow({ ab, onRecastUpdate }) {
+  const companyId = useCompanyId()
   const [open, setOpen] = useState(false)
   const ch = CHALLENGE_META[ab.challenge] ?? CHALLENGE_META.MEDIUM
 
   async function handleSave(body) {
-    const res = await fetch(`/api/analytics/addbacks/${COMPANY_ID}/${ab.addback_key}`, {
+    const res = await fetch(`/api/analytics/addbacks/${companyId}/${ab.addback_key}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...body, addback_key: ab.addback_key }),
@@ -168,7 +169,7 @@ function AddbackRow({ ab, onRecastUpdate }) {
   }
 
   async function handleDelete() {
-    const res = await fetch(`/api/analytics/addbacks/${COMPANY_ID}/${ab.addback_key}`, { method: 'DELETE' })
+    const res = await fetch(`/api/analytics/addbacks/${companyId}/${ab.addback_key}`, { method: 'DELETE' })
     if (res.ok) { onRecastUpdate(await res.json()); setOpen(false) }
   }
 
@@ -226,24 +227,25 @@ function AddbackRow({ ab, onRecastUpdate }) {
 
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function Valuation() {
+  const companyId = useCompanyId()
   const [scores,  setScores]  = useState(null)
   const [metrics, setMetrics] = useState(null)
   const [recast,  setRecast]  = useState(null)
   const [addingCustom, setAddingCustom] = useState(false)
 
   const loadRecast = useCallback(() =>
-    fetch(`/api/analytics/ebitda-recast/${COMPANY_ID}`)
+    fetch(`/api/analytics/ebitda-recast/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setRecast(d) })
-      .catch(() => {}), [])
+      .catch(() => {}), [companyId])
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${COMPANY_ID}`)
+    fetch(`/api/analytics/scores/${companyId}`)
       .then(r => r.ok ? r.json() : null).then(setScores).catch(() => {})
-    fetch(`/api/analytics/metrics/${COMPANY_ID}`)
+    fetch(`/api/analytics/metrics/${companyId}`)
       .then(r => r.ok ? r.json() : null).then(setMetrics).catch(() => {})
     loadRecast()
-  }, [loadRecast])
+  }, [companyId, loadRecast])
 
   if (!scores || !metrics || !recast) {
     return (
@@ -263,7 +265,7 @@ export default function Valuation() {
 
   // ── Derived values ──
   const ev             = scores?.enterprise_value ?? {}
-  const sourceCitation = ev?.source_citation ?? 'IBBA Market Pulse Q1 2025'
+  const sourceCitation = ev?.valuation_summary ?? ev?.source_citation ?? 'DRS-based internal multiple band (no third-party market feed configured).'
   const floor          = ev?.floor    ?? 0
   const midpoint       = ev?.midpoint ?? 0
   const ceiling        = ev?.ceiling  ?? 0
@@ -295,7 +297,7 @@ export default function Valuation() {
 
   async function handleCustomSave(body) {
     const key = `custom_${Date.now()}`
-    const res = await fetch(`/api/analytics/addbacks/${COMPANY_ID}/${key}`, {
+    const res = await fetch(`/api/analytics/addbacks/${companyId}/${key}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...body, is_custom: true }),
@@ -582,7 +584,7 @@ export default function Valuation() {
         <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
         <div className="text-[11px] text-muted-foreground leading-relaxed">
           <span className="font-semibold text-amber-400">Platform Assumptions: </span>
-          EV multiples sourced from <span className="text-foreground font-medium">{sourceCitation}</span> for businesses with $1M–$5M EBITDA in professional services.
+          EV range: <span className="text-foreground font-medium">{sourceCitation}</span>
           Owner compensation market rate set at <span className="text-foreground font-medium">${MARKET_RATE.toLocaleString()}/yr (BLS OES 2024)</span>.
           Challenge rates determine addback inclusion: Low = 100% all scenarios; Medium = 50% conservative, 100% aggressive; High = aggressive only.
           These are advisory estimates, not a formal valuation opinion.

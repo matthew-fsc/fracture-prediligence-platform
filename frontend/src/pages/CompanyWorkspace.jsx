@@ -3,11 +3,33 @@ import { useNavigate } from 'react-router-dom'
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
-import { company, valueCreationLevers, marketBenchmarks } from '../lib/mockData'
+import { company, valueCreationLevers } from '../lib/mockData'
+
+// Map API category keys → display category for color coding
+const CAT_PRIORITY_TO_SEVERITY = (p) => p === 1 ? 'critical' : p <= 3 ? 'high' : 'medium'
+const CAT_PRIORITY_TO_TIMELINE = (p) => p <= 1 ? '18–24mo' : p <= 3 ? '6–12mo' : '3–6mo'
+
+function buildLevers(gapData) {
+  if (!gapData?.gaps?.length) return valueCreationLevers
+  const rawSum = gapData.gaps.reduce((s, g) => s + g.ev_uplift, 0)
+  const total  = gapData.total_value_gap ?? rawSum
+  const scale  = rawSum > 0 ? total / rawSum : 1
+  return gapData.gaps.map(g => ({
+    rank:      g.priority,
+    initiative: g.label,
+    detail:    `Score ${g.current_score.toFixed(0)} → ${g.target_score}/100 · ${g.score_gap.toFixed(0)}-point gap`,
+    valueMin:  Math.round(g.ev_uplift * scale * 0.75),
+    valueMax:  Math.round(g.ev_uplift * scale),
+    timeline:  CAT_PRIORITY_TO_TIMELINE(g.priority),
+    severity:  CAT_PRIORITY_TO_SEVERITY(g.priority),
+  }))
+}
 // Note: company (name/initials/founded/industry) still from mockData until company API exists
 import { ArrowRight, TrendingUp } from 'lucide-react'
+import { Skeleton } from '../components/ui/Skeleton'
+import { useCompanyId } from '../context/CompanyContext'
+import { withCompanyQuery } from '../lib/navLinks'
 
-const COMPANY_ID = 1
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 function buildChartData(monthly24m) {
@@ -23,29 +45,35 @@ function buildChartData(monthly24m) {
 
 export default function CompanyWorkspace() {
   const navigate = useNavigate()
+  const companyId = useCompanyId()
   const [liveScores, setLiveScores] = useState(null)
   const [metrics, setMetrics]       = useState(null)
   const [bqData, setBqData]         = useState(null)
   const [gapData, setGapData]       = useState(null)
+  const [marketBench, setMarketBench] = useState(undefined)
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${COMPANY_ID}`)
+    fetch(`/api/analytics/scores/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(setLiveScores)
       .catch(() => {})
-    fetch(`/api/analytics/metrics/${COMPANY_ID}`)
+    fetch(`/api/analytics/metrics/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(setMetrics)
       .catch(() => {})
-    fetch(`/api/analytics/buyer-questions/${COMPANY_ID}`)
+    fetch(`/api/analytics/buyer-questions/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(setBqData)
       .catch(() => {})
-    fetch(`/api/analytics/value-gap/${COMPANY_ID}`)
+    fetch(`/api/analytics/value-gap/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(setGapData)
       .catch(() => {})
-  }, [])
+    fetch(`/api/analytics/market-benchmarks/${companyId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(setMarketBench)
+      .catch(() => { setMarketBench(null) })
+  }, [companyId])
 
   const ev = liveScores?.enterprise_value ?? {}
   const kpis = {
@@ -82,6 +110,8 @@ export default function CompanyWorkspace() {
       sev:    q.severity === 'CRITICAL' ? 'critical' : 'high',
     })) ?? []
 
+  const levers = buildLevers(gapData)
+
   const intelCards = [
     { label: 'EBITDA',           value: fmtM(kpis.ebitda),          sub: 'Defensible (base)',         color: 'blue'    },
     { label: 'EBITDA Multiple',  value: `${kpis.ebitdaMultiple}×`,   sub: 'DRS-adjusted',              color: 'purple'  },
@@ -97,6 +127,70 @@ export default function CompanyWorkspace() {
     emerald: 'border-emerald-500/20 bg-emerald-500/5 text-emerald-400',
     amber:   'border-amber-500/20 bg-amber-500/5 text-amber-400',
     primary: 'border-primary/20 bg-primary/5 text-primary',
+  }
+
+  if (liveScores === null || metrics === null) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        {/* Company header skeleton */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-start gap-4">
+            <Skeleton className="w-12 h-12 rounded-xl flex-shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-5 w-48" />
+              <Skeleton className="h-3 w-72" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+          </div>
+        </div>
+        {/* Intel cards skeleton */}
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-3 space-y-2">
+              <Skeleton className="h-2 w-16" />
+              <Skeleton className="h-6 w-20" />
+              <Skeleton className="h-2 w-14" />
+            </div>
+          ))}
+        </div>
+        {/* 3-col content skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-4 space-y-3">
+              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-36 w-full" />
+            </div>
+          ))}
+        </div>
+        {/* Levers + market position skeleton */}
+        <div className="grid grid-cols-12 gap-4">
+          <div className="col-span-12 md:col-span-8 rounded-xl border border-border bg-card p-4 space-y-3">
+            <Skeleton className="h-2 w-40" />
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 py-2 border-b border-border/50 last:border-0">
+                <Skeleton className="h-3 w-4 flex-shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-3 w-40" />
+                  <Skeleton className="h-2 w-64" />
+                </div>
+                <Skeleton className="h-3 w-20 flex-shrink-0" />
+                <Skeleton className="h-3 w-12 flex-shrink-0" />
+                <Skeleton className="h-4 w-14 flex-shrink-0" />
+              </div>
+            ))}
+          </div>
+          <div className="col-span-12 md:col-span-4 rounded-xl border border-border bg-card p-4 space-y-3">
+            <Skeleton className="h-2 w-28" />
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="space-y-1">
+                <Skeleton className="h-2 w-full" />
+                <Skeleton className="h-1 w-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -122,10 +216,7 @@ export default function CompanyWorkspace() {
             </div>
           </div>
         </div>
-        <div className="mt-4 flex items-center justify-between px-3 py-2 rounded-lg bg-muted/50 border border-border">
-          <span className="text-[11px] text-muted-foreground">Intelligence summary not generated · click to analyze</span>
-          <button className="text-[11px] text-primary font-medium px-2 py-0.5 rounded hover:bg-primary/10 transition-colors">Analyze</button>
-        </div>
+
       </div>
 
       {/* Intelligence cards */}
@@ -230,7 +321,7 @@ export default function CompanyWorkspace() {
               </div>
             ))}
           </div>
-          <button onClick={() => navigate('/BuyerLens')}
+          <button onClick={() => navigate(withCompanyQuery('/BuyerLens', companyId))}
             className="mt-3 text-[11px] text-primary font-medium flex items-center gap-1">
             Full risk profile <ArrowRight className="w-3 h-3" />
           </button>
@@ -242,7 +333,7 @@ export default function CompanyWorkspace() {
         <div className="col-span-12 md:col-span-8 rounded-xl border border-border bg-card p-4">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Value Creation Levers</p>
           <div className="space-y-0">
-            {valueCreationLevers.map((item) => (
+            {levers.map((item) => (
               <div key={item.rank} className="flex items-center gap-4 py-2.5 border-b border-border last:border-0">
                 <span className="text-[11px] font-bold text-muted-foreground w-4 flex-shrink-0">{item.rank}</span>
                 <div className="flex-1 min-w-0">
@@ -252,7 +343,7 @@ export default function CompanyWorkspace() {
                 <span className="text-xs font-semibold text-emerald-400 whitespace-nowrap flex-shrink-0">
                   +{fmtM(item.valueMin)}–{fmtM(item.valueMax)}
                 </span>
-                <span className="text-[10px] text-muted-foreground w-8 flex-shrink-0">{item.timeline}</span>
+                <span className="text-[10px] text-muted-foreground w-16 flex-shrink-0 whitespace-nowrap">{item.timeline}</span>
                 <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0',
                   item.severity === 'critical' ? 'border-red-500/20 bg-red-500/10 text-red-400' :
                   item.severity === 'high' ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' :
@@ -267,31 +358,44 @@ export default function CompanyWorkspace() {
         {/* Market position */}
         <div className="col-span-12 md:col-span-4 rounded-xl border border-border bg-card p-4">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Market Position</p>
-          <p className="text-[10px] text-muted-foreground mb-3">Source: PitchBook · 248 peers</p>
+          <p className="text-[10px] text-muted-foreground mb-3">
+            {marketBench === undefined && 'Loading peer benchmarks…'}
+            {marketBench !== undefined && (marketBench?.source_line || 'No curated benchmark segment matched — set company industry in data settings.')}
+          </p>
+          {marketBench?.comparison_note && (
+            <p className="text-[9px] text-amber-400/90 mb-2">{marketBench.comparison_note}</p>
+          )}
           <div className="space-y-3">
-            {marketBenchmarks.map((b) => {
-              const above = b.direction === 'higher_better' ? b.company > b.median : b.company < b.median
+            {(marketBench?.benchmarks ?? []).map((b) => {
+              const med = b.median != null ? Number(b.median) : null
+              const co = b.company != null ? Number(b.company) : null
+              if (med == null || co == null) return null
+              const above = b.direction === 'higher_better' ? co > med : co < med
+              const barPct = med > 0 ? Math.min((co / (med * 2)) * 100, 100) : 0
               return (
                 <div key={b.metric}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[11px] text-muted-foreground">{b.metric}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground">med {b.median}{b.unit}</span>
+                      <span className="text-[10px] text-muted-foreground">med {med}{b.unit}</span>
                       <span className={cn('text-[11px] font-semibold', above ? 'text-emerald-400' : 'text-amber-400')}>
-                        {b.company}{b.unit}
+                        {co.toFixed(1)}{b.unit}
                       </span>
                     </div>
                   </div>
                   <div className="h-1 bg-muted rounded-full">
                     <div className={cn('h-1 rounded-full', above ? 'bg-emerald-500' : 'bg-amber-500')}
-                      style={{ width: `${Math.min((b.company / (b.median * 2)) * 100, 100)}%` }} />
+                      style={{ width: `${barPct}%` }} />
                   </div>
                 </div>
               )
             })}
           </div>
           <p className="text-[10px] text-muted-foreground mt-3">
-            Overall: <span className="text-foreground font-medium">{kpis.drsPercentile}th percentile</span> vs $5M–$10M prof. services
+            {marketBench?.segment_label
+              ? <>Segment: <span className="text-foreground font-medium">{marketBench.segment_label}</span>. </>
+              : null}
+            DRS proxy: <span className="text-foreground font-medium">{kpis.drsPercentile}th percentile</span> (illustrative vs platform scoring tiers)
           </p>
         </div>
       </div>

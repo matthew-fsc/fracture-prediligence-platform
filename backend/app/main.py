@@ -21,16 +21,35 @@ def _bootstrap_db():
 
     Base.metadata.create_all(bind=engine)
 
+    # Additive column migrations — safe to run on every startup
+    from sqlalchemy import text, inspect as sa_inspect
+    inspector = sa_inspect(engine)
+    if 'qualitative_inputs' in inspector.get_table_names():
+        existing = {c['name'] for c in inspector.get_columns('qualitative_inputs')}
+        new_cols = {
+            'contract_pct':           'NUMERIC(5,1)',
+            'customer_contract_type': 'VARCHAR(32)',
+            'key_person_revenue_pct': 'NUMERIC(5,1)',
+        }
+        with engine.connect() as conn:
+            for col, col_type in new_cols.items():
+                if col not in existing:
+                    conn.execute(text(f'ALTER TABLE qualitative_inputs ADD COLUMN {col} {col_type}'))
+            conn.commit()
+
     db = SessionLocal()
     try:
         from app.ontology.models import Company
         from app.core.db_functions import _ensure_spots_setting
+        from app.analytics.market_benchmarks import seed_curated_benchmarks_if_empty
 
         if not db.query(Company).filter(Company.id == 1).first():
             db.add(Company(id=1, name="Demo Company"))
             db.commit()
 
         _ensure_spots_setting(db)
+        seed_curated_benchmarks_if_empty(db)
+        db.commit()
     finally:
         db.close()
 

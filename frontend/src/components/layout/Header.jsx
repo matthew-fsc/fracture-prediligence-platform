@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Bell, Building2, ChevronDown, Search, LogOut } from 'lucide-react'
 import { fmtM, cn } from '../../lib/utils'
 import { useUser, useClerk } from '@clerk/clerk-react'
@@ -101,7 +102,14 @@ function UserSection() {
 // ---------------------------------------------------------------------------
 // Header
 // ---------------------------------------------------------------------------
-export default function Header({ liveScores }) {
+export default function Header({ liveScores, companyId = 1 }) {
+  const { data: companyRow } = useQuery({
+    queryKey: ['company', companyId],
+    queryFn: () => apiClient.get(`/api/companies/${companyId}`),
+    enabled: Number.isFinite(companyId) && companyId > 0,
+  })
+  const companyName = companyRow?.name ?? `Company #${companyId}`
+
   const loading = liveScores === null
   const drs = liveScores?.drs?.base
   const ev  = liveScores?.enterprise_value?.midpoint ?? null
@@ -118,7 +126,7 @@ export default function Header({ liveScores }) {
       <div className="flex items-center gap-3">
         <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border hover:bg-muted/50 transition-colors text-xs font-medium text-card-foreground">
           <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="max-w-[140px] truncate">ABC Company Inc</span>
+          <span className="max-w-[140px] truncate">{companyName}</span>
           <ChevronDown className="w-3 h-3 text-muted-foreground" />
         </button>
         <span className={cn('text-xs font-semibold', drsColor)}>

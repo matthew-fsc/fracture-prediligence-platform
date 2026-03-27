@@ -3,7 +3,7 @@ import {
   Zap, House, Building, Workflow, Grid3x3, BarChart2,
   Eye, TrendingUp, Target, Activity,
   Folder, FileText, ChevronLeft, ShieldAlert,
-  UploadCloud, GitMerge,
+  UploadCloud, GitMerge, ClipboardList,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
@@ -26,8 +26,9 @@ const groups = [
   {
     label: 'Intelligence',
     items: [
-      { label: 'Readiness Score',    path: 'readiness',         icon: Grid3x3 },
-      { label: 'Business Quality',   path: 'business-quality',  icon: BarChart2 },
+      { label: 'Readiness Score',    path: 'readiness',           icon: Grid3x3 },
+      { label: 'Qualitative Inputs', path: 'qualitative-inputs', icon: ClipboardList },
+      { label: 'Business Quality',   path: 'business-quality',   icon: BarChart2 },
       { label: 'Buyer Risk Profile', path: 'buyer-lens',        icon: Eye },
       { label: 'Valuation',          path: 'valuation',         icon: TrendingUp },
       { label: 'Risk Heatmap',       path: 'risk-heatmap',      icon: ShieldAlert },

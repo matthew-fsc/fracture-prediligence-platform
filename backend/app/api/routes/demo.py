@@ -121,6 +121,12 @@ DEMO_DATA = {
         "ceiling": 16800000,
         "multiple_used": "5.0-7.0",
         "ebitda_base": 2400000,
+        "multiple_basis": "blended",
+        "drs_multiple_floor": 5.0,
+        "drs_multiple_ceiling": 7.0,
+        "market_reference": None,
+        "valuation_summary": "Illustrative demo EV — not tied to live benchmark seed data.",
+        "source_citation": "Illustrative demo EV — not tied to live benchmark seed data.",
     },
     "flagged_issues": [
         {

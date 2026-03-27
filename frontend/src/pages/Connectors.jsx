@@ -3,14 +3,13 @@ import { Link, useLocation } from 'react-router-dom'
 import { Upload, AlertCircle, FileText, RefreshCw, ChevronRight, CheckCircle, Circle, Database } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
+import { useCompanyId } from '../context/CompanyContext'
 
 function useSiblingPath(segment) {
   const { pathname } = useLocation()
   // Replace the last path segment (or append if at demo root)
   return pathname.replace(/\/[^/]*$/, '') + '/' + segment
 }
-
-const COMPANY_ID = 1
 
 const SOURCE_TYPES = [
   { value: 'quickbooks_pl',  label: 'QuickBooks — P&L' },
@@ -48,6 +47,7 @@ function phaseLabel(phase, status) {
 }
 
 export default function Connectors() {
+  const companyId = useCompanyId()
   const fieldMappingPath = useSiblingPath('field-mapping')
   const [jobs, setJobs]             = useState([])
   const [uploading, setUploading]   = useState(false)
@@ -64,7 +64,7 @@ export default function Connectors() {
     form.append('file', file)
     form.append('source_type', sourceType)
     try {
-      const res = await fetch(`/api/ingestion/upload/${COMPANY_ID}`, { method: 'POST', body: form })
+      const res = await fetch(`/api/ingestion/upload/${companyId}`, { method: 'POST', body: form })
       const json = await res.json()
       if (!res.ok) throw new Error(json.detail || 'Upload failed')
       setJobs(prev => [json, ...prev])

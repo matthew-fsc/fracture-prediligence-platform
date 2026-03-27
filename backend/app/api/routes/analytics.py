@@ -16,7 +16,8 @@ from app.analytics.a6_management_team import compute_management_team
 from app.analytics.a7_growth_drivers import compute_growth_drivers
 from app.analytics.a8_financial_integrity import compute_financial_integrity
 from app.analytics.a9_drs_composite import CategoryScores, compute_drs
-from app.analytics.a10_enterprise_value import compute_enterprise_value
+from app.analytics.a10_enterprise_value import compute_enterprise_value, format_ev_valuation_summary
+from app.analytics.market_benchmarks import build_benchmarks_payload, get_market_multiple_context
 from app.analytics.a11_value_gap import compute_value_gap
 from app.analytics.a13_buyer_questions import generate_buyer_questions
 from app.core.config import settings
@@ -81,6 +82,24 @@ def _qual_repeatability_score(pct: float) -> float:
     if pct >= 25: return 50.0
     return 25.0
 
+def _qual_contract_score(contract_pct: float, contract_type: str) -> float:
+    """Score 0–100 from % customers contracted + contract type quality."""
+    if contract_pct >= 90: base = 90.0
+    elif contract_pct >= 70: base = 70.0 + (contract_pct - 70) / 20 * 20
+    elif contract_pct >= 50: base = 50.0 + (contract_pct - 50) / 20 * 20
+    elif contract_pct >= 20: base = 25.0 + (contract_pct - 20) / 30 * 25
+    else: base = contract_pct / 20 * 25
+    type_adj = {"msa": 10.0, "retainer": 5.0, "mix": 0.0, "project": -10.0}.get(contract_type, 0.0)
+    return round(min(100.0, max(0.0, base + type_adj)), 1)
+
+def _qual_key_person_score(key_person_pct: float) -> float:
+    """Score 0–100 — lower dependency = higher score."""
+    if key_person_pct <= 10: return 90.0
+    if key_person_pct <= 25: return 75.0
+    if key_person_pct <= 50: return 50.0
+    if key_person_pct <= 75: return 25.0
+    return 10.0
+
 
 # ---------------------------------------------------------------------------
 # Pydantic schemas
@@ -100,6 +119,9 @@ class QualitativeRequest(BaseModel):
     pipeline_value: Optional[float] = None
     market_positioning: Optional[str] = None
     repeatability_pct: Optional[float] = None
+    contract_pct: Optional[float] = None
+    customer_contract_type: Optional[str] = None
+    key_person_revenue_pct: Optional[float] = None
 
 
 @router.get("/metrics/{company_id}")
@@ -107,6 +129,15 @@ def get_metrics(company_id: int, db: Session = Depends(get_db)):
     """A1: Raw metric registry — totals, counts, and computed ratios."""
     metrics = compute_metrics(company_id, db)
     return metrics
+
+
+@router.get("/market-benchmarks/{company_id}")
+def get_market_benchmarks(company_id: int, db: Session = Depends(get_db)):
+    """Peer medians and segment label for the company's industry × EBITDA band (curated + provenance)."""
+    try:
+        return build_benchmarks_payload(db, company_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/scores/{company_id}")
@@ -131,10 +162,13 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
         ).first()
 
         ops_raw = ops.composite
+        rev_raw = rev.composite
         growth_raw = growth.composite
         ops_qual_complete = False
+        rev_qual_complete = False
         growth_qual_complete = False
         qual_sub_scores_ops = {}
+        qual_sub_scores_rev = {}
         qual_sub_scores_growth = {}
 
         if qual:
@@ -172,6 +206,39 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
                     "product_repeatability":{"score": s_rep,  "value": float(qual.repeatability_pct),"label": f"{qual.repeatability_pct:.0f}% standardized", "source": "advisor_input"},
                 }
 
+            # --- P2c: Revenue quality qualitative override (contract + key person) ---
+            a3_contract_fields = [qual.contract_pct, qual.customer_contract_type]
+            if all(v is not None for v in a3_contract_fields):
+                s_contract = _qual_contract_score(float(qual.contract_pct), qual.customer_contract_type)
+                qual_sub_scores_rev["durability"] = {
+                    "score": s_contract,
+                    "value": float(qual.contract_pct),
+                    "label": f"{qual.contract_pct:.0f}% contracted ({qual.customer_contract_type})",
+                    "source": "advisor_input",
+                }
+                # Recompute revenue_quality composite: replace financial durability with qualitative
+                rev_qual_composite = round(
+                    rev.recurring_rate_score * 0.30
+                    + rev.concentration_score * 0.25
+                    + s_contract             * 0.20
+                    + rev.consistency_score  * 0.15
+                    + rev.nrr_score          * 0.10,
+                    1,
+                )
+                # Key person risk blends into the composite when provided
+                if qual.key_person_revenue_pct is not None:
+                    s_kp = _qual_key_person_score(float(qual.key_person_revenue_pct))
+                    # Blend: 85% existing composite + 15% key-person score
+                    rev_qual_composite = round(rev_qual_composite * 0.85 + s_kp * 0.15, 1)
+                    qual_sub_scores_rev["key_person_risk"] = {
+                        "score": s_kp,
+                        "value": float(qual.key_person_revenue_pct),
+                        "label": f"{qual.key_person_revenue_pct:.0f}% revenue owner-dependent",
+                        "source": "advisor_input",
+                    }
+                rev_raw = rev_qual_composite
+                rev_qual_complete = True
+
         # --- P1: Load advisor overrides ---
         overrides_rows = db.query(AdvisorOverride).filter(
             AdvisorOverride.company_id == company_id
@@ -179,7 +246,7 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
         override_map = {o.category: o for o in overrides_rows}
 
         raw_scores = {
-            "revenue_quality":          round(rev.composite, 1),
+            "revenue_quality":          round(rev_raw, 1),
             "financial_integrity":      round(fin.composite, 1),
             "operational_independence": round(ops_raw, 1),
             "customer_risk":            round(cust.composite, 1),
@@ -212,7 +279,13 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
                 d["adjusted_at"] = None
             return d
 
-        rev_d  = enrich("revenue_quality",          rev.to_dict(),    raw_scores["revenue_quality"],          adj_scores["revenue_quality"])
+        rev_base = rev.to_dict()
+        if rev_qual_complete:
+            rev_base["sub_scores"].update(qual_sub_scores_rev)
+            rev_base["qualitative_complete"] = True
+        else:
+            rev_base["qualitative_complete"] = False
+        rev_d  = enrich("revenue_quality", rev_base, raw_scores["revenue_quality"], adj_scores["revenue_quality"])
         fin_d  = enrich("financial_integrity",       fin.to_dict(),    raw_scores["financial_integrity"],       adj_scores["financial_integrity"])
         cust_d = enrich("customer_risk",             cust.to_dict(),   raw_scores["customer_risk"],             adj_scores["customer_risk"])
         mgmt_d = enrich("management_team",           mgmt.to_dict(),   raw_scores["management_team"],           adj_scores["management_team"])
@@ -263,9 +336,11 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
         from decimal import Decimal as _Decimal
         metrics = compute_metrics(company_id, db)
         ebitda_dec = _Decimal(str(round(float(metrics.ebitda_ttm), 2)))
-        ev = compute_enterprise_value(ebitda_dec, drs.tier)
+        mctx = get_market_multiple_context(db, company_id, float(ebitda_dec))
+        ev = compute_enterprise_value(ebitda_dec, drs.tier, market_context=mctx)
+        valuation_summary = format_ev_valuation_summary(ev)
 
-        qual_complete = ops_qual_complete and growth_qual_complete
+        qual_complete = ops_qual_complete and growth_qual_complete and rev_qual_complete
         has_overrides = bool(override_map)
 
         return {
@@ -293,7 +368,12 @@ def get_all_scores(company_id: int, db: Session = Depends(get_db)):
                 "ceiling":       float(ev.ev_ceiling),
                 "multiple_used": f"{ev.multiple_floor}–{ev.multiple_ceiling}",
                 "ebitda_base":   float(ebitda_dec),
-                "source_citation": f"IBBA Market Pulse Q1 2025, Business Services, $1M–$5M EBITDA — Tier: {drs.tier.value}",
+                "multiple_basis": ev.multiple_basis,
+                "drs_multiple_floor": ev.drs_multiple_floor,
+                "drs_multiple_ceiling": ev.drs_multiple_ceiling,
+                "market_reference": ev.market_reference,
+                "valuation_summary": valuation_summary,
+                "source_citation": valuation_summary,
             },
             "rules": {"version": SCORING_RULES_VERSION, "category_weights": SCORING_RULES.category_weights},
         }
@@ -735,8 +815,11 @@ def get_qualitative(company_id: int, db: Session = Depends(get_db)):
             "mgmt_total_functions":  row.mgmt_total_functions,
             "pipeline_value":        float(row.pipeline_value)        if row.pipeline_value        is not None else None,
             "market_positioning":    row.market_positioning,
-            "repeatability_pct":     float(row.repeatability_pct)     if row.repeatability_pct     is not None else None,
-            "updated_at":            row.updated_at.isoformat(),
+            "repeatability_pct":      float(row.repeatability_pct)      if row.repeatability_pct      is not None else None,
+            "contract_pct":           float(row.contract_pct)           if row.contract_pct           is not None else None,
+            "customer_contract_type": row.customer_contract_type,
+            "key_person_revenue_pct": float(row.key_person_revenue_pct) if row.key_person_revenue_pct is not None else None,
+            "updated_at":             row.updated_at.isoformat(),
         },
     }
 

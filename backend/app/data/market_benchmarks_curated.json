@@ -1,0 +1,85 @@
+{
+  "release": {
+    "source_type": "ibba_curated",
+    "label": "IBBA Market Pulse Q1 2025 (curated peer aggregates)",
+    "as_of_date": "2025-03-01",
+    "doc_ref": "curated_ibba_market_pulse_2025q1_v1"
+  },
+  "segments": [
+    {
+      "industry_slug": "field_services",
+      "industry_display_name": "Field Services — Traffic & Transportation",
+      "ebitda_band_label": "$500K–$1M",
+      "ebitda_band_min": 500000,
+      "ebitda_band_max": 1000000,
+      "peer_count": 248,
+      "revenue_growth_median_pct": 8,
+      "ebitda_margin_median_pct": 22,
+      "payroll_ratio_median_pct": 55,
+      "recurring_rev_median_pct": 55,
+      "top_customer_conc_median_pct": 25,
+      "market_ebitda_multiple_floor": 3.5,
+      "market_ebitda_multiple_ceiling": 5.5
+    },
+    {
+      "industry_slug": "field_services",
+      "industry_display_name": "Field Services — Traffic & Transportation",
+      "ebitda_band_label": "$1M–$5M",
+      "ebitda_band_min": 1000000,
+      "ebitda_band_max": 5000000,
+      "peer_count": 312,
+      "revenue_growth_median_pct": 9,
+      "ebitda_margin_median_pct": 21,
+      "payroll_ratio_median_pct": 52,
+      "recurring_rev_median_pct": 58,
+      "top_customer_conc_median_pct": 22,
+      "market_ebitda_multiple_floor": 4.0,
+      "market_ebitda_multiple_ceiling": 6.5
+    },
+    {
+      "industry_slug": "business_services",
+      "industry_display_name": "Business Services (general)",
+      "ebitda_band_label": "$500K–$1M",
+      "ebitda_band_min": 500000,
+      "ebitda_band_max": 1000000,
+      "peer_count": 180,
+      "revenue_growth_median_pct": 7,
+      "ebitda_margin_median_pct": 20,
+      "payroll_ratio_median_pct": 58,
+      "recurring_rev_median_pct": 48,
+      "top_customer_conc_median_pct": 28,
+      "market_ebitda_multiple_floor": 3.25,
+      "market_ebitda_multiple_ceiling": 5.0
+    },
+    {
+      "industry_slug": "business_services",
+      "industry_display_name": "Business Services (general)",
+      "ebitda_band_label": "$1M–$5M",
+      "ebitda_band_min": 1000000,
+      "ebitda_band_max": 5000000,
+      "peer_count": 420,
+      "revenue_growth_median_pct": 8,
+      "ebitda_margin_median_pct": 22,
+      "payroll_ratio_median_pct": 55,
+      "recurring_rev_median_pct": 55,
+      "top_customer_conc_median_pct": 25,
+      "market_ebitda_multiple_floor": 3.75,
+      "market_ebitda_multiple_ceiling": 5.75
+    },
+    {
+      "industry_slug": "professional_services",
+      "industry_display_name": "Professional Services",
+      "ebitda_band_label": "$1M–$5M",
+      "ebitda_band_min": 1000000,
+      "ebitda_band_max": 5000000,
+      "peer_count": 265,
+      "revenue_growth_median_pct": 10,
+      "ebitda_margin_median_pct": 24,
+      "payroll_ratio_median_pct": 50,
+      "recurring_rev_median_pct": 62,
+      "top_customer_conc_median_pct": 20,
+      "market_ebitda_multiple_floor": 4.25,
+      "market_ebitda_multiple_ceiling": 7.0
+    }
+  ]
+}

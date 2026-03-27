@@ -8,8 +8,8 @@ import {
 import { cn, fmtM } from '../lib/utils'
 import { recentActivity } from '../lib/mockData'
 import { Skeleton } from '../components/ui/Skeleton'
-
-const COMPANY_ID = 1
+import { useCompanyId } from '../context/CompanyContext'
+import { withCompanyQuery } from '../lib/navLinks'
 
 const colorCfg = {
   blue:    'border-blue-500/20 bg-blue-500/5 text-blue-400',
@@ -41,28 +41,30 @@ const quickActions = [
 
 export default function Home() {
   const navigate = useNavigate()
+  const companyId = useCompanyId()
   const [liveData, setLiveData] = useState(null)
   const [bqData, setBqData] = useState(null)
   const [gapData, setGapData] = useState(null)
 
   useEffect(() => {
-    fetch(`/api/analytics/scores/${COMPANY_ID}`)
+    fetch(`/api/analytics/scores/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(setLiveData)
       .catch(() => {})
-    fetch(`/api/analytics/buyer-questions/${COMPANY_ID}`)
+    fetch(`/api/analytics/buyer-questions/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(setBqData)
       .catch(() => {})
-    fetch(`/api/analytics/value-gap/${COMPANY_ID}`)
+    fetch(`/api/analytics/value-gap/${companyId}`)
       .then(r => r.ok ? r.json() : null)
       .then(setGapData)
       .catch(() => {})
-  }, [])
+  }, [companyId])
 
-  const drs      = liveData?.drs?.base ?? 0
-  const currentEV = liveData?.enterprise_value?.midpoint ?? 0
-  const valueGap  = gapData?.total_value_gap ?? Math.max(0, (liveData?.enterprise_value?.ceiling ?? 0) - currentEV)
+  const drs       = liveData?.drs?.base ?? 0
+  const currentEV  = liveData?.enterprise_value?.midpoint ?? 0
+  const potentialEV = gapData?.potential_ev_midpoint ?? liveData?.enterprise_value?.ceiling ?? 0
+  const valueGap   = Math.max(0, potentialEV - currentEV)
 
   const criticalCount = bqData?.questions?.filter(q => q.severity === 'CRITICAL').length ?? 0
   const highCount     = bqData?.questions?.filter(q => q.severity === 'HIGH').length ?? 0
@@ -117,7 +119,7 @@ export default function Home() {
           {MODULES.map(m => {
             const Icon = m.icon
             return (
-              <div key={m.path} onClick={() => navigate(m.path)}
+              <div key={m.path} onClick={() => navigate(withCompanyQuery(m.path, companyId))}
                 className={cn('rounded-lg border p-4 hover:scale-[1.02] transition-all cursor-pointer group', colorCfg[m.color])}>
                 <Icon className="w-5 h-5 mb-2" />
                 <p className="text-sm font-semibold text-foreground">{m.label}</p>
@@ -162,7 +164,7 @@ export default function Home() {
           </p>
           <div className="space-y-2">
             {quickActions.map((a, i) => (
-              <button key={i} onClick={() => navigate(a.path)}
+              <button key={i} onClick={() => navigate(withCompanyQuery(a.path, companyId))}
                 className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-border hover:bg-muted/30 transition-colors group">
                 <span className={cn('text-xs font-medium', a.color)}>{a.label}</span>
                 <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-muted-foreground" />

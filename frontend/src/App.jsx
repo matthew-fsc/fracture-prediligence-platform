@@ -1,7 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import AppShell from './components/layout/AppShell'
 import DemoShell from './components/layout/DemoShell'
 import ProtectedRoute from './components/auth/ProtectedRoute'
+import { CompanyProvider } from './context/CompanyContext'
 
 // Public / marketing pages
 import LandingPage from './pages/LandingPage'
@@ -76,6 +77,7 @@ function ProtectedAppShell() {
 export default function App() {
   return (
     <BrowserRouter>
+      <CompanyProvider>
       <Routes>
         {/* ---------------------------------------------------------------- */}
         {/* Marketing / public routes                                         */}
@@ -152,28 +154,29 @@ export default function App() {
         />
 
         {/* ---------------------------------------------------------------- */}
-        {/* Dashboard routes (auth required, AppShell)                        */}
+        {/* Dashboard routes (auth required, AppShell) — pathless layout */}
+        {/* avoids duplicate parent path="/" with the landing route.          */}
         {/* ---------------------------------------------------------------- */}
-        <Route path="/" element={<ProtectedAppShell />}>
-          <Route path="Home"              element={<Home />} />
-          <Route path="CompanyWorkspace"  element={<CompanyWorkspace />} />
-          <Route path="AdvisoryWorkflow"  element={<AdvisoryWorkflow />} />
-          <Route path="Readiness"         element={<Readiness />} />
-          <Route path="BusinessQuality"   element={<BusinessQuality />} />
-          <Route path="BuyerLens"         element={<BuyerLens />} />
-          <Route path="Valuation"         element={<Valuation />} />
-          <Route path="ValueGap"          element={<ValueGap />} />
-          <Route path="InitiativeImpact"  element={<InitiativeImpact />} />
-          <Route path="RiskHeatmap"       element={<RiskHeatmap />} />
-          <Route path="ScenarioSimulator" element={<ScenarioSimulator />} />
-          <Route path="Connectors"        element={<Connectors />} />
-          <Route path="DataMapping"       element={<DataMapping />} />
-          <Route path="DataQuality"       element={<DataQuality />} />
-          <Route path="DataRoom"          element={<DataRoom />} />
-          <Route path="Reports"           element={<Reports />} />
-          <Route path="AICopilot"         element={<AICopilot />} />
-          <Route path="Admin"             element={<Admin />} />
-          <Route path="QualitativeInputs" element={<QualitativeInputs />} />
+        <Route element={<ProtectedAppShell />}>
+          <Route path="/Home"              element={<Home />} />
+          <Route path="/CompanyWorkspace"  element={<CompanyWorkspace />} />
+          <Route path="/AdvisoryWorkflow"  element={<AdvisoryWorkflow />} />
+          <Route path="/Readiness"         element={<Readiness />} />
+          <Route path="/BusinessQuality"   element={<BusinessQuality />} />
+          <Route path="/BuyerLens"         element={<BuyerLens />} />
+          <Route path="/Valuation"         element={<Valuation />} />
+          <Route path="/ValueGap"          element={<ValueGap />} />
+          <Route path="/InitiativeImpact"  element={<InitiativeImpact />} />
+          <Route path="/RiskHeatmap"       element={<RiskHeatmap />} />
+          <Route path="/ScenarioSimulator" element={<ScenarioSimulator />} />
+          <Route path="/Connectors"        element={<Connectors />} />
+          <Route path="/DataMapping"       element={<DataMapping />} />
+          <Route path="/DataQuality"       element={<DataQuality />} />
+          <Route path="/DataRoom"          element={<DataRoom />} />
+          <Route path="/Reports"           element={<Reports />} />
+          <Route path="/AICopilot"         element={<AICopilot />} />
+          <Route path="/Admin"             element={<Admin />} />
+          <Route path="/QualitativeInputs" element={<QualitativeInputs />} />
         </Route>
 
         {/* ---------------------------------------------------------------- */}
@@ -181,6 +184,7 @@ export default function App() {
         {/* ---------------------------------------------------------------- */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      </CompanyProvider>
     </BrowserRouter>
   )
 }

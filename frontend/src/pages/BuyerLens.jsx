@@ -3,8 +3,7 @@ import { AlertCircle, AlertTriangle, Info, FileText } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { Skeleton } from '../components/ui/Skeleton'
-
-const COMPANY_ID = 1
+import { useCompanyId } from '../context/CompanyContext'
 
 const CATEGORY_LABELS = {
   revenue_quality:          'Revenue Quality',
@@ -38,6 +37,7 @@ function buyerBadge(t) {
 }
 
 export default function BuyerLens() {
+  const companyId = useCompanyId()
   const [data, setData]           = useState(null)
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(null)
@@ -45,11 +45,13 @@ export default function BuyerLens() {
   const [filterSev, setFilterSev] = useState('all')
 
   useEffect(() => {
-    fetch(`/api/analytics/buyer-questions/${COMPANY_ID}`)
+    setLoading(true)
+    setError(null)
+    fetch(`/api/analytics/buyer-questions/${companyId}`)
       .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
       .then(d => { setData(d); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
-  }, [])
+  }, [companyId])
 
   const questions = (data?.questions ?? []).filter(q => {
     if (filterCat !== 'all' && q.category !== filterCat) return false
