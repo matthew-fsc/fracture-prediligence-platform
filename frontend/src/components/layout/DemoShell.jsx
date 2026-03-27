@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Outlet, useSearchParams, Link } from 'react-router-dom'
+import { Outlet, useSearchParams } from 'react-router-dom'
 import DemoSidebar from './DemoSidebar'
 import ConversionModal from '../demo/ConversionModal'
+import { DemoDashboardExitLink } from '../demo/DemoDashboardExit'
 import { DemoContext } from '../../context/DemoContext'
 import { Bell, Search, Share2, Check, ArrowLeft } from 'lucide-react'
 import { usePageTitle } from '../../hooks/usePageTitle'
@@ -28,13 +29,10 @@ function DemoHeader({ demoData, slug, personalized }) {
     <header className="h-14 border-b border-border bg-card/60 backdrop-blur-sm flex items-center justify-between px-4 flex-shrink-0">
       {/* Left */}
       <div className="flex items-center gap-3">
-        <Link
-          to="/Home"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground hover:text-foreground"
-        >
+        <DemoDashboardExitLink className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-60 disabled:pointer-events-none">
           <ArrowLeft className="w-3.5 h-3.5" />
           Dashboard
-        </Link>
+        </DemoDashboardExitLink>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-card-foreground">
           <span
             style={{

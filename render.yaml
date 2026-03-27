@@ -17,6 +17,11 @@ services:
         value: production
       - key: RUN_MIGRATIONS
         value: "true"
+      # Passed into the Docker build stage as ARG (must match Dockerfile) + available at runtime.
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: VITE_API_BASE_URL
+        value: ""
       - key: DATABASE_URL
         sync: false
       - key: SECRET_KEY

@@ -14,7 +14,14 @@ jobs:
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
+      # Optional: add repo secret VITE_CLERK_PUBLISHABLE_KEY so the remote build embeds Clerk in the SPA.
       - name: Deploy
-        run: flyctl deploy --remote-only
+        run: |
+          if [ -n "${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}" ]; then
+            flyctl deploy --remote-only \
+              --build-arg "VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}"
+          else
+            flyctl deploy --remote-only
+          fi
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

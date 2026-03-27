@@ -4,6 +4,15 @@ WORKDIR /build
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
+
+# Vite bakes these into the static bundle at build time (not runtime).
+# Same-origin Docker: leave VITE_API_BASE_URL empty so /api is relative to the browser origin.
+# Clerk publishable key is safe to embed (public); must match backend CLERK_JWKS_URL instance.
+ARG VITE_CLERK_PUBLISHABLE_KEY=
+ARG VITE_API_BASE_URL=
+ENV VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
 RUN npm run build
 
 FROM python:3.12-slim

@@ -175,7 +175,10 @@ Copy `backend/.env.example` → `backend/.env` and `frontend/.env.example` → `
 From the repo root that contains `frontend/`, `backend/`, and `Dockerfile`:
 
 ```bash
-docker build -t prediligence .
+docker build -t prediligence \
+  --build-arg VITE_CLERK_PUBLISHABLE_KEY=pk_live_... \
+  --build-arg VITE_API_BASE_URL= \
+  .
 docker run --rm -p 8000:8000 \
   -e DATABASE_URL=postgresql://user:pass@host:5432/dbname \
   -e SECRET_KEY="$(openssl rand -hex 32)" \
@@ -186,6 +189,8 @@ docker run --rm -p 8000:8000 \
   -e RUN_MIGRATIONS=true \
   prediligence
 ```
+
+The `--build-arg` values are baked into the static SPA at build time. Omitting them produces a UI without Clerk/API configuration. For split hosting, set `VITE_API_BASE_URL` to your API origin (no trailing slash).
 
 The image runs `uvicorn` on `0.0.0.0:$PORT` (default `8000`) with `--proxy-headers` so `X-Forwarded-*` from nginx/Caddy works. Set `RUN_MIGRATIONS=true` to run `alembic upgrade head` on container start (recommended for first deploys; then consider running migrations as a separate job).
 

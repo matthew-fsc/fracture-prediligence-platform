@@ -1,5 +1,6 @@
 # Railway — deploy from Dockerfile at repo root.
 # Create project → connect repo → add PostgreSQL → set env vars in UI.
+# Required for a working SPA: VITE_CLERK_PUBLISHABLE_KEY (and VITE_API_BASE_URL if API is on another host).
 
 [build]
 builder = "DOCKERFILE"

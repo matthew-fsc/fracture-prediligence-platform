@@ -1,4 +1,5 @@
-import { NavLink, Link } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
+import { DemoDashboardExitLink } from '../demo/DemoDashboardExit'
 import {
   Zap, House, Building, Workflow, Grid3x3, BarChart2,
   Eye, TrendingUp, Target, Activity,
@@ -124,13 +125,10 @@ export default function DemoSidebar({ basePrefix = '/demo' }) {
         >
           Request Founding license
         </button>
-        <Link
-          to="/Home"
-          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] font-medium text-sidebar-foreground/60 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/40 transition-colors duration-100"
-        >
+        <DemoDashboardExitLink className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] font-medium text-sidebar-foreground/60 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/40 transition-colors duration-100 disabled:opacity-60 disabled:pointer-events-none text-left">
           <LayoutDashboard className="w-3.5 h-3.5 flex-shrink-0" />
           Back to Dashboard
-        </Link>
+        </DemoDashboardExitLink>
       </div>
     </aside>
   )
