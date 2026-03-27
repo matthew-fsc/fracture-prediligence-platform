@@ -26,6 +26,7 @@ def upgrade() -> None:
         sa.Column("ein",         sa.String(32)),
         sa.Column("state",       sa.String(2)),
         sa.Column("entity_type", sa.String(32)),
+        if_not_exists=True,
     )
 
     # ── customers ──────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ def upgrade() -> None:
         sa.Column("confidence_level", sa.String(16),   server_default="MEDIUM"),
         sa.Column("ingested_at",      sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("reviewer_sign_off",sa.String(128)),
+        if_not_exists=True,
     )
 
     # ── employees ──────────────────────────────────────────────────────────
@@ -66,6 +68,7 @@ def upgrade() -> None:
         sa.Column("confidence_level", sa.String(16),   server_default="MEDIUM"),
         sa.Column("ingested_at",      sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("reviewer_sign_off",sa.String(128)),
+        if_not_exists=True,
     )
 
     # ── revenue_streams ────────────────────────────────────────────────────
@@ -85,6 +88,7 @@ def upgrade() -> None:
         sa.Column("confidence_level", sa.String(16),   server_default="MEDIUM"),
         sa.Column("ingested_at",      sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("reviewer_sign_off",sa.String(128)),
+        if_not_exists=True,
     )
 
     # ── expenses ───────────────────────────────────────────────────────────
@@ -104,6 +108,7 @@ def upgrade() -> None:
         sa.Column("confidence_level", sa.String(16),   server_default="MEDIUM"),
         sa.Column("ingested_at",      sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("reviewer_sign_off",sa.String(128)),
+        if_not_exists=True,
     )
 
     # ── contracts ──────────────────────────────────────────────────────────
@@ -125,6 +130,7 @@ def upgrade() -> None:
         sa.Column("confidence_level",  sa.String(16),   server_default="MEDIUM"),
         sa.Column("ingested_at",       sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("reviewer_sign_off", sa.String(128)),
+        if_not_exists=True,
     )
 
     # ── ingestion_jobs ─────────────────────────────────────────────────────
@@ -150,6 +156,7 @@ def upgrade() -> None:
         sa.Column("created_at",       sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("updated_at",       sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("completed_at",     sa.DateTime),
+        if_not_exists=True,
     )
 
     # ── seed a default company ─────────────────────────────────────────────
