@@ -58,6 +58,7 @@ import QualitativeInputs from './pages/QualitativeInputs'
 
 // Admin pages
 import AdminDemos from './pages/admin/AdminDemos'
+import SettingsPage from './pages/SettingsPage'
 
 // Wrapper that reads :slug from the URL and passes it to DemoShell
 function DemoShellWithSlug() {
@@ -95,6 +96,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <OnboardingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/*"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
             </ProtectedRoute>
           }
         />

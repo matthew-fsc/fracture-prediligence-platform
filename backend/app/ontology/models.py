@@ -79,6 +79,7 @@ class Company(Base):
 
     id:       Mapped[int]         = mapped_column(Integer, primary_key=True)
     name:     Mapped[str]         = mapped_column(String(256))
+    owner_user_id: Mapped[Optional[str]] = mapped_column(String(256), nullable=True, index=True)  # Clerk sub
     industry: Mapped[Optional[str]] = mapped_column(String(128))
     founded:  Mapped[Optional[int]] = mapped_column(Integer)
     ein:      Mapped[Optional[str]] = mapped_column(String(32))

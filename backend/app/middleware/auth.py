@@ -73,12 +73,7 @@ class CurrentUser:
 # FastAPI dependency
 # ---------------------------------------------------------------------------
 
-async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-) -> CurrentUser:
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Authorization header required")
-
+async def authenticate_credentials(credentials: HTTPAuthorizationCredentials) -> CurrentUser:
     token = credentials.credentials
 
     try:
@@ -121,3 +116,22 @@ async def get_current_user(
         raise
     except Exception as exc:
         raise HTTPException(status_code=401, detail=f"Authentication failed: {exc}") from exc
+
+
+async def get_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> CurrentUser:
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    return await authenticate_credentials(credentials)
+
+
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Optional[CurrentUser]:
+    """In development, missing Authorization allows None (demo / local). In production, requires a valid token."""
+    if not credentials:
+        if settings.APP_ENV.lower() == "development":
+            return None
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    return await authenticate_credentials(credentials)

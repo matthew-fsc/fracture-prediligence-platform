@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     DEMO_TOTAL_SPOTS: int = 20
     DEMO_SLUG_RETRY_COUNT: int = 5
 
+    # Optional: set to your Clerk user id (sub) to assign demo company id=1 on bootstrap (local dev).
+    SEED_COMPANY_1_OWNER_USER_ID: str = ""
+
     DRS_CONFIDENCE_LOW_MULTIPLIER: float = 0.9
     DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER: float = 1.05
 

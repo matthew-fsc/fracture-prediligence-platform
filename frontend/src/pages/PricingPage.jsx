@@ -69,11 +69,7 @@ const TIERS = [
 async function startCheckout(tierId, userEmail) {
   const data = await apiRequest('/api/create-checkout', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      // Include Clerk session token if available
-      ...(window.__clerkSessionToken ? { Authorization: `Bearer ${window.__clerkSessionToken}` } : {}),
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tier: tierId, email: userEmail }),
   })
   const { checkout_url } = data
