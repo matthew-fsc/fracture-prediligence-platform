@@ -4,6 +4,12 @@ set -e
 LISTEN_PORT="${PORT:-8000}"
 echo "[entrypoint] cwd=$(pwd) PORT=${LISTEN_PORT} RUN_MIGRATIONS=${RUN_MIGRATIONS:-}"
 
+if [ "${CLEAN_DB:-}" = "true" ]; then
+  echo "[entrypoint] Cleaning database (DROP SCHEMA public CASCADE; CREATE SCHEMA public)..."
+  psql "$DATABASE_URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" || true
+  echo "[entrypoint] database cleaned"
+fi
+
 if [ "${RUN_MIGRATIONS:-}" = "true" ]; then
   echo "[entrypoint] alembic upgrade head"
   alembic upgrade head || {
