@@ -4,16 +4,59 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
+from app.analytics.a9_drs_composite import CategoryScores, compute_drs
 from app.api.deps import get_company_scope
 from app.core.database import get_db
-from app.ontology.models import Company
 from app.analytics.a14_report_generator import generate_report_pdf, REPORT_BUILDERS
+from app.ontology.models import Company, GeneratedReport
+from app.services.analytics_service import compute_category_modules
 
 router = APIRouter()
 
 CompanyScoped = Annotated[Company, Depends(get_company_scope)]
+
+
+def _snapshot_drs(company_id: int, db: Session) -> float | None:
+    try:
+        mod = compute_category_modules(company_id, db)
+        cat = CategoryScores(
+            revenue_quality=mod["revenue_quality"].composite,
+            financial_integrity=mod["financial_integrity"].composite,
+            operational_independence=mod["operational_independence"].composite,
+            customer_risk=mod["customer_risk"].composite,
+            management_team=mod["management_team"].composite,
+            growth_drivers=mod["growth_drivers"].composite,
+        )
+        return round(float(compute_drs(cat).base_drs), 2)
+    except Exception:
+        return None
+
+
+@router.get("/{company_id}/history")
+def report_history(company: CompanyScoped, db: Session = Depends(get_db)):
+    """Recent PDF generations for this company (metadata only)."""
+    rows = (
+        db.query(GeneratedReport)
+        .filter(GeneratedReport.company_id == company.id)
+        .order_by(desc(GeneratedReport.created_at))
+        .limit(100)
+        .all()
+    )
+    return {
+        "company_id": company.id,
+        "reports": [
+            {
+                "id": r.id,
+                "template_id": r.template_id,
+                "drs_score": float(r.drs_score) if r.drs_score is not None else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+    }
 
 
 @router.get("/{company_id}/generate/{report_type}")
@@ -30,7 +73,19 @@ def generate_report(
         )
     try:
         pdf_bytes = generate_report_pdf(report_type, company.id, db)
-        filename  = f"{report_type}_company_{company.id}.pdf"
+        filename = f"{report_type}_company_{company.id}.pdf"
+        try:
+            snap = _snapshot_drs(company.id, db)
+            db.add(
+                GeneratedReport(
+                    company_id=company.id,
+                    template_id=report_type,
+                    drs_score=snap,
+                )
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",

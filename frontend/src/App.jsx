@@ -30,7 +30,10 @@ import DemoReports from './pages/Reports'
 import DemoRiskHeatmap from './pages/RiskHeatmap'
 import DemoConnectors from './pages/Connectors'
 import DemoDataMapping from './pages/DataMapping'
-import DemoQualitativeInputs from './pages/QualitativeInputs'
+import DemoEBITDATimeline from './pages/EBITDATimeline'
+import DemoMarketComps from './pages/MarketComps'
+import DemoEngagementIntake from './pages/EngagementIntake'
+import DemoAdvisoryLibrary from './pages/AdvisoryLibrary'
 
 // Dashboard pages
 import Home from './pages/Home'
@@ -51,7 +54,10 @@ import DataRoom from './pages/DataRoom'
 import Reports from './pages/Reports'
 import AICopilot from './pages/AICopilot'
 import Admin from './pages/Admin'
-import QualitativeInputs from './pages/QualitativeInputs'
+import EBITDATimeline from './pages/EBITDATimeline'
+import MarketComps from './pages/MarketComps'
+import EngagementIntake from './pages/EngagementIntake'
+import AdvisoryLibrary from './pages/AdvisoryLibrary'
 
 // Admin pages
 import AdminDemos from './pages/admin/AdminDemos'
@@ -85,7 +91,7 @@ export default function App() {
         <Route path="/sign-in/*" element={<SignInPage />} />
         <Route path="/sign-up/*" element={<SignUpPage />} />
 
-        {/* Lowercase aliases → dashboard routes (bookmarks, external redirects) */}
+        {/* Lowercase aliases ? dashboard routes (bookmarks, external redirects) */}
         <Route path="/home" element={<Navigate to="/Home" replace />} />
         <Route path="/companyworkspace" element={<Navigate to="/CompanyWorkspace" replace />} />
         <Route path="/connectors" element={<Navigate to="/Connectors" replace />} />
@@ -94,7 +100,13 @@ export default function App() {
         <Route path="/valuation" element={<Navigate to="/Valuation" replace />} />
         <Route path="/valuegap" element={<Navigate to="/ValueGap" replace />} />
         <Route path="/buyerlens" element={<Navigate to="/BuyerLens" replace />} />
+        <Route path="/engagement-intake" element={<Navigate to="/EngagementIntake" replace />} />
+        <Route path="/engagementintake" element={<Navigate to="/EngagementIntake" replace />} />
         <Route path="/aicopilot" element={<Navigate to="/AICopilot" replace />} />
+        <Route path="/advisorylibrary" element={<Navigate to="/AdvisoryLibrary" replace />} />
+        <Route path="/advisory-library" element={<Navigate to="/AdvisoryLibrary" replace />} />
+        <Route path="/QualitativeInputs" element={<Navigate to="/EngagementIntake" replace />} />
+        <Route path="/qualitativeinputs" element={<Navigate to="/EngagementIntake" replace />} />
 
         {/* ---------------------------------------------------------------- */}
         {/* Post-payment onboarding (auth required)                           */}
@@ -136,7 +148,11 @@ export default function App() {
           <Route path="reports"            element={<DemoReports />} />
           <Route path="data-sources"       element={<DemoConnectors />} />
           <Route path="field-mapping"      element={<DemoDataMapping />} />
-          <Route path="qualitative-inputs" element={<DemoQualitativeInputs />} />
+          <Route path="qualitative-inputs" element={<Navigate to="engagement-intake" replace />} />
+          <Route path="ebitda-timeline"    element={<DemoEBITDATimeline />} />
+          <Route path="market-comps"       element={<DemoMarketComps />} />
+          <Route path="engagement-intake"  element={<DemoEngagementIntake />} />
+          <Route path="advisory-library"  element={<DemoAdvisoryLibrary />} />
         </Route>
         <Route path="/demo/:slug" element={<DemoShellWithSlug />}>
           <Route index element={<DemoHome2 />} />
@@ -155,7 +171,11 @@ export default function App() {
           <Route path="reports"            element={<DemoReports />} />
           <Route path="data-sources"       element={<DemoConnectors />} />
           <Route path="field-mapping"      element={<DemoDataMapping />} />
-          <Route path="qualitative-inputs" element={<DemoQualitativeInputs />} />
+          <Route path="qualitative-inputs" element={<Navigate to="engagement-intake" replace />} />
+          <Route path="ebitda-timeline"    element={<DemoEBITDATimeline />} />
+          <Route path="market-comps"       element={<DemoMarketComps />} />
+          <Route path="engagement-intake"  element={<DemoEngagementIntake />} />
+          <Route path="advisory-library"  element={<DemoAdvisoryLibrary />} />
         </Route>
 
         {/* ---------------------------------------------------------------- */}
@@ -171,7 +191,7 @@ export default function App() {
         />
 
         {/* ---------------------------------------------------------------- */}
-        {/* Dashboard routes (auth required, AppShell) — pathless layout */}
+        {/* Dashboard routes (auth required, AppShell) � pathless layout */}
         {/* avoids duplicate parent path="/" with the landing route.          */}
         {/* ---------------------------------------------------------------- */}
         <Route element={<ProtectedAppShell />}>
@@ -193,7 +213,10 @@ export default function App() {
           <Route path="/Reports"           element={<Reports />} />
           <Route path="/AICopilot"         element={<AICopilot />} />
           <Route path="/Admin"             element={<Admin />} />
-          <Route path="/QualitativeInputs" element={<QualitativeInputs />} />
+          <Route path="/EBITDATimeline"    element={<EBITDATimeline />} />
+          <Route path="/MarketComps"       element={<MarketComps />} />
+          <Route path="/EngagementIntake"  element={<EngagementIntake />} />
+          <Route path="/AdvisoryLibrary"  element={<AdvisoryLibrary />} />
         </Route>
 
         {/* ---------------------------------------------------------------- */}

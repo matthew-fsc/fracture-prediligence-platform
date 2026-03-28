@@ -237,6 +237,45 @@ class ColumnMappingResult:
         }
 
 
+def column_mapping_result_from_stored(stored: dict, ingestion_id: str) -> ColumnMappingResult:
+    """Rebuild ColumnMappingResult from persisted job.column_mappings JSON (after advisor overrides)."""
+    if not stored:
+        return ColumnMappingResult(ingestion_id=ingestion_id)
+    mappings: list[ColumnMapping] = []
+    for m in stored.get("mappings", []):
+        alts_raw = m.get("alternative_fields") or []
+        if alts_raw and isinstance(alts_raw[0], dict):
+            alt_tuples = [(x["field"], int(x["confidence"])) for x in alts_raw]
+        else:
+            alt_tuples = [(x[0], int(x[1])) for x in alts_raw] if alts_raw else []
+        mappings.append(
+            ColumnMapping(
+                source_column=m["source_column"],
+                ontology_field=m.get("ontology_field"),
+                entity_type=m.get("entity_type"),
+                confidence=int(m.get("confidence", 0)),
+                match_method=m.get("match_method", "manual"),
+                match_detail=m.get("match_detail", ""),
+                requires_review=bool(m.get("requires_review", False)),
+                alternative_fields=alt_tuples,
+            )
+        )
+    auto_mapped = sum(
+        1
+        for x in mappings
+        if x.ontology_field and not x.requires_review and x.match_method != "excluded"
+    )
+    excluded = sum(1 for x in mappings if x.match_method == "excluded")
+    review_required = sum(1 for x in mappings if x.requires_review)
+    return ColumnMappingResult(
+        ingestion_id=stored.get("ingestion_id") or ingestion_id,
+        mappings=mappings,
+        auto_mapped=auto_mapped,
+        review_required=review_required,
+        excluded=excluded,
+    )
+
+
 def _normalize(s: str) -> str:
     return re.sub(r"[^a-z0-9 ]", "", str(s).lower()).strip()
 

@@ -32,6 +32,9 @@ class Settings(BaseSettings):
 
     RAW_DATA_DIR: str = "data/raw"
     REPORTS_DIR: str = "data/reports"
+    # Uploaded report logos (per company id + extension), relative to backend root if not absolute.
+    COMPANY_LOGO_DIR: str = "data/company_logos"
+    COMPANY_LOGO_MAX_BYTES: int = 2 * 1024 * 1024
     # Max upload size for CSV/Excel ingestion (bytes). Default 25 MiB.
     INGESTION_MAX_UPLOAD_BYTES: int = 25 * 1024 * 1024
 

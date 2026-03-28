@@ -14,7 +14,7 @@ const TIERS = [
     name: 'Founding Advisor',
     price: '$179',
     per: '/mo',
-    badge: 'Limited — 20 spots',
+    badge: 'Limited � 20 spots',
     highlight: true,
     tagline: 'Rate locked for life',
     features: [
@@ -24,7 +24,7 @@ const TIERS = [
       'Direct access to product roadmap',
       'Founding member badge',
     ],
-    cta: 'Claim Founding Access →',
+    cta: 'Claim Founding Access ?',
   },
   {
     id: 'pro',
@@ -41,7 +41,7 @@ const TIERS = [
       'Data room organization',
       'Priority support',
     ],
-    cta: 'Start Free Trial →',
+    cta: 'Start Free Trial ?',
   },
   {
     id: 'team',
@@ -58,7 +58,7 @@ const TIERS = [
       'Custom branding on reports',
       'API access',
     ],
-    cta: 'Contact Us →',
+    cta: 'Contact Us ?',
     mailto: 'matthew@fracturesystems.com',
   },
 ]
@@ -139,7 +139,7 @@ function TierCard({ tier }) {
       <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px 0', flex: 1 }}>
         {tier.features.map((feat) => (
           <li key={feat} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-            <span style={{ color: COLORS.gold, fontSize: 13, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>✓</span>
+            <span style={{ color: COLORS.gold, fontSize: 13, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>?</span>
             <span style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, lineHeight: 1.5 }}>{feat}</span>
           </li>
         ))}
@@ -201,7 +201,7 @@ export default function PricingPage() {
           Lock in your advisor rate today.
         </h1>
         <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 16, maxWidth: 480, margin: '0 auto 12px', lineHeight: 1.7 }}>
-          20 founding spots at $179/mo — rate locked for life. Full access to every feature.
+          20 founding spots at $179/mo � rate locked for life. Full access to every feature.
         </p>
         <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>
           All plans include a 14-day free trial. No credit card required to start.
@@ -223,7 +223,7 @@ export default function PricingPage() {
             {[
               { q: 'What happens after the free trial?', a: "You'll be charged your plan rate automatically. Cancel anytime before the trial ends and you won't be charged." },
               { q: 'Can I switch plans?', a: 'Yes. Upgrade or downgrade at any time from your account settings.' },
-              { q: 'What is a Founding Advisor spot?', a: 'The first 20 advisors who subscribe lock in $179/mo for life — even when the Pro tier increases to market rate.' },
+              { q: 'What is a Founding Advisor spot?', a: 'The first 20 advisors who subscribe lock in $179/mo for life � even when the Pro tier increases to market rate.' },
             ].map(({ q, a }) => (
               <div key={q} style={{ borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 20 }}>
                 <p style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 600, margin: '0 0 6px 0' }}>{q}</p>
@@ -233,7 +233,7 @@ export default function PricingPage() {
           </div>
           <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, marginTop: 28 }}>
             Still have questions?{' '}
-            <a href="mailto:matthew@fracturesystems.com" style={{ color: COLORS.gold, textDecoration: 'none' }}>Email us →</a>
+            <a href="mailto:matthew@fracturesystems.com" style={{ color: COLORS.gold, textDecoration: 'none' }}>Email us ?</a>
           </p>
         </div>
       </section>

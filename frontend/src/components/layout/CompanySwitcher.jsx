@@ -86,7 +86,7 @@ export default function CompanySwitcher({ displayName }) {
               </div>
             )}
             {!isLoading && companies.length === 0 && (
-              <p className="text-[11px] text-muted-foreground px-3 py-2">No clients yet — add one below.</p>
+              <p className="text-[11px] text-muted-foreground px-3 py-2">No clients yet � add one below.</p>
             )}
             {!isLoading &&
               companies.map((c) => (

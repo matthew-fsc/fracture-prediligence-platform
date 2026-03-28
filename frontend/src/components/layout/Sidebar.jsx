@@ -2,7 +2,8 @@ import { NavLink, Link } from 'react-router-dom'
 import {
   Zap, House, Building, Workflow, Grid3x3, BarChart2,
   Eye, TrendingUp, Target, Activity, Plug, ArrowRightLeft,
-  Folder, FileText, Bot, Settings, ChevronLeft, ClipboardList, MonitorPlay,
+  Folder, FileText, Bot, Settings, ChevronLeft, MonitorPlay,
+  LineChart, GitCompare, NotebookPen, BookOpen,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useCompanyId } from '../../context/CompanyContext'
@@ -14,6 +15,7 @@ const groups = [
     items: [
       { label: 'Home',               href: '/Home',             icon: House },
       { label: 'Company Workspace',  href: '/CompanyWorkspace', icon: Building },
+      { label: 'Engagement Intake',  href: '/EngagementIntake', icon: NotebookPen },
       { label: 'Advisory Workflow',  href: '/AdvisoryWorkflow', icon: Workflow },
     ],
   },
@@ -21,16 +23,17 @@ const groups = [
     label: 'Intelligence',
     items: [
       { label: 'Readiness Score',    href: '/Readiness',           icon: Grid3x3 },
-      { label: 'Qualitative Inputs', href: '/QualitativeInputs',   icon: ClipboardList },
       { label: 'Business Quality',   href: '/BusinessQuality',     icon: BarChart2 },
       { label: 'Buyer Risk Profile', href: '/BuyerLens',        icon: Eye },
       { label: 'Valuation',          href: '/Valuation',        icon: TrendingUp },
+      { label: 'Market Comps',       href: '/MarketComps',      icon: GitCompare },
     ],
   },
   {
     label: 'Value Creation',
     items: [
       { label: 'Value Gap',          href: '/ValueGap',         icon: Target },
+      { label: 'EBITDA & EV Timeline', href: '/EBITDATimeline', icon: LineChart },
       { label: 'Initiative Impact',  href: '/InitiativeImpact', icon: Zap },
       { label: 'Scenario Simulator', href: '/ScenarioSimulator',icon: Activity },
     ],
@@ -48,6 +51,7 @@ const groups = [
     label: 'Output',
     items: [
       { label: 'Reports',            href: '/Reports',          icon: FileText },
+      { label: 'Advisory Library',   href: '/AdvisoryLibrary',  icon: BookOpen },
       { label: 'AI Copilot',         href: '/AICopilot',        icon: Bot },
       { label: 'Admin',              href: '/Admin',            icon: Settings },
     ],
@@ -75,7 +79,7 @@ export default function Sidebar({ mobileOpen = false, onNavigate }) {
             <h1 className="text-[12px] font-semibold text-sidebar-accent-foreground truncate leading-tight">
               Pre-Diligence Platform
             </h1>
-            <p className="text-[9px] text-sidebar-foreground tracking-widest uppercase leading-tight">
+            <p className="text-[11px] text-sidebar-foreground tracking-widest uppercase leading-tight">
               Fracture Systems
             </p>
           </div>
@@ -86,7 +90,7 @@ export default function Sidebar({ mobileOpen = false, onNavigate }) {
       <nav className="flex-1 py-2 overflow-y-auto">
         {groups.map((group) => (
           <div key={group.label} className="mb-1">
-            <p className="text-[9px] font-semibold text-sidebar-foreground/40 uppercase tracking-widest px-4 py-1.5">
+            <p className="text-[11px] font-semibold text-sidebar-foreground/40 uppercase tracking-widest px-4 py-1.5">
               {group.label}
             </p>
             <div className="px-2 space-y-0.5">
@@ -136,7 +140,7 @@ export default function Sidebar({ mobileOpen = false, onNavigate }) {
         <button
           type="button"
           onClick={() => onNavigate?.()}
-          className="text-[10px] text-sidebar-foreground/40 flex items-center gap-1 min-h-[44px] py-2 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring rounded"
+          className="text-[11px] text-sidebar-foreground/40 flex items-center gap-1 min-h-[44px] py-2 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring rounded"
         >
           <ChevronLeft className="w-3 h-3" />
           <span className="md:hidden">Close menu</span>

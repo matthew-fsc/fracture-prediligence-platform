@@ -1,7 +1,11 @@
 """Blueprint II analytics engine — API routes."""
 
+import json
+import mimetypes
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Annotated, Optional
 from sqlalchemy.orm import Session
@@ -20,11 +24,29 @@ from app.analytics.a9_drs_composite import CategoryScores, compute_drs
 from app.analytics.a10_enterprise_value import compute_enterprise_value, format_ev_valuation_summary
 from app.analytics.market_benchmarks import build_benchmarks_payload, get_market_multiple_context
 from app.analytics.a11_value_gap import compute_value_gap
+from app.analytics.ebitda_basis import ebitda_basis_for_company
 from app.analytics.a13_buyer_questions import generate_buyer_questions
 from app.core.config import settings
 from app.core.scoring_rules import SCORING_RULES, SCORING_RULES_VERSION
-from app.ontology.models import AdvisorOverride, QualitativeInputs, AddbackOverride, Company
+from app.ontology.models import (
+    AdvisorOverride,
+    QualitativeInputs,
+    QualitativeInputAudit,
+    AddbackOverride,
+    BuyerQuestionState,
+    Company,
+    CompanyInitiative,
+    EngagementProfile,
+    EngagementSnapshot,
+)
+from app.services.advisory_workflow import build_advisory_workflow
 from app.services.analytics_service import compute_category_modules
+from app.services.company_logo_storage import (
+    delete_company_logo_files,
+    has_uploaded_company_logo,
+    resolve_company_logo_path,
+    save_company_logo_upload,
+)
 
 router = APIRouter()
 
@@ -34,6 +56,20 @@ VALID_CATEGORIES = {
     "revenue_quality", "financial_integrity", "operational_independence",
     "customer_risk", "management_team", "growth_drivers",
 }
+
+
+def _ebitda_basis(company_id: int, db: Session) -> dict:
+    return ebitda_basis_for_company(company_id, db)
+
+
+def _expense_category_code(cat) -> str:
+    """Normalize expense.category for P&L line items (may be Enum or plain str from DB)."""
+    if cat is None:
+        return "OPEX"
+    if isinstance(cat, str):
+        return cat.strip().upper() or "OPEX"
+    v = getattr(cat, "value", None)
+    return str(v).strip().upper() if v is not None else str(cat).strip().upper() or "OPEX"
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +167,96 @@ class QualitativeRequest(BaseModel):
 def get_metrics(company: CompanyScoped, db: Session = Depends(get_db)):
     """A1: Raw metric registry — totals, counts, and computed ratios."""
     metrics = compute_metrics(company.id, db)
-    return metrics
+    basis = _ebitda_basis(company.id, db)
+    d = jsonable_encoder(metrics)
+    d["ebitda_ttm"] = basis["ebitda_normalized_ttm"]
+    d["ebitda_proxy_ttm"] = basis["ebitda_proxy_ttm"]
+    d["ebitda_basis_note"] = (
+        "Primary EBITDA = ontology proxy (revenue − COGS − OpEx) plus advisor-entered D&A. "
+        "Interest and tax below are for disclosure only and are not added here."
+    )
+    d["depreciation_amortization_ttm"] = basis["depreciation_amortization_ttm"]
+    d["interest_expense_ttm"] = basis["interest_expense_ttm"]
+    d["income_tax_expense_ttm"] = basis["income_tax_expense_ttm"]
+    d["market_rate_replacement_annual"] = basis["market_rate_replacement_annual"]
+    return d
+
+
+class CompanyFinancialPatch(BaseModel):
+    """Advisor inputs for EBITDA normalization and optional PDF branding."""
+
+    market_rate_replacement_annual: Optional[float] = None
+    depreciation_amortization_ttm: Optional[float] = None
+    interest_expense_ttm: Optional[float] = None
+    income_tax_expense_ttm: Optional[float] = None
+    report_firm_name: Optional[str] = None
+    report_cover_blurb: Optional[str] = None
+    report_logo_url: Optional[str] = None
+
+
+@router.get("/company-financial/{company_id}")
+def get_company_financial(company: CompanyScoped, db: Session = Depends(get_db)):
+    """Advisor-editable company fields for EBITDA basis and PDF branding."""
+    db.refresh(company)
+    return {
+        "ebitda_basis": _ebitda_basis(company.id, db),
+        "report_firm_name": company.report_firm_name,
+        "report_cover_blurb": company.report_cover_blurb,
+        "report_logo_url": company.report_logo_url,
+        "has_uploaded_logo": has_uploaded_company_logo(company.id),
+    }
+
+
+@router.patch("/company-financial/{company_id}")
+def patch_company_financial(
+    company: CompanyScoped,
+    body: CompanyFinancialPatch,
+    db: Session = Depends(get_db),
+):
+    """Update per-company EBITDA basis fields (scoped like other analytics routes)."""
+    data = body.model_dump(exclude_unset=True)
+    for k, v in data.items():
+        setattr(company, k, v)
+    db.commit()
+    db.refresh(company)
+    return {
+        "ebitda_basis": _ebitda_basis(company.id, db),
+        "report_firm_name": company.report_firm_name,
+        "report_cover_blurb": company.report_cover_blurb,
+        "report_logo_url": company.report_logo_url,
+        "has_uploaded_logo": has_uploaded_company_logo(company.id),
+    }
+
+
+@router.post("/company-financial/{company_id}/logo")
+async def upload_company_logo(
+    company: CompanyScoped,
+    file: UploadFile = File(...),
+):
+    """Upload a logo image for PDF reports (PNG, JPEG, WebP, or GIF; max size from settings)."""
+    raw = await file.read()
+    try:
+        save_company_logo_upload(company.id, raw, file.content_type or "")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True, "has_uploaded_logo": True}
+
+
+@router.delete("/company-financial/{company_id}/logo")
+def delete_company_logo(company: CompanyScoped):
+    """Remove the uploaded logo file for this company."""
+    delete_company_logo_files(company.id)
+    return {"ok": True, "has_uploaded_logo": False}
+
+
+@router.get("/company-financial/{company_id}/logo")
+def download_company_logo(company: CompanyScoped):
+    """Serve the uploaded logo for preview (same auth as other company-scoped routes)."""
+    path = resolve_company_logo_path(company.id)
+    if not path:
+        raise HTTPException(status_code=404, detail="No logo uploaded")
+    media_type, _ = mimetypes.guess_type(str(path))
+    return FileResponse(path, media_type=media_type or "application/octet-stream")
 
 
 @router.get("/market-benchmarks/{company_id}")
@@ -337,8 +462,8 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
         drs = compute_drs(cat)
 
         from decimal import Decimal as _Decimal
-        metrics = compute_metrics(company.id, db)
-        ebitda_dec = _Decimal(str(round(float(metrics.ebitda_ttm), 2)))
+        basis = _ebitda_basis(company.id, db)
+        ebitda_dec = _Decimal(str(round(basis["ebitda_normalized_ttm"], 2)))
         mctx = get_market_multiple_context(db, company.id, float(ebitda_dec))
         ev = compute_enterprise_value(ebitda_dec, drs.tier, market_context=mctx)
         valuation_summary = format_ev_valuation_summary(ev)
@@ -379,6 +504,20 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
                 "source_citation": valuation_summary,
             },
             "rules": {"version": SCORING_RULES_VERSION, "category_weights": SCORING_RULES.category_weights},
+            "methodology": {
+                "version": SCORING_RULES_VERSION,
+                "summary": (
+                    "DRS is a 0–100 weighted composite of six category scores. "
+                    "Each category is computed from financial ontology data and optional qualitative inputs."
+                ),
+                "category_weights_percent": {
+                    k: round(v * 100, 1) for k, v in SCORING_RULES.category_weights.items()
+                },
+                "tiers": [{"min_drs": lo, "tier": name} for lo, name in SCORING_RULES.drs_tier_thresholds],
+                "value_gap_target_score": SCORING_RULES.value_gap_target_score,
+                "low_confidence_category_multiplier": settings.DRS_CONFIDENCE_LOW_MULTIPLIER,
+                "low_confidence_optimistic_multiplier": settings.DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER,
+            },
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -431,21 +570,132 @@ def get_value_gap(company: CompanyScoped, db: Session = Depends(get_db)):
         mgmt = modules["management_team"]
         growth = modules["growth_drivers"]
         fin = modules["financial_integrity"]
-        metrics = compute_metrics(company.id, db)
+        basis = _ebitda_basis(company.id, db)
 
-        cat_scores = {
-            "revenue_quality":          rev.composite,
-            "financial_integrity":      fin.composite,
-            "operational_independence": ops.composite,
-            "customer_risk":            cust.composite,
-            "management_team":          mgmt.composite,
-            "growth_drivers":           growth.composite,
+        ops_raw = ops.composite
+        rev_raw = rev.composite
+        growth_raw = growth.composite
+        qual_sub_overrides: dict[str, dict] = {}
+
+        # --- P2: Apply qualitative inputs (must mirror get_all_scores logic) ---
+        qual = db.query(QualitativeInputs).filter(
+            QualitativeInputs.company_id == company.id
+        ).first()
+        if qual:
+            a4_fields = [qual.owner_hours_per_week, qual.sop_pct, qual.automation_pct,
+                         qual.mgmt_qualified, qual.mgmt_total_functions]
+            if all(v is not None for v in a4_fields):
+                s_hours = _qual_owner_hours_score(float(qual.owner_hours_per_week))
+                s_sop   = _qual_sop_score(float(qual.sop_pct))
+                s_auto  = _qual_automation_score(float(qual.automation_pct))
+                s_mgmt  = _qual_mgmt_depth_score(int(qual.mgmt_qualified), int(qual.mgmt_total_functions))
+                ops_raw = round(s_hours * 0.35 + s_sop * 0.30 + s_auto * 0.15 + s_mgmt * 0.20, 1)
+                qual_sub_overrides["operational_independence"] = {
+                    "owner_hours":       {"score": s_hours, "label": f"{qual.owner_hours_per_week:.0f} hrs/week in operations"},
+                    "sop_documentation": {"score": s_sop,   "label": f"{qual.sop_pct:.0f}% SOPs documented"},
+                    "process_automation":{"score": s_auto,  "label": f"{qual.automation_pct:.0f}% tasks automated"},
+                    "management_depth":  {"score": s_mgmt,  "label": f"{qual.mgmt_qualified} of {qual.mgmt_total_functions} functions covered"},
+                }
+
+            a7_fields = [qual.pipeline_value, qual.market_positioning, qual.repeatability_pct]
+            if all(v is not None for v in a7_fields):
+                metrics_for_qual = compute_metrics(company.id, db)
+                ttm_rev = float(metrics_for_qual.total_revenue_ttm)
+                s_pipe = _qual_pipeline_score(float(qual.pipeline_value), ttm_rev)
+                s_mkt  = _qual_market_pos_score(qual.market_positioning)
+                s_rep  = _qual_repeatability_score(float(qual.repeatability_pct))
+                growth_raw = round(growth.cagr_score * 0.35 + s_pipe * 0.30 + s_mkt * 0.20 + s_rep * 0.15, 1)
+                pipe_ratio = float(qual.pipeline_value) / ttm_rev if ttm_rev > 0 else 0
+                qual_sub_overrides.setdefault("growth_drivers", {}).update({
+                    "pipeline_coverage":    {"score": s_pipe, "label": f"{pipe_ratio:.2f}x pipeline coverage"},
+                    "market_positioning":   {"score": s_mkt,  "label": qual.market_positioning.replace("_", " ")},
+                    "product_repeatability":{"score": s_rep,  "label": f"{qual.repeatability_pct:.0f}% standardized"},
+                })
+
+            a3_contract_fields = [qual.contract_pct, qual.customer_contract_type]
+            if all(v is not None for v in a3_contract_fields):
+                s_contract = _qual_contract_score(float(qual.contract_pct), qual.customer_contract_type)
+                rev_qual_composite = round(
+                    rev.recurring_rate_score * 0.30
+                    + rev.concentration_score * 0.25
+                    + s_contract * 0.20
+                    + rev.consistency_score * 0.15
+                    + rev.nrr_score * 0.10,
+                    1,
+                )
+                qual_sub_overrides.setdefault("revenue_quality", {})["durability"] = {
+                    "score": s_contract,
+                    "label": f"{qual.contract_pct:.0f}% contracted ({qual.customer_contract_type})",
+                }
+                if qual.key_person_revenue_pct is not None:
+                    s_kp = _qual_key_person_score(float(qual.key_person_revenue_pct))
+                    rev_qual_composite = round(rev_qual_composite * 0.85 + s_kp * 0.15, 1)
+                    qual_sub_overrides["revenue_quality"]["key_person_risk"] = {
+                        "score": s_kp,
+                        "label": f"{qual.key_person_revenue_pct:.0f}% revenue owner-dependent",
+                    }
+                rev_raw = rev_qual_composite
+
+        raw_scores = {
+            "revenue_quality":          round(rev_raw, 1),
+            "financial_integrity":      round(fin.composite, 1),
+            "operational_independence": round(ops_raw, 1),
+            "customer_risk":            round(cust.composite, 1),
+            "management_team":          round(mgmt.composite, 1),
+            "growth_drivers":           round(growth_raw, 1),
         }
-        from decimal import Decimal as _D
-        ebitda = float(metrics.ebitda_ttm)
 
+        # --- P1: Apply advisor overrides (same pattern as get_all_scores) ---
+        overrides_rows = db.query(AdvisorOverride).filter(
+            AdvisorOverride.company_id == company.id
+        ).all()
+        override_map = {o.category: o for o in overrides_rows}
+
+        def apply_override(key, raw):
+            if key in override_map:
+                return max(0.0, min(100.0, raw + float(override_map[key].adjustment)))
+            return raw
+
+        cat_scores = {k: round(apply_override(k, v), 1) for k, v in raw_scores.items()}
+
+        ebitda = basis["ebitda_normalized_ttm"]
         result = compute_value_gap(company.id, cat_scores, ebitda)
-        return result.to_dict()
+        result_dict = result.to_dict()
+
+        # Enrich each gap with weak sub-scores, merging qualitative overrides
+        cat_modules_map = {
+            "revenue_quality":          rev,
+            "financial_integrity":      fin,
+            "operational_independence": ops,
+            "customer_risk":            cust,
+            "management_team":          mgmt,
+            "growth_drivers":           growth,
+        }
+        for gap in result_dict["gaps"]:
+            cat_key = gap["category"]
+            mod = cat_modules_map.get(cat_key)
+            if mod:
+                sub = mod.to_dict().get("sub_scores") or {}
+                if cat_key in qual_sub_overrides:
+                    sub = {**sub, **qual_sub_overrides[cat_key]}
+                gap["weak_sub_scores"] = [
+                    {"key": k, "label": v.get("label", k), "score": round(v.get("score", 0), 1)}
+                    for k, v in sub.items()
+                    if isinstance(v, dict) and v.get("score", 100) < 75
+                ]
+            else:
+                gap["weak_sub_scores"] = []
+
+        return result_dict
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/advisory-workflow/{company_id}")
+def get_advisory_workflow(company: CompanyScoped, db: Session = Depends(get_db)):
+    """CEPA-style engagement stages with progress derived from live company + analytics signals."""
+    try:
+        return build_advisory_workflow(company, db)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -462,22 +712,197 @@ def get_buyer_questions(company: CompanyScoped, db: Session = Depends(get_db)):
         growth = modules["growth_drivers"]
         fin = modules["financial_integrity"]
 
-        cat_scores = {
-            "revenue_quality":          rev.composite,
-            "financial_integrity":      fin.composite,
-            "operational_independence": ops.composite,
-            "customer_risk":            cust.composite,
-            "management_team":          mgmt.composite,
-            "growth_drivers":           growth.composite,
+        ops_raw = ops.composite
+        rev_raw = rev.composite
+        growth_raw = growth.composite
+
+        # --- P2: Apply qualitative inputs (must mirror get_all_scores logic) ---
+        qual = db.query(QualitativeInputs).filter(
+            QualitativeInputs.company_id == company.id
+        ).first()
+        if qual:
+            a4_fields = [qual.owner_hours_per_week, qual.sop_pct, qual.automation_pct,
+                         qual.mgmt_qualified, qual.mgmt_total_functions]
+            if all(v is not None for v in a4_fields):
+                s_hours = _qual_owner_hours_score(float(qual.owner_hours_per_week))
+                s_sop   = _qual_sop_score(float(qual.sop_pct))
+                s_auto  = _qual_automation_score(float(qual.automation_pct))
+                s_mgmt  = _qual_mgmt_depth_score(int(qual.mgmt_qualified), int(qual.mgmt_total_functions))
+                ops_raw = round(s_hours * 0.35 + s_sop * 0.30 + s_auto * 0.15 + s_mgmt * 0.20, 1)
+
+            a7_fields = [qual.pipeline_value, qual.market_positioning, qual.repeatability_pct]
+            if all(v is not None for v in a7_fields):
+                metrics_for_qual = compute_metrics(company.id, db)
+                ttm_rev = float(metrics_for_qual.total_revenue_ttm)
+                s_pipe = _qual_pipeline_score(float(qual.pipeline_value), ttm_rev)
+                s_mkt  = _qual_market_pos_score(qual.market_positioning)
+                s_rep  = _qual_repeatability_score(float(qual.repeatability_pct))
+                growth_raw = round(growth.cagr_score * 0.35 + s_pipe * 0.30 + s_mkt * 0.20 + s_rep * 0.15, 1)
+
+            a3_contract_fields = [qual.contract_pct, qual.customer_contract_type]
+            if all(v is not None for v in a3_contract_fields):
+                s_contract = _qual_contract_score(float(qual.contract_pct), qual.customer_contract_type)
+                rev_qual_composite = round(
+                    rev.recurring_rate_score * 0.30
+                    + rev.concentration_score * 0.25
+                    + s_contract * 0.20
+                    + rev.consistency_score * 0.15
+                    + rev.nrr_score * 0.10,
+                    1,
+                )
+                if qual.key_person_revenue_pct is not None:
+                    s_kp = _qual_key_person_score(float(qual.key_person_revenue_pct))
+                    rev_qual_composite = round(rev_qual_composite * 0.85 + s_kp * 0.15, 1)
+                rev_raw = rev_qual_composite
+
+        raw_scores = {
+            "revenue_quality":          round(rev_raw, 1),
+            "financial_integrity":      round(fin.composite, 1),
+            "operational_independence": round(ops_raw, 1),
+            "customer_risk":            round(cust.composite, 1),
+            "management_team":          round(mgmt.composite, 1),
+            "growth_drivers":           round(growth_raw, 1),
         }
+
+        # --- P1: Apply advisor overrides ---
+        overrides_rows = db.query(AdvisorOverride).filter(
+            AdvisorOverride.company_id == company.id
+        ).all()
+        override_map = {o.category: o for o in overrides_rows}
+
+        def apply_override(key, raw):
+            if key in override_map:
+                return max(0.0, min(100.0, raw + float(override_map[key].adjustment)))
+            return raw
+
+        cat_scores = {k: round(apply_override(k, v), 1) for k, v in raw_scores.items()}
         questions = generate_buyer_questions(cat_scores)
+        states = {
+            s.question_id: s
+            for s in db.query(BuyerQuestionState).filter(BuyerQuestionState.company_id == company.id).all()
+        }
+        qlist = []
+        for q in questions:
+            d = q.to_dict()
+            st = states.get(q.id)
+            d["tracking_status"] = st.status if st else "open"
+            d["response_text"] = st.response_text if st else None
+            d["mitigating_initiative_id"] = st.mitigating_initiative_id if st else None
+            qlist.append(d)
         return {
             "company_id": company.id,
-            "total":      len(questions),
-            "questions":  [q.to_dict() for q in questions],
+            "total":      len(qlist),
+            "questions":  qlist,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class BuyerQuestionPatch(BaseModel):
+    status: str = "open"
+    response_text: Optional[str] = None
+    mitigating_initiative_id: Optional[int] = None
+
+
+@router.patch("/buyer-questions/{company_id}/{question_id}")
+def patch_buyer_question(
+    company: CompanyScoped,
+    question_id: int,
+    body: BuyerQuestionPatch,
+    db: Session = Depends(get_db),
+):
+    row = (
+        db.query(BuyerQuestionState)
+        .filter(
+            BuyerQuestionState.company_id == company.id,
+            BuyerQuestionState.question_id == question_id,
+        )
+        .first()
+    )
+    if not row:
+        row = BuyerQuestionState(company_id=company.id, question_id=question_id)
+        db.add(row)
+    row.status = body.status
+    row.response_text = body.response_text
+    row.mitigating_initiative_id = body.mitigating_initiative_id
+    db.commit()
+    db.refresh(row)
+    return {
+        "question_id": question_id,
+        "tracking_status": row.status,
+        "response_text": row.response_text,
+        "mitigating_initiative_id": row.mitigating_initiative_id,
+    }
+
+
+class InitiativeCreate(BaseModel):
+    title: str
+    category: Optional[str] = None
+    timeline: Optional[str] = None
+    cost_estimate: Optional[float] = None
+    ev_impact_estimate: Optional[float] = None
+    advisor_ev_override: Optional[float] = None
+    depends_on_initiative_id: Optional[int] = None
+
+
+@router.get("/initiatives/{company_id}")
+def list_initiatives(company: CompanyScoped, db: Session = Depends(get_db)):
+    rows = (
+        db.query(CompanyInitiative)
+        .filter(CompanyInitiative.company_id == company.id)
+        .order_by(CompanyInitiative.created_at.desc())
+        .all()
+    )
+    return {
+        "company_id": company.id,
+        "initiatives": [
+            {
+                "id": r.id,
+                "title": r.title,
+                "category": r.category,
+                "timeline": r.timeline,
+                "cost_estimate": float(r.cost_estimate) if r.cost_estimate is not None else None,
+                "ev_impact_estimate": float(r.ev_impact_estimate) if r.ev_impact_estimate is not None else None,
+                "advisor_ev_override": float(r.advisor_ev_override) if r.advisor_ev_override is not None else None,
+                "depends_on_initiative_id": r.depends_on_initiative_id,
+                "source": r.source,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.post("/initiatives/{company_id}", status_code=201)
+def create_initiative(
+    company: CompanyScoped,
+    body: InitiativeCreate,
+    db: Session = Depends(get_db),
+):
+    row = CompanyInitiative(
+        company_id=company.id,
+        title=body.title,
+        category=body.category,
+        timeline=body.timeline,
+        cost_estimate=body.cost_estimate,
+        ev_impact_estimate=body.ev_impact_estimate,
+        advisor_ev_override=body.advisor_ev_override,
+        depends_on_initiative_id=body.depends_on_initiative_id,
+        source="custom",
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {
+        "id": row.id,
+        "title": row.title,
+        "category": row.category,
+        "timeline": row.timeline,
+        "cost_estimate": float(row.cost_estimate) if row.cost_estimate is not None else None,
+        "ev_impact_estimate": float(row.ev_impact_estimate) if row.ev_impact_estimate is not None else None,
+        "advisor_ev_override": float(row.advisor_ev_override) if row.advisor_ev_override is not None else None,
+        "depends_on_initiative_id": row.depends_on_initiative_id,
+        "source": row.source,
+    }
 
 
 def _build_recast_payload(company_id: int, db: Session) -> dict:
@@ -489,12 +914,13 @@ def _build_recast_payload(company_id: int, db: Session) -> dict:
     from app.ontology.models import Expense, ExpenseCategory
 
     metrics = compute_metrics(company_id, db)
-    market_rate = _D("120000")
+    basis = _ebitda_basis(company_id, db)
+    market_rate = _D(str(basis["market_rate_replacement_annual"]))
 
     CHALLENGE_LABELS = {
-        "LOW":             "Fully defensible — include in all scenarios",
-        "MEDIUM":          "Partially defensible — 50% in conservative, 100% in aggressive",
-        "HIGH":            "Challenged — excluded from conservative, included in aggressive",
+        "LOW":             "Fully defensible — included in conservative, base, and aggressive",
+        "MEDIUM":          "Partially defensible — excluded from conservative; 50% in base; 100% in aggressive",
+        "HIGH":            "Challenged — excluded from conservative and base; aggressive only",
         "NOT_DEFENSIBLE":  "Remove — buyer will not accept",
     }
 
@@ -600,29 +1026,56 @@ def _build_recast_payload(company_id: int, db: Session) -> dict:
                 "challenge_label":    CHALLENGE_LABELS.get(ov.challenge, ov.challenge),
             })
 
-    # --- Compute three scenarios ---
-    reported = float(metrics.ebitda_ttm)
+    # --- Compute three scenarios (conservative = LOW only; base = LOW + 50% MEDIUM; aggressive = all) ---
+    reported = float(basis["ebitda_normalized_ttm"])
     conservative = reported
-    base         = reported
-    aggressive   = reported
+    base = reported
+    aggressive = reported
 
     for ab in final_addbacks:
         amt = ab["amount"]
-        ch  = ab["challenge"]
+        ch = ab["challenge"]
         if ch == "NOT_DEFENSIBLE":
             continue
         if ch == "LOW":
-            conservative += amt; base += amt; aggressive += amt
+            conservative += amt
+            base += amt
+            aggressive += amt
         elif ch == "MEDIUM":
-            conservative += amt * 0.5; base += amt * 0.5; aggressive += amt
+            base += amt * 0.5
+            aggressive += amt
         elif ch == "HIGH":
             aggressive += amt
 
     total_addbacks = sum(ab["amount"] for ab in final_addbacks if ab["challenge"] != "NOT_DEFENSIBLE")
 
+    # --- Build expense line items for P&L detail view ---
+    from collections import defaultdict
+    line_item_groups: dict[tuple, dict] = defaultdict(lambda: {"amount": 0.0, "category": None, "description": None})
+    for e in expenses:
+        cat = _expense_category_code(e.category)
+        desc = (e.description or "Unknown").strip()
+        key = (desc, cat)
+        line_item_groups[key]["amount"] += float(e.amount or 0)
+        line_item_groups[key]["category"] = cat
+        line_item_groups[key]["description"] = desc
+
+    expense_line_items = sorted(
+        [
+            {"description": desc, "category": cat, "amount": round(data["amount"], 2)}
+            for (desc, cat), data in line_item_groups.items()
+            if data["amount"] > 0
+        ],
+        key=lambda x: -x["amount"],
+    )
+
     return {
         "company_id":         company_id,
         "reported_ebitda":    round(reported, 2),
+        "ebitda_proxy_ttm":   round(basis["ebitda_proxy_ttm"], 2),
+        "depreciation_amortization_ttm": round(basis["depreciation_amortization_ttm"], 2),
+        "interest_expense_ttm": round(basis["interest_expense_ttm"], 2),
+        "income_tax_expense_ttm": round(basis["income_tax_expense_ttm"], 2),
         "conservative_ebitda": round(conservative, 2),
         "base_ebitda":        round(base, 2),
         "aggressive_ebitda":  round(aggressive, 2),
@@ -631,11 +1084,12 @@ def _build_recast_payload(company_id: int, db: Session) -> dict:
         "owner_comp_total":   float(metrics.owner_compensation_total),
         "market_rate":        float(market_rate),
         "addback_schedule":   final_addbacks,
+        "expense_line_items": expense_line_items,
         "has_overrides":      bool(override_map),
         "data_notes": [
-            "D&A, interest, and income tax lines not extractable from CSV format. Add manually if QuickBooks P&L is available.",
-            f"Owner market-rate replacement set to ${float(market_rate):,.0f}/yr. Override for this client's role complexity.",
-            "Reported EBITDA = proxy (revenue − COGS − OpEx from ontology).",
+            "Starting EBITDA = ontology proxy plus advisor-entered D&A (if any). Interest and tax are stored for disclosure and are not auto-added to EBITDA here.",
+            f"Owner market-rate replacement: ${float(market_rate):,.0f}/yr (editable on company / recast settings).",
+            "Ontology proxy = revenue − COGS − OpEx when expense detail exists; otherwise a labor-based estimate.",
         ],
     }
 
@@ -829,6 +1283,45 @@ def get_qualitative(company: CompanyScoped, db: Session = Depends(get_db)):
     }
 
 
+def _qualitative_snapshot(row: QualitativeInputs) -> dict:
+    return {
+        "owner_hours_per_week": float(row.owner_hours_per_week) if row.owner_hours_per_week is not None else None,
+        "sop_pct": float(row.sop_pct) if row.sop_pct is not None else None,
+        "automation_pct": float(row.automation_pct) if row.automation_pct is not None else None,
+        "mgmt_qualified": row.mgmt_qualified,
+        "mgmt_total_functions": row.mgmt_total_functions,
+        "pipeline_value": float(row.pipeline_value) if row.pipeline_value is not None else None,
+        "market_positioning": row.market_positioning,
+        "repeatability_pct": float(row.repeatability_pct) if row.repeatability_pct is not None else None,
+        "contract_pct": float(row.contract_pct) if row.contract_pct is not None else None,
+        "customer_contract_type": row.customer_contract_type,
+        "key_person_revenue_pct": float(row.key_person_revenue_pct) if row.key_person_revenue_pct is not None else None,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    }
+
+
+@router.get("/qualitative-audit/{company_id}")
+def list_qualitative_audit(company: CompanyScoped, db: Session = Depends(get_db), limit: int = 20):
+    rows = (
+        db.query(QualitativeInputAudit)
+        .filter(QualitativeInputAudit.company_id == company.id)
+        .order_by(QualitativeInputAudit.created_at.desc())
+        .limit(min(limit, 100))
+        .all()
+    )
+    return {
+        "company_id": company.id,
+        "entries": [
+            {
+                "id": r.id,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "snapshot": json.loads(r.snapshot_json) if r.snapshot_json else {},
+            }
+            for r in rows
+        ],
+    }
+
+
 @router.post("/qualitative/{company_id}")
 def save_qualitative(company: CompanyScoped, body: QualitativeRequest, db: Session = Depends(get_db)):
     row = db.query(QualitativeInputs).filter(
@@ -840,6 +1333,174 @@ def save_qualitative(company: CompanyScoped, body: QualitativeRequest, db: Sessi
             setattr(row, k, v)
         row.updated_at = datetime.utcnow()
     else:
-        db.add(QualitativeInputs(company_id=company.id, **data))
+        row = QualitativeInputs(company_id=company.id, **data)
+        db.add(row)
+    db.commit()
+    db.refresh(row)
+    db.add(
+        QualitativeInputAudit(
+            company_id=company.id,
+            snapshot_json=json.dumps(_qualitative_snapshot(row)),
+        )
+    )
     db.commit()
     return {"status": "saved", "company_id": company.id}
+
+
+# ---------------------------------------------------------------------------
+# Engagement timeline snapshots
+# ---------------------------------------------------------------------------
+
+def _snap_to_dict(s: EngagementSnapshot) -> dict:
+    return {
+        "id":               s.id,
+        "milestone":        s.milestone,
+        "date":             s.date,
+        "stage":            s.stage,
+        "status":           s.status,
+        "drs":              float(s.drs)              if s.drs              is not None else None,
+        "drs_tier":         s.drs_tier,
+        "ebitda":           float(s.ebitda)           if s.ebitda           is not None else None,
+        "ev_floor":         float(s.ev_floor)         if s.ev_floor         is not None else None,
+        "ev_ceiling":       float(s.ev_ceiling)       if s.ev_ceiling       is not None else None,
+        "ev_midpoint":      float(s.ev_midpoint)      if s.ev_midpoint      is not None else None,
+        "multiple_floor":   float(s.multiple_floor)   if s.multiple_floor   is not None else None,
+        "multiple_ceiling": float(s.multiple_ceiling) if s.multiple_ceiling is not None else None,
+        "notes":            s.notes,
+        "sort_order":       s.sort_order,
+        "created_at":       s.created_at.isoformat(),
+    }
+
+
+class SnapshotRequest(BaseModel):
+    milestone:        str
+    date:             str
+    stage:            str            = "value_gap"
+    status:           str            = "complete"
+    drs:              Optional[float] = None
+    drs_tier:         Optional[str]  = None
+    ebitda:           Optional[float] = None
+    ev_floor:         Optional[float] = None
+    ev_ceiling:       Optional[float] = None
+    ev_midpoint:      Optional[float] = None
+    multiple_floor:   Optional[float] = None
+    multiple_ceiling: Optional[float] = None
+    notes:            Optional[str]  = None
+
+
+@router.get("/timeline/{company_id}")
+def list_timeline(company: CompanyScoped, db: Session = Depends(get_db)):
+    rows = (
+        db.query(EngagementSnapshot)
+        .filter(EngagementSnapshot.company_id == company.id)
+        .order_by(EngagementSnapshot.sort_order, EngagementSnapshot.created_at)
+        .all()
+    )
+    return [_snap_to_dict(r) for r in rows]
+
+
+@router.post("/timeline/{company_id}", status_code=201)
+def create_snapshot(company: CompanyScoped, body: SnapshotRequest, db: Session = Depends(get_db)):
+    # sort_order = max existing + 1 so new snap appends to end
+    existing_count = db.query(EngagementSnapshot).filter(
+        EngagementSnapshot.company_id == company.id
+    ).count()
+    snap = EngagementSnapshot(
+        company_id=company.id,
+        sort_order=existing_count,
+        **body.model_dump(),
+    )
+    db.add(snap)
+    db.commit()
+    db.refresh(snap)
+    return _snap_to_dict(snap)
+
+
+@router.delete("/timeline/{company_id}/{snapshot_id}", status_code=204)
+def delete_snapshot(company: CompanyScoped, snapshot_id: int, db: Session = Depends(get_db)):
+    snap = db.query(EngagementSnapshot).filter(
+        EngagementSnapshot.id == snapshot_id,
+        EngagementSnapshot.company_id == company.id,
+    ).first()
+    if not snap:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    db.delete(snap)
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Engagement intake (owner goals, exit plan, buyer universe)
+# ---------------------------------------------------------------------------
+
+class EngagementProfilePayload(BaseModel):
+    owner_goals_narrative: Optional[str] = None
+    exit_timeline: Optional[str] = None
+    target_valuation: Optional[float] = None
+    personal_financial_gap: Optional[float] = None
+    transaction_type: Optional[str] = None
+    buyer_universe_notes: Optional[str] = None
+    preferred_buyer_types: Optional[list[str]] = None
+
+
+def _engagement_profile_dict(row: EngagementProfile) -> dict:
+    buyers: list[str] = []
+    if row.preferred_buyer_types_json:
+        try:
+            buyers = json.loads(row.preferred_buyer_types_json)
+            if not isinstance(buyers, list):
+                buyers = []
+        except Exception:
+            buyers = []
+    return {
+        "company_id": row.company_id,
+        "owner_goals_narrative": row.owner_goals_narrative,
+        "exit_timeline": row.exit_timeline,
+        "target_valuation": float(row.target_valuation) if row.target_valuation is not None else None,
+        "personal_financial_gap": float(row.personal_financial_gap) if row.personal_financial_gap is not None else None,
+        "transaction_type": row.transaction_type,
+        "buyer_universe_notes": row.buyer_universe_notes,
+        "preferred_buyer_types": buyers,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    }
+
+
+@router.get("/engagement-profile/{company_id}")
+def get_engagement_profile(company: CompanyScoped, db: Session = Depends(get_db)):
+    row = db.query(EngagementProfile).filter(EngagementProfile.company_id == company.id).first()
+    if not row:
+        return {
+            "company_id": company.id,
+            "owner_goals_narrative": None,
+            "exit_timeline": None,
+            "target_valuation": None,
+            "personal_financial_gap": None,
+            "transaction_type": None,
+            "buyer_universe_notes": None,
+            "preferred_buyer_types": [],
+            "updated_at": None,
+        }
+    return _engagement_profile_dict(row)
+
+
+@router.patch("/engagement-profile/{company_id}")
+def patch_engagement_profile(
+    company: CompanyScoped,
+    body: EngagementProfilePayload,
+    db: Session = Depends(get_db),
+):
+    data = body.model_dump(exclude_unset=True)
+    buyers = data.pop("preferred_buyer_types", None)
+
+    row = db.query(EngagementProfile).filter(EngagementProfile.company_id == company.id).first()
+    if not row:
+        row = EngagementProfile(company_id=company.id)
+        db.add(row)
+
+    if buyers is not None:
+        row.preferred_buyer_types_json = json.dumps(buyers)
+    for k, v in data.items():
+        setattr(row, k, v)
+
+    db.commit()
+    db.refresh(row)
+    return _engagement_profile_dict(row)

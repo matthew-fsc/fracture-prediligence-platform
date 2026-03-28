@@ -27,10 +27,10 @@ TOTAL_SPOTS = settings.DEMO_TOTAL_SPOTS
 DEMO_DATA = {
     "company": {
         "id": "demo",
-        "name": "Meridian Consulting Group",
-        "industry": "Professional Services / Management Consulting",
-        "founded": 2014,
-        "state": "CO",
+        "name": "ABC Company Inc",
+        "industry": "Field Services — Traffic Management & Transportation",
+        "founded": 2009,
+        "state": "CA",
         "employees": 13,
         "ttm_revenue": 4280000,
         "ebitda": 2400000,

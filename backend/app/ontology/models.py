@@ -86,6 +86,19 @@ class Company(Base):
     state:    Mapped[Optional[str]] = mapped_column(String(2))
     entity_type: Mapped[Optional[str]] = mapped_column(String(32))  # LLC, S-Corp, C-Corp
 
+    # Advisor-entered business facts (override ingested data when missing/unreliable)
+    total_headcount: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Advisor-entered normalization (TTM); null = use defaults in analytics
+    market_rate_replacement_annual: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
+    depreciation_amortization_ttm: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
+    interest_expense_ttm: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
+    income_tax_expense_ttm: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
+
+    report_firm_name: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    report_cover_blurb: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    report_logo_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+
     revenue_streams: Mapped[list[RevenueStream]] = relationship(back_populates="company")
     customers:       Mapped[list[Customer]]       = relationship(back_populates="company")
     employees:       Mapped[list[Employee]]        = relationship(back_populates="company")
@@ -288,6 +301,146 @@ class AddbackOverride(Base):
     advisor_id:   Mapped[Optional[str]]  = mapped_column(String(256), nullable=True)
     is_custom:    Mapped[bool]           = mapped_column(Boolean, default=False)  # True = advisor-added line
     updated_at:   Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Engagement timeline snapshots (EBITDA & EV checkpoints per company)
+# ---------------------------------------------------------------------------
+
+class EngagementSnapshot(Base):
+    __tablename__ = "engagement_snapshots"
+
+    id:               Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:       Mapped[int]            = mapped_column(ForeignKey("companies.id"), index=True)
+    milestone:        Mapped[str]            = mapped_column(String(256))
+    date:             Mapped[str]            = mapped_column(String(64))    # display string, e.g. "Mar 27, 2025"
+    stage:            Mapped[str]            = mapped_column(String(64))    # onboarding|data_collection|baseline|…
+    status:           Mapped[str]            = mapped_column(String(32))    # complete|current|projected
+    drs:              Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    drs_tier:         Mapped[Optional[str]]  = mapped_column(String(32), nullable=True)
+    ebitda:           Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    ev_floor:         Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    ev_ceiling:       Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    ev_midpoint:      Mapped[Optional[float]] = mapped_column(Numeric(14, 2), nullable=True)
+    multiple_floor:   Mapped[Optional[float]] = mapped_column(Numeric(6, 3), nullable=True)
+    multiple_ceiling: Mapped[Optional[float]] = mapped_column(Numeric(6, 3), nullable=True)
+    notes:            Mapped[Optional[str]]  = mapped_column(Text, nullable=True)
+    sort_order:       Mapped[int]            = mapped_column(Integer, default=0)
+    created_at:       Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship("Company")
+
+
+class GeneratedReport(Base):
+    __tablename__ = "generated_reports"
+
+    id:          Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:  Mapped[int]            = mapped_column(ForeignKey("companies.id"), index=True)
+    template_id: Mapped[str]            = mapped_column(String(64))
+    drs_score:   Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    created_at:  Mapped[datetime]       = mapped_column(DateTime, server_default=func.now())
+
+    company: Mapped[Company] = relationship("Company")
+
+
+class BuyerQuestionState(Base):
+    __tablename__ = "buyer_question_states"
+
+    id:                         Mapped[int]             = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:                 Mapped[int]             = mapped_column(ForeignKey("companies.id"), index=True)
+    question_id:                Mapped[int]             = mapped_column(Integer, nullable=False)
+    status:                     Mapped[str]             = mapped_column(String(32), default="open")
+    response_text:              Mapped[Optional[str]]   = mapped_column(Text, nullable=True)
+    mitigating_initiative_id:   Mapped[Optional[int]]   = mapped_column(Integer, nullable=True)
+    updated_at:                 Mapped[datetime]        = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    company: Mapped[Company] = relationship("Company")
+
+
+class CompanyInitiative(Base):
+    __tablename__ = "company_initiatives"
+
+    id:                         Mapped[int]             = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:                 Mapped[int]             = mapped_column(ForeignKey("companies.id"), index=True)
+    title:                      Mapped[str]             = mapped_column(String(512))
+    category:                   Mapped[Optional[str]]   = mapped_column(String(64), nullable=True)
+    timeline:                   Mapped[Optional[str]]   = mapped_column(String(128), nullable=True)
+    cost_estimate:              Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
+    ev_impact_estimate:         Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
+    advisor_ev_override:        Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
+    depends_on_initiative_id:   Mapped[Optional[int]]   = mapped_column(ForeignKey("company_initiatives.id"), nullable=True)
+    source:                     Mapped[str]             = mapped_column(String(32), default="custom")
+    created_at:                 Mapped[datetime]        = mapped_column(DateTime, server_default=func.now())
+
+    company: Mapped[Company] = relationship("Company")
+
+
+class QualitativeInputAudit(Base):
+    __tablename__ = "qualitative_input_audits"
+
+    id:            Mapped[int]      = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:    Mapped[int]      = mapped_column(ForeignKey("companies.id"), index=True)
+    snapshot_json: Mapped[str]      = mapped_column(Text)
+    created_at:    Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    company: Mapped[Company] = relationship("Company")
+
+
+class EngagementProfile(Base):
+    """Advisor + owner intake: goals, exit horizon, valuation targets, buyer preferences."""
+
+    __tablename__ = "engagement_profiles"
+
+    id:                         Mapped[int]             = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:                 Mapped[int]             = mapped_column(ForeignKey("companies.id"), unique=True, index=True)
+    owner_goals_narrative:      Mapped[Optional[str]]   = mapped_column(Text, nullable=True)
+    exit_timeline:              Mapped[Optional[str]]   = mapped_column(String(256), nullable=True)
+    target_valuation:           Mapped[Optional[Decimal]] = mapped_column(Numeric(16, 2), nullable=True)
+    personal_financial_gap:     Mapped[Optional[Decimal]] = mapped_column(Numeric(16, 2), nullable=True)
+    transaction_type:           Mapped[Optional[str]]   = mapped_column(String(64), nullable=True)
+    buyer_universe_notes:       Mapped[Optional[str]]   = mapped_column(Text, nullable=True)
+    preferred_buyer_types_json: Mapped[Optional[str]]   = mapped_column(Text, nullable=True)
+    updated_at:                 Mapped[datetime]        = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    company: Mapped[Company] = relationship("Company")
+
+
+# ---------------------------------------------------------------------------
+# Advisory Library — unified catalog of buyer questions, initiatives, risk flags
+# ---------------------------------------------------------------------------
+
+class AdvisoryLibraryItem(Base):
+    """
+    Global reusable catalog item.  item_type determines which UI surface it
+    appears on (buyer_question → BuyerLens, initiative → InitiativeImpact,
+    risk_flag → RiskHeatmap).  Tags drive how the item is filtered and surfaced.
+    """
+    __tablename__ = "advisory_library_items"
+
+    id:                 Mapped[int]             = mapped_column(Integer, primary_key=True, autoincrement=True)
+    item_type:          Mapped[str]             = mapped_column(String(32), nullable=False, index=True)  # buyer_question | initiative | risk_flag
+    title:              Mapped[str]             = mapped_column(String(1024), nullable=False)
+    description:        Mapped[Optional[str]]   = mapped_column(Text, nullable=True)
+
+    # Tagging — DRS category, severity, buyer type, plus a free-form JSON tags array
+    category:           Mapped[Optional[str]]   = mapped_column(String(64), nullable=True, index=True)   # DRS category key
+    severity:           Mapped[Optional[str]]   = mapped_column(String(16), nullable=True)               # CRITICAL | HIGH | MEDIUM
+    buyer_type:         Mapped[Optional[str]]   = mapped_column(String(32), nullable=True)               # PE | Strategic | Financial | All
+    tags_json:          Mapped[Optional[str]]   = mapped_column(Text, nullable=True)                     # JSON array of custom string tags
+
+    # For buyer questions
+    data_needed:        Mapped[Optional[str]]   = mapped_column(Text, nullable=True)
+    score_trigger:      Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+
+    # For initiatives
+    effort:             Mapped[Optional[str]]   = mapped_column(String(32), nullable=True)               # Low | Medium | High
+    timeline:           Mapped[Optional[str]]   = mapped_column(String(128), nullable=True)
+    ev_impact:          Mapped[Optional[str]]   = mapped_column(String(32), nullable=True)               # Low | Medium | High | Critical
+
+    source:             Mapped[str]             = mapped_column(String(32), default="system")            # system | advisor
+    is_active:          Mapped[bool]            = mapped_column(Boolean, default=True, index=True)
+    created_at:         Mapped[datetime]        = mapped_column(DateTime, server_default=func.now())
+    updated_at:         Mapped[datetime]        = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 # ---------------------------------------------------------------------------

@@ -5,7 +5,8 @@
       "Bash(git -C \"C:/Users/Fracture Systems/prediligence-platform\" ls-files)",
       "Bash(find 'C:/Users/Fracture Systems/prediligence-platform' -name *.py)",
       "Bash(find 'C:/Users/Fracture Systems/prediligence-platform/frontend' -name *.js -o -name *.jsx -o -name *.ts -o -name *.tsx -o -name *.json)",
-      "Bash(find '/c/Users/Fracture Systems/prediligence-platform' -maxdepth 3 -type f \\\\\\(-name package.json -o -name vite.config.* -o -name requirements.txt -o -name Procfile -o -name docker-compose.yml \\\\\\))"
+      "Bash(find '/c/Users/Fracture Systems/prediligence-platform' -maxdepth 3 -type f \\\\\\(-name package.json -o -name vite.config.* -o -name requirements.txt -o -name Procfile -o -name docker-compose.yml \\\\\\))",
+      "Bash(sort -t: -k2 -rn)"
     ]
   }
 }

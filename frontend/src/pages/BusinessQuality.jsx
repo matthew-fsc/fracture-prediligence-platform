@@ -36,18 +36,18 @@ function MetricPanel({ label, displayValue, benchmark, percentile, status, trend
     <div className={cn('rounded-xl border bg-card p-4 space-y-3', c.border)}>
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
           <p className={cn('text-2xl font-bold mt-0.5', c.value)}>{displayValue}</p>
         </div>
-        <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase', c.badge)}>{status}</span>
+        <span className={cn('text-[11px] font-bold px-1.5 py-0.5 rounded border uppercase', c.badge)}>{status}</span>
       </div>
       <div className="min-h-[60px]">{children}</div>
-      <div className="flex items-center justify-between text-[10px]">
+      <div className="flex items-center justify-between text-[11px]">
         <span className="text-muted-foreground">{benchmark}</span>
         {percentile != null && <span className={cn('font-bold', c.value)}>{percentile}th pctile</span>}
       </div>
       {trendLabel && (
-        <p className={cn('text-[10px]', trendDir === 'up' ? 'text-emerald-400' : trendDir === 'down' ? 'text-red-400' : 'text-muted-foreground')}>
+        <p className={cn('text-[11px]', trendDir === 'up' ? 'text-emerald-400' : trendDir === 'down' ? 'text-red-400' : 'text-muted-foreground')}>
           {trendDir === 'up' ? '↑' : trendDir === 'down' ? '↓' : '→'} {trendLabel}
         </p>
       )}
@@ -149,7 +149,7 @@ export default function BusinessQuality() {
       <SectionHeader
         title="Business Quality Assessment"
         subtitle="Internal operating truth derived from normalized data — source of record for all advisory analysis"
-        action={<span className="text-[10px] font-semibold px-2.5 py-1 rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-400">Internal Data · Source of Record</span>}
+        action={<span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-400">Internal Data · Source of Record</span>}
       />
 
       {!bannerDismissed && metrics?.total_opex_ttm === 0 && (
@@ -207,7 +207,7 @@ export default function BusinessQuality() {
             <div className="h-2 bg-muted rounded-full">
               <div className="h-2 bg-emerald-500 rounded-full" style={{ width: `${Math.min(recurringRate, 100)}%` }} />
             </div>
-            <div className="flex justify-between text-[9px] text-muted-foreground">
+            <div className="flex justify-between text-[11px] text-muted-foreground">
               <span>0%</span><span className="text-amber-400">20% med</span><span className="text-emerald-400">40% UQ</span>
             </div>
           </div>
@@ -227,7 +227,7 @@ export default function BusinessQuality() {
             <div className="h-2 bg-muted rounded-full">
               <div className="h-2 bg-emerald-500 rounded-full" style={{ width: `${Math.min((ebitdaMargin / 50) * 100, 100)}%` }} />
             </div>
-            <div className="flex justify-between text-[9px] text-muted-foreground">
+            <div className="flex justify-between text-[11px] text-muted-foreground">
               <span>0%</span><span className="text-amber-400">13% med</span><span className="text-emerald-400">22% UQ</span>
             </div>
           </div>
@@ -245,7 +245,7 @@ export default function BusinessQuality() {
         >
           <div className="space-y-1.5">
             <div>
-              <div className="flex justify-between text-[10px] mb-0.5">
+              <div className="flex justify-between text-[11px] mb-0.5">
                 <span className="text-muted-foreground">This company</span>
                 <span className={cn('font-bold', costRatio > 85 ? 'text-red-400' : costRatio > 75 ? 'text-amber-400' : 'text-emerald-400')}>{costRatio.toFixed(0)}%</span>
               </div>
@@ -255,7 +255,7 @@ export default function BusinessQuality() {
               </div>
             </div>
             <div>
-              <div className="flex justify-between text-[10px] mb-0.5">
+              <div className="flex justify-between text-[11px] mb-0.5">
                 <span className="text-muted-foreground">Field svc median</span>
                 <span className="text-amber-400 font-bold">75%</span>
               </div>
@@ -310,7 +310,7 @@ export default function BusinessQuality() {
           <div className="space-y-1.5 mt-1">
             {years.slice(-3).map((yr, i) => (
               <div key={yr}>
-                <div className="flex justify-between text-[10px] mb-0.5">
+                <div className="flex justify-between text-[11px] mb-0.5">
                   <span className="text-muted-foreground">{yr}</span>
                   <span className="text-foreground font-medium">{fmtM(revByYear[yr])}</span>
                 </div>
@@ -333,7 +333,7 @@ export default function BusinessQuality() {
               Trailing 12 months · {fmtM(totalRevenue)} TTM · Source: QuickBooks Online
             </p>
           </div>
-          <span className="text-[9px] font-semibold px-2 py-0.5 rounded border border-border text-muted-foreground">Internal Data</span>
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded border border-border text-muted-foreground">Internal Data</span>
         </div>
         {chartWithExp.length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>

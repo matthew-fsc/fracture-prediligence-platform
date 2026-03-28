@@ -2,9 +2,9 @@ import { NavLink } from 'react-router-dom'
 import { DemoDashboardExitLink } from '../demo/DemoDashboardExit'
 import {
   Zap, House, Building, Workflow, Grid3x3, BarChart2,
-  Eye, TrendingUp, Target, Activity,
-  Folder, FileText, ChevronLeft, ShieldAlert,
-  UploadCloud, GitMerge, ClipboardList, LayoutDashboard,
+  Eye, TrendingUp, Target, Activity, LineChart, GitCompare,
+  FileText, ChevronLeft, ShieldAlert, BookOpen,
+  UploadCloud, GitMerge, LayoutDashboard, NotebookPen,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useDemoData } from '../../context/DemoContext'
@@ -22,6 +22,7 @@ const groups = [
     items: [
       { label: 'Home',               path: '',                  icon: House },
       { label: 'Company Workspace',  path: 'company',           icon: Building },
+      { label: 'Engagement Intake',  path: 'engagement-intake', icon: NotebookPen },
       { label: 'Advisory Workflow',  path: 'workflow',          icon: Workflow },
     ],
   },
@@ -29,26 +30,27 @@ const groups = [
     label: 'Intelligence',
     items: [
       { label: 'Readiness Score',    path: 'readiness',           icon: Grid3x3 },
-      { label: 'Qualitative Inputs', path: 'qualitative-inputs', icon: ClipboardList },
       { label: 'Business Quality',   path: 'business-quality',   icon: BarChart2 },
       { label: 'Buyer Risk Profile', path: 'buyer-lens',        icon: Eye },
       { label: 'Valuation',          path: 'valuation',         icon: TrendingUp },
+      { label: 'Market Comps',       path: 'market-comps',      icon: GitCompare },
       { label: 'Risk Heatmap',       path: 'risk-heatmap',      icon: ShieldAlert },
     ],
   },
   {
     label: 'Value Creation',
     items: [
-      { label: 'Value Gap',          path: 'value-gap',         icon: Target },
-      { label: 'Initiative Impact',  path: 'initiative-impact', icon: Zap },
-      { label: 'Scenario Simulator', path: 'scenario-simulator',icon: Activity },
+      { label: 'Value Gap',            path: 'value-gap',         icon: Target },
+      { label: 'EBITDA & EV Timeline', path: 'ebitda-timeline',   icon: LineChart },
+      { label: 'Initiative Impact',    path: 'initiative-impact', icon: Zap },
+      { label: 'Scenario Simulator',   path: 'scenario-simulator',icon: Activity },
     ],
   },
   {
     label: 'Output',
     items: [
-      { label: 'Data Room (VDR)',    path: 'data-room',         icon: Folder },
       { label: 'Reports',            path: 'reports',           icon: FileText },
+      { label: 'Advisory Library',   path: 'advisory-library',  icon: BookOpen },
     ],
   },
 ]
@@ -68,7 +70,7 @@ export default function DemoSidebar({ basePrefix = '/demo' }) {
             <h1 className="text-[12px] font-semibold text-sidebar-accent-foreground truncate leading-tight">
               Pre-Diligence Platform
             </h1>
-            <p className="text-[9px] text-sidebar-foreground tracking-widest uppercase leading-tight">
+            <p className="text-[11px] text-sidebar-foreground tracking-widest uppercase leading-tight">
               Fracture Systems
             </p>
           </div>
@@ -79,7 +81,7 @@ export default function DemoSidebar({ basePrefix = '/demo' }) {
       <nav className="flex-1 py-2 overflow-y-auto">
         {groups.map((group) => (
           <div key={group.label} className="mb-1">
-            <p className="text-[9px] font-semibold text-sidebar-foreground/40 uppercase tracking-widest px-4 py-1.5">
+            <p className="text-[11px] font-semibold text-sidebar-foreground/40 uppercase tracking-widest px-4 py-1.5">
               {group.label}
             </p>
             <div className="px-2 space-y-0.5">

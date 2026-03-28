@@ -2,9 +2,9 @@
 export const COMMAND_PALETTE_ROUTES = [
   { label: 'Home', href: '/Home' },
   { label: 'Company Workspace', href: '/CompanyWorkspace' },
+  { label: 'Engagement Intake', href: '/EngagementIntake' },
   { label: 'Advisory Workflow', href: '/AdvisoryWorkflow' },
   { label: 'Readiness Score', href: '/Readiness' },
-  { label: 'Qualitative Inputs', href: '/QualitativeInputs' },
   { label: 'Business Quality', href: '/BusinessQuality' },
   { label: 'Buyer Risk Profile', href: '/BuyerLens' },
   { label: 'Valuation', href: '/Valuation' },
@@ -17,6 +17,7 @@ export const COMMAND_PALETTE_ROUTES = [
   { label: 'Data Quality', href: '/DataQuality' },
   { label: 'Data Room', href: '/DataRoom' },
   { label: 'Reports', href: '/Reports' },
+  { label: 'Advisory Library', href: '/AdvisoryLibrary' },
   { label: 'AI Copilot', href: '/AICopilot' },
   { label: 'Admin', href: '/Admin' },
   { label: 'Account settings', href: '/settings' },

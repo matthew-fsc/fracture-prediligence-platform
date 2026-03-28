@@ -20,7 +20,7 @@ export function CompanyProvider({ children }) {
     if (q != null) return q
     const s = parseCompanyId(localStorage.getItem(STORAGE_KEY))
     if (s != null) return s
-    // Do not default to id=1 — that can point at another user's company. Hydrate from /api/companies in CompanySwitcher.
+    // Do not default to id=1 � that can point at another user's company. Hydrate from /api/companies in CompanySwitcher.
     return null
   })
 

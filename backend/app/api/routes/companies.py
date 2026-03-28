@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import ensure_company_access
 from app.core.config import settings
 from app.core.database import get_db
-from app.middleware.auth import CurrentUser, get_current_user, get_current_user_optional
+from app.middleware.auth import CurrentUser, get_current_user, get_current_user_optional  # get_current_user used by create_company
 from app.ontology.models import Company
 
 router = APIRouter()
@@ -31,6 +31,14 @@ class CompanyPatch(BaseModel):
     ein: Optional[str] = None
     state: Optional[str] = None
     entity_type: Optional[str] = None
+    total_headcount: Optional[int] = None
+    market_rate_replacement_annual: Optional[float] = None
+    depreciation_amortization_ttm: Optional[float] = None
+    interest_expense_ttm: Optional[float] = None
+    income_tax_expense_ttm: Optional[float] = None
+    report_firm_name: Optional[str] = None
+    report_cover_blurb: Optional[str] = None
+    report_logo_url: Optional[str] = None
 
 
 @router.get("/")
@@ -42,8 +50,8 @@ def list_companies(
     if user:
         q = q.filter(Company.owner_user_id == user.user_id)
     else:
-        if settings.APP_ENV.lower() != "development":
-            raise HTTPException(status_code=401, detail="Authorization required")
+        # No token: return only unowned (demo/shared) companies
+        q = q.filter(Company.owner_user_id.is_(None))
     return q.order_by(Company.id).all()
 
 
@@ -81,7 +89,7 @@ def get_company(
 def patch_company(
     company_id: int,
     body: CompanyPatch,
-    user: CurrentUser = Depends(get_current_user),
+    user: Optional[CurrentUser] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     row = ensure_company_access(company_id, user, db)

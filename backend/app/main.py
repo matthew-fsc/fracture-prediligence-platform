@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from app.api.routes import ingestion, analytics, companies, reports, demo
+from app.api.routes import ingestion, analytics, companies, reports, demo, library
 from app.api.routes import payments, webhooks
 from app.core.config import settings
 from app.core.database import engine, SessionLocal, Base
@@ -51,6 +51,21 @@ def _bootstrap_db():
                 conn.execute(text('ALTER TABLE companies ADD COLUMN owner_user_id VARCHAR(256)'))
                 conn.commit()
             logger.info('Added companies.owner_user_id column (additive migration).')
+        fin_cols = {
+            'market_rate_replacement_annual': 'NUMERIC(14,2)',
+            'depreciation_amortization_ttm': 'NUMERIC(14,2)',
+            'interest_expense_ttm': 'NUMERIC(14,2)',
+            'income_tax_expense_ttm': 'NUMERIC(14,2)',
+            'report_firm_name': 'VARCHAR(256)',
+            'report_cover_blurb': 'TEXT',
+            'report_logo_url': 'VARCHAR(512)',
+            'total_headcount': 'INTEGER',
+        }
+        with engine.connect() as conn:
+            for col, col_type in fin_cols.items():
+                if col not in co_cols:
+                    conn.execute(text(f'ALTER TABLE companies ADD COLUMN {col} {col_type}'))
+            conn.commit()
 
     db = SessionLocal()
     try:
@@ -73,6 +88,8 @@ def _bootstrap_db():
 
         _ensure_spots_setting(db)
         seed_curated_benchmarks_if_empty(db)
+        from app.api.routes.library import seed_library_if_empty
+        seed_library_if_empty(db)
         db.commit()
     finally:
         db.close()
@@ -114,6 +131,7 @@ app.include_router(ingestion.router,  prefix="/api/ingestion",  tags=["ingestion
 app.include_router(analytics.router,  prefix="/api/analytics",  tags=["analytics"])
 app.include_router(companies.router,  prefix="/api/companies",  tags=["companies"])
 app.include_router(reports.router,    prefix="/api/reports",    tags=["reports"])
+app.include_router(library.router,    prefix="/api/library",    tags=["library"])
 app.include_router(demo.router,       prefix="/api",            tags=["demo"])
 app.include_router(payments.router,   prefix="/api",            tags=["payments"])
 app.include_router(webhooks.router,   prefix="/api",            tags=["webhooks"])

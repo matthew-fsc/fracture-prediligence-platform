@@ -215,7 +215,7 @@ export default function ScenarioSimulator() {
         title="Scenario Simulator"
         subtitle="Advisory Risk Scenarios — Not a Forecast. Model adverse events and quantify their valuation impact in real time."
         action={
-          <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-400">
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-400">
             {SCENARIOS.length} scenarios
           </span>
         }
@@ -224,7 +224,7 @@ export default function ScenarioSimulator() {
       <div className="grid grid-cols-12 gap-4">
         {/* Scenario selector */}
         <div className="col-span-12 lg:col-span-3 space-y-2">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Select Scenario</p>
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Select Scenario</p>
           {SCENARIOS.map(s => {
             const Icon = s.icon
             const active = activeScenario === s.id
@@ -236,7 +236,7 @@ export default function ScenarioSimulator() {
                   <Icon className={cn('w-3.5 h-3.5', active ? iconColor[s.color] : 'text-muted-foreground')} />
                   <p className={cn('text-xs font-semibold', active ? 'text-foreground' : 'text-muted-foreground')}>{s.label}</p>
                 </div>
-                <p className="text-[9px] text-muted-foreground leading-snug pl-5">{s.description}</p>
+                <p className="text-[11px] text-muted-foreground leading-snug pl-5">{s.description}</p>
               </button>
             )
           })}
@@ -260,7 +260,7 @@ export default function ScenarioSimulator() {
                     <input type="range" min={param.min} max={param.max} step={param.step} value={val}
                       onChange={e => setParams(prev => ({ ...prev, [param.key]: Number(e.target.value) }))}
                       className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary" />
-                    <div className="flex justify-between text-[9px] text-muted-foreground mt-1">
+                    <div className="flex justify-between text-[11px] text-muted-foreground mt-1">
                       <span>{param.min}{param.unit}</span><span>{param.max}{param.unit}</span>
                     </div>
                   </div>
@@ -279,7 +279,7 @@ export default function ScenarioSimulator() {
                 { label: 'DRS Impact', val: result.drsHit ?? 0, isPos: (result.drsHit ?? 0) >= 0, fmt: v => `${v >= 0 ? '+' : ''}${v.toFixed(0)} pts` },
               ].map(c => (
                 <div key={c.label} className="p-2.5 rounded-lg border border-border bg-secondary/30">
-                  <p className="text-[9px] text-muted-foreground mb-0.5">{c.label}</p>
+                  <p className="text-[11px] text-muted-foreground mb-0.5">{c.label}</p>
                   <p className={cn('text-sm font-bold', c.isPos ? 'text-emerald-400' : 'text-red-400')}>
                     {c.fmt ? c.fmt(c.val) : `${c.isPos ? '+' : '-'}${fmtM(Math.abs(c.val))}`}
                   </p>
@@ -287,7 +287,7 @@ export default function ScenarioSimulator() {
               ))}
             </div>
             {activeScenario === 'owner_departure' && result.currentOpsScore != null && (
-              <div className="mb-3 p-2.5 rounded-lg border border-border bg-secondary/30 text-[10px]">
+              <div className="mb-3 p-2.5 rounded-lg border border-border bg-secondary/30 text-[11px]">
                 <p className="text-muted-foreground mb-1">Operational Independence Score</p>
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">Current ({ownerHours}hrs): <span className="font-bold text-foreground">{result.currentOpsScore}</span></span>
@@ -298,14 +298,14 @@ export default function ScenarioSimulator() {
             )}
             <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-secondary/50">
               <div>
-                <p className="text-[10px] text-muted-foreground">Scenario Enterprise Value</p>
+                <p className="text-[11px] text-muted-foreground">Scenario Enterprise Value</p>
                 <p className="text-xl font-bold text-foreground">{fmtM(result.newEV)}</p>
               </div>
               <div className="text-right">
-                <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase', sevColor[result.severity])}>{result.severity}</span>
+                <span className={cn('text-[11px] font-bold px-1.5 py-0.5 rounded border uppercase', sevColor[result.severity])}>{result.severity}</span>
                 <p className={cn('text-sm font-bold mt-1', result.evImpact >= 0 ? 'text-emerald-400' : 'text-red-400')}>
                   {result.evImpact >= 0 ? '+' : '-'}{fmtM(Math.abs(result.evImpact))}
-                  {liveBase.ev > 0 && <span className="text-[10px] text-muted-foreground ml-1">({((result.evImpact / liveBase.ev) * 100).toFixed(1)}%)</span>}
+                  {liveBase.ev > 0 && <span className="text-[11px] text-muted-foreground ml-1">({((result.evImpact / liveBase.ev) * 100).toFixed(1)}%)</span>}
                 </p>
               </div>
             </div>
@@ -342,7 +342,7 @@ export default function ScenarioSimulator() {
                 { label: 'Multiple', base: `${liveBase.multiple}×`, scen: `${(liveBase.multiple + result.multipleImpact).toFixed(1)}×`, delta: result.multipleImpact },
                 { label: 'EV',       base: fmtM(liveBase.ev),       scen: fmtM(result.newEV),                             delta: result.evImpact },
               ].map(r => (
-                <div key={r.label} className="flex items-center justify-between text-[10px] py-1.5 border-b border-border/50 last:border-0">
+                <div key={r.label} className="flex items-center justify-between text-[11px] py-1.5 border-b border-border/50 last:border-0">
                   <span className="text-muted-foreground">{r.label}</span>
                   <div className="flex items-center gap-3">
                     <span className="text-muted-foreground/50">{r.base}</span>
@@ -354,8 +354,8 @@ export default function ScenarioSimulator() {
           </div>
 
           <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
-            <p className="text-[9px] font-bold text-amber-400 uppercase tracking-wider mb-1">Advisory Risk Scenarios — Not a Forecast</p>
-            <p className="text-[9px] text-muted-foreground leading-relaxed">These scenarios are modeling tools for advisor-client conversations, not predictions. Multiple adjustments reflect market convention, not guaranteed outcomes.</p>
+            <p className="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-1">Advisory Risk Scenarios — Not a Forecast</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">These scenarios are modeling tools for advisor-client conversations, not predictions. Multiple adjustments reflect market convention, not guaranteed outcomes.</p>
           </div>
         </div>
       </div>

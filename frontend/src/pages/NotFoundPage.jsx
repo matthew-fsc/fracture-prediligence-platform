@@ -3,7 +3,7 @@ import { usePageTitle } from '../hooks/usePageTitle'
 import { marketingColors as COLORS } from '../theme/marketingColors'
 
 export default function NotFoundPage() {
-  usePageTitle('404 — Page Not Found')
+  usePageTitle('404 � Page Not Found')
 
   return (
     <div style={{ minHeight: '100vh', background: COLORS.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px', textAlign: 'center' }}>
@@ -28,7 +28,7 @@ export default function NotFoundPage() {
           to="/"
           style={{ background: COLORS.gold, color: COLORS.bg, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 14, padding: '12px 28px', borderRadius: 8, textDecoration: 'none' }}
         >
-          Go Home →
+          Go Home ?
         </Link>
         <Link
           to="/demo"

@@ -90,7 +90,7 @@ export default function CommandPalette({ open, onClose }) {
                 )}
               >
                 {r.label}
-                <span className="block text-[10px] text-muted-foreground font-mono mt-0.5">{r.href}</span>
+                <span className="block text-[11px] text-muted-foreground font-mono mt-0.5">{r.href}</span>
               </button>
             </li>
           ))}

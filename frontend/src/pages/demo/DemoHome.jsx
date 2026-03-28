@@ -143,7 +143,7 @@ function IssueCard({ issue }) {
         {issue.description}
       </p>
       <p style={{ color: '#60a5fa', fontFamily: "'DM Sans', sans-serif", fontSize: 12, margin: 0 }}>
-        <strong>Needed:</strong> {issue.data_needed} · <strong>Timeline:</strong> {issue.timeline}
+        <strong>Needed:</strong> {issue.data_needed} � <strong>Timeline:</strong> {issue.timeline}
       </p>
     </div>
   )
@@ -231,7 +231,7 @@ function DataRoomSection({ section }) {
               borderRadius: 4,
             }}
           >
-            {doc.status === 'complete' ? '✓ ' : '✗ '}{doc.name.replace(' — MISSING', '')}
+            {doc.status === 'complete' ? '? ' : '? '}{doc.name.replace(' � MISSING', '')}
           </span>
         ))}
       </div>
@@ -308,9 +308,9 @@ export default function DemoHome() {
           {company.name}
         </h1>
         <p style={{ color: '#8A9BB0', fontFamily: "'DM Sans', sans-serif", fontSize: 13, margin: 0 }}>
-          {company.state && `${company.state} · `}
-          {company.industry} · Founded {company.founded} · {company.employees} employees ·{' '}
-          Owner: {company.owner} · Advisor: {company.advisor}
+          {company.state && `${company.state} � `}
+          {company.industry} � Founded {company.founded} � {company.employees} employees �{' '}
+          Owner: {company.owner} � Advisor: {company.advisor}
         </p>
       </div>
 
@@ -327,7 +327,7 @@ export default function DemoHome() {
         <StatCard
           label="Enterprise Value"
           value={fmtDollar(enterprise_value.midpoint)}
-          sub={`${fmtDollar(enterprise_value.floor)} – ${fmtDollar(enterprise_value.ceiling)} range`}
+          sub={`${fmtDollar(enterprise_value.floor)} � ${fmtDollar(enterprise_value.ceiling)} range`}
           accent="#C9973A"
         />
         <StatCard
@@ -362,9 +362,9 @@ export default function DemoHome() {
 
         {/* Monthly Revenue Chart */}
         <div style={CARD_STYLE}>
-          <h2 style={SECTION_HEADING}>Monthly Revenue — 2024</h2>
+          <h2 style={SECTION_HEADING}>Monthly Revenue � 2024</h2>
           <p style={{ color: '#8A9BB0', fontFamily: "'DM Sans', sans-serif", fontSize: 12, margin: '0 0 16px 0' }}>
-            Retainer-driven professional services · TTM {fmtDollar(company.ttm_revenue)}
+            Retainer-driven professional services � TTM {fmtDollar(company.ttm_revenue)}
           </p>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={monthly_revenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>

@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
+from app.ontology.models import Company
 from app.ontology.models import Employee, RevenueStream, EmployeeStatus
 
 
@@ -75,19 +76,23 @@ def compute_management_team(company_id: int, db: Session) -> ManagementTeamScore
     employees = db.query(Employee).filter(Employee.company_id == company_id).all()
     revenue   = db.query(RevenueStream).filter(RevenueStream.company_id == company_id).all()
 
+    # Fall back to manual headcount if no employee records were ingested
+    company_row = db.query(Company).filter(Company.id == company_id).first()
+    manual_headcount = company_row.total_headcount if company_row and company_row.total_headcount else 0
+
     if not employees:
         return ManagementTeamScore(
             company_id=company_id, composite=50.0,
             completeness_score=50.0, size_score=50.0,
             ownership_score=50.0, role_coverage_score=50.0,
-            mgmt_count=0, total_headcount=0, revenue_per_employee=0.0,
+            mgmt_count=0, total_headcount=manual_headcount, revenue_per_employee=0.0,
             owner_count=0, has_finance_role=False, has_sales_role=False, has_ops_role=False,
             data_confidence="LOW",
             data_gaps=["management_classification", "role_classification"],
         )
 
     active = [e for e in employees if e.status == EmployeeStatus.ACTIVE]
-    total  = len(active)
+    total  = len(active) if len(active) > 0 else manual_headcount
     owners = [e for e in active if e.is_owner]
 
     # Classify roles

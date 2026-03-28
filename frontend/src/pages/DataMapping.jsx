@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useState, useEffect, useMemo } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, CheckCircle, AlertCircle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
@@ -8,7 +8,7 @@ import { cn } from '../lib/utils'
 import { useCompanyId } from '../context/CompanyContext'
 import { apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
-import { withCompanyQuery } from '../lib/navLinks'
+import { withCompanyQuery, resolvePath } from '../lib/navLinks'
 
 function useSiblingPath(segment) {
   const { pathname } = useLocation()
@@ -46,13 +46,17 @@ function methodBadge(m) {
 export default function DataMapping() {
   const companyId = useCompanyId()
   const qc = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlJobId = searchParams.get('jobId')
+  const { pathname } = useLocation()
   const dataSourcesPath = useSiblingPath('data-sources')
-  const connectorsPath = withCompanyQuery('/Connectors', companyId)
+  const connectorsPath = withCompanyQuery(resolvePath('/Connectors', pathname), companyId)
   const [selectedJobId, setSelectedJobId] = useState(null)
   const [mappings, setMappings] = useState([])
   const [overrides, setOverrides] = useState({})
   const [saving, setSaving]     = useState(false)
   const [saved, setSaved]       = useState(false)
+  const [reviewOnly, setReviewOnly] = useState(() => Boolean(urlJobId))
 
   const companyReady = companyId != null && companyId > 0
 
@@ -73,12 +77,21 @@ export default function DataMapping() {
       setSelectedJobId(null)
       return
     }
+    const ids = jobs.map((j) => j.job_id)
+    const fromUrl = urlJobId ? parseInt(urlJobId, 10) : NaN
     setSelectedJobId((prev) => {
-      const ids = jobs.map((j) => j.job_id)
+      if (Number.isFinite(fromUrl) && ids.includes(fromUrl)) return fromUrl
       if (prev && ids.includes(prev)) return prev
       return jobs[0].job_id
     })
-  }, [jobs])
+  }, [jobs, urlJobId])
+
+  function selectJob(id) {
+    setSelectedJobId(id)
+    const next = new URLSearchParams(searchParams)
+    next.set('jobId', String(id))
+    setSearchParams(next, { replace: true })
+  }
 
   const {
     data: selected,
@@ -109,6 +122,7 @@ export default function DataMapping() {
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
       await qc.invalidateQueries({ queryKey: ['ingestion-job', companyId, selected.job_id] })
+      await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
       toast.success('Mappings saved')
     } catch (e) {
       toast.error(e?.message || 'Could not save mappings')
@@ -118,6 +132,10 @@ export default function DataMapping() {
 
   const reviewRequired = mappings.filter(m => m.requires_review)
   const autoMapped     = mappings.filter(m => !m.requires_review && m.ontology_field)
+  const displayMappings = useMemo(
+    () => (reviewOnly ? mappings.filter(m => m.requires_review) : mappings),
+    [mappings, reviewOnly],
+  )
 
   if (!companyReady) {
     return (
@@ -139,7 +157,7 @@ export default function DataMapping() {
         title="Field Mapping"
         subtitle="Review and approve column → ontology field assignments. Override low-confidence mappings before committing."
         action={selected ? (
-          <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-400">
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-400">
             {autoMapped.length} auto · {reviewRequired.length} review
           </span>
         ) : null}
@@ -180,21 +198,30 @@ export default function DataMapping() {
 
       {!jobsLoading && !jobsError && jobs.length > 0 && (
         <div className="grid grid-cols-4 gap-4">
+          {urlJobId && selectedJobId === parseInt(urlJobId, 10) && (
+            <div className="col-span-4 rounded-lg border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-sm text-card-foreground">
+              <p className="font-semibold text-amber-400 text-xs uppercase tracking-wide mb-1">Mapping review for this upload</p>
+              <p className="text-xs text-muted-foreground">
+                Columns flagged below need a confident ontology field (or exclusion). Unmatched or low-confidence headers stay in
+                <span className="text-amber-400 font-medium"> Needs review</span> until you assign a field and save.
+              </p>
+            </div>
+          )}
           {/* Job selector */}
           <div className="col-span-1">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Ingestion Jobs</p>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Ingestion Jobs</p>
             <div className="space-y-1">
               {jobs.map(job => (
                 <button
                   key={job.job_id}
-                  onClick={() => setSelectedJobId(job.job_id)}
+                  onClick={() => selectJob(job.job_id)}
                   className={cn('w-full text-left px-3 py-2.5 rounded-lg border transition-colors',
                     selected?.job_id === job.job_id
                       ? 'border-primary/20 bg-primary/5 text-foreground'
                       : 'border-border hover:bg-muted/30 text-muted-foreground')}
                 >
                   <p className="text-xs font-medium truncate">{job.filename}</p>
-                  <p className="text-[10px] opacity-60 mt-0.5">{job.status} · {job.row_count ?? 0} rows</p>
+                  <p className="text-[11px] opacity-60 mt-0.5">{job.status} · {job.row_count ?? 0} rows</p>
                 </button>
               ))}
             </div>
@@ -218,7 +245,7 @@ export default function DataMapping() {
                     { label: 'Total Columns', value: mappings.length,       total: null,            color: 'blue'    },
                   ].map(k => (
                     <div key={k.label} className="rounded-xl border border-border bg-card p-3">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">{k.label}</p>
+                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">{k.label}</p>
                       <p className={cn('text-xl font-bold',
                         k.color === 'emerald' ? 'text-emerald-400' : k.color === 'amber' ? 'text-amber-400' : 'text-blue-400')}>
                         {k.value}
@@ -234,6 +261,17 @@ export default function DataMapping() {
                 </div>
 
                 {/* Mappings */}
+                <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={reviewOnly}
+                      onChange={e => setReviewOnly(e.target.checked)}
+                      className="rounded border-border"
+                    />
+                    Show only columns needing review
+                  </label>
+                </div>
                 <div className="rounded-xl border border-border bg-card overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                     <p className="text-xs font-semibold text-card-foreground">Column Mappings — {selected.filename}</p>
@@ -248,7 +286,10 @@ export default function DataMapping() {
                     )}
                   </div>
                   <div className="divide-y divide-border">
-                    {mappings.map((m, i) => (
+                    {displayMappings.length === 0 && reviewOnly && (
+                      <p className="px-4 py-6 text-sm text-muted-foreground text-center">No columns need review for this job.</p>
+                    )}
+                    {displayMappings.map((m, i) => (
                       <div key={i} className={cn('flex items-center gap-4 px-4 py-3', m.requires_review && 'bg-amber-500/5')}>
                         <span className="text-xs text-muted-foreground font-mono w-40 truncate flex-shrink-0" title={m.source_column}>
                           {m.source_column}
@@ -268,13 +309,13 @@ export default function DataMapping() {
                           ) : (
                             <span className="text-xs font-mono text-primary">{m.ontology_field ?? '—'}</span>
                           )}
-                          <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{m.match_detail}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{m.match_detail}</p>
                         </div>
-                        <span className="text-[10px] text-muted-foreground w-20 text-right flex-shrink-0 capitalize">{m.entity_type ?? '—'}</span>
+                        <span className="text-[11px] text-muted-foreground w-20 text-right flex-shrink-0 capitalize">{m.entity_type ?? '—'}</span>
                         <span className={cn('text-xs font-bold w-10 text-right flex-shrink-0', confidenceColor(m.confidence))}>
                           {m.confidence > 0 ? `${m.confidence}%` : '—'}
                         </span>
-                        <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0', methodBadge(m.match_method))}>
+                        <span className={cn('text-[11px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0', methodBadge(m.match_method))}>
                           {m.match_method}
                         </span>
                         <div className="w-4 flex-shrink-0">

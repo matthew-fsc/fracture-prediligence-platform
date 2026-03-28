@@ -35,19 +35,32 @@ const SEVERITY_COLORS = {
   MEDIUM:   { dot: 'bg-blue-500',   border: 'border-blue-500/30',   bg: 'bg-blue-500/10',   text: 'text-blue-400'   },
 }
 
-// Urgency buckets based on how many questions the category generated (X axis 0-2)
-function urgencyLabel(count) {
-  if (count >= 4) return 'Urgent'
-  if (count >= 2) return 'Elevated'
-  return 'Monitor'
-}
-function urgencyRank(count) {
-  if (count >= 4) return 2
-  if (count >= 2) return 1
-  return 0
-}
-
 const URGENCY_LABELS = ['Monitor', 'Elevated', 'Urgent']
+
+/**
+ * Urgency on the X axis: relative exposure vs other categories that have flags.
+ * Absolute thresholds (e.g. ≥4 questions) collapse everything into "Urgent" when
+ * the API caps the list (~20) and several categories each have many questions.
+ */
+function buildCategoryUrgencyRanks(catCounts) {
+  const pairs = Object.entries(catCounts)
+    .filter(([, c]) => c > 0)
+    .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))
+  const n = pairs.length
+  const rankByCategory = {}
+  const labelByCategory = {}
+  pairs.forEach(([cat], i) => {
+    let rank
+    if (n <= 1) {
+      rank = 2
+    } else {
+      rank = Math.min(2, Math.floor((3 * i) / n))
+    }
+    rankByCategory[cat] = rank
+    labelByCategory[cat] = URGENCY_LABELS[rank]
+  })
+  return { rankByCategory, labelByCategory }
+}
 const CELL_BG = [
   // row 0 (Critical), row 1 (High), row 2 (Medium)  — columns 0-2 (Monitor→Urgent)
   // Formatted as [row][col]
@@ -63,7 +76,7 @@ function RiskDot({ q }) {
     <div className="relative inline-block" onMouseEnter={() => setTip(true)} onMouseLeave={() => setTip(false)}>
       <div className={cn('w-2.5 h-2.5 rounded-full cursor-pointer border border-white/20', col.dot)} />
       {tip && (
-        <div className="absolute z-50 bottom-4 left-0 w-64 rounded-lg border border-border bg-card shadow-xl p-3 text-[10px] space-y-1">
+        <div className="absolute z-50 bottom-4 left-0 w-64 rounded-lg border border-border bg-card shadow-xl p-3 text-[11px] space-y-1">
           <p className={cn('font-bold text-xs', col.text)}>{q.severity} · {q.buyer_type}</p>
           <p className="text-card-foreground leading-relaxed">{q.question}</p>
           <p className="text-muted-foreground">{CATEGORY_LABELS[q.category] ?? q.category}</p>
@@ -75,17 +88,27 @@ function RiskDot({ q }) {
 
 export default function RiskHeatmap() {
   const companyId = useCompanyId()
+  const companyReady = companyId != null && companyId > 0
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
 
   useEffect(() => {
+    if (!companyReady) { setLoading(false); return }
     setLoading(true)
     fetch(apiUrl(`/api/analytics/buyer-questions/${companyId}`))
       .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [companyId])
+  }, [companyId, companyReady])
+
+  if (!companyReady) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader title="Risk Heatmap" subtitle="Select a client in the header to load the risk matrix." />
+      </div>
+    )
+  }
 
   if (loading) {
     return (
@@ -110,6 +133,8 @@ export default function RiskHeatmap() {
     catCounts[q.category] = (catCounts[q.category] ?? 0) + 1
   }
 
+  const { rankByCategory, labelByCategory } = buildCategoryUrgencyRanks(catCounts)
+
   // Build heatmap cell contents: cells[impactRow 0-2][urgencyCol 0-2] = list of questions
   const cells = { 0: {}, 1: {}, 2: {} }
   for (let r = 0; r <= 2; r++) {
@@ -119,7 +144,7 @@ export default function RiskHeatmap() {
   }
   for (const q of questions) {
     const row = SEVERITY_RANK[q.severity] ?? 0
-    const col = urgencyRank(catCounts[q.category] ?? 0)
+    const col = rankByCategory[q.category] ?? 1
     cells[row][col].push(q)
   }
 
@@ -131,16 +156,22 @@ export default function RiskHeatmap() {
                    : catQs.some(q => q.severity === 'HIGH') ? 'HIGH'
                    : catQs.length > 0 ? 'MEDIUM'
                    : null
-    return { key, label, count, urgency: urgencyLabel(count), worstSev }
+    return {
+      key,
+      label,
+      count,
+      urgency: count > 0 ? (labelByCategory[key] ?? 'Monitor') : '—',
+      worstSev,
+    }
   }).sort((a, b) => b.count - a.count)
 
   return (
     <div className="space-y-5 max-w-[1400px]">
       <SectionHeader
         title="Risk Heatmap"
-        subtitle="Every flagged risk plotted by buyer impact (severity) and resolution urgency (question density) — hover dots to preview"
+        subtitle="Impact = question severity; urgency = relative question density vs other flagged DRS categories (not a fixed count threshold) — hover dots to preview"
         action={
-          <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full border border-red-500/20 bg-red-500/10 text-red-400">
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-red-500/20 bg-red-500/10 text-red-400">
             {criticalCount} critical · {highCount} high · {mediumCount} medium
           </span>
         }
@@ -160,9 +191,9 @@ export default function RiskHeatmap() {
             <div key={label} className={cn('rounded-xl border p-4 flex items-center gap-4', cls)}>
               <Icon className="w-6 h-6 opacity-70 flex-shrink-0" />
               <div>
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
                 <p className="text-2xl font-black">{count}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{note}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{note}</p>
               </div>
             </div>
           )
@@ -171,14 +202,17 @@ export default function RiskHeatmap() {
 
       {/* Heatmap grid */}
       <div className="rounded-xl border border-border bg-card p-5">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
           Risk Matrix — Impact vs Urgency · hover dots to preview question
+        </p>
+        <p className="text-[11px] text-muted-foreground mb-4">
+          Urgent = categories with the most flagged questions in this view; Monitor = comparatively fewer flags in the same set.
         </p>
         <div className="flex gap-3">
           {/* Y-axis label */}
           <div className="flex flex-col justify-around items-end w-28 flex-shrink-0 pb-8">
             {['Critical', 'High', 'Medium'].map(l => (
-              <span key={l} className="text-[10px] font-semibold text-muted-foreground text-right leading-tight">{l} Impact</span>
+              <span key={l} className="text-[11px] font-semibold text-muted-foreground text-right leading-tight">{l} Impact</span>
             ))}
           </div>
 
@@ -203,10 +237,10 @@ export default function RiskHeatmap() {
                         {cellQs.map((q, i) => <RiskDot key={i} q={q} />)}
                       </div>
                       {cellQs.length === 0 && (
-                        <span className="text-[9px] text-muted-foreground/30">—</span>
+                        <span className="text-[11px] text-muted-foreground/30">—</span>
                       )}
                       {cellQs.length > 0 && (
-                        <p className="text-[9px] text-muted-foreground mt-2">{cellQs.length} risk{cellQs.length > 1 ? 's' : ''}</p>
+                        <p className="text-[11px] text-muted-foreground mt-2">{cellQs.length} risk{cellQs.length > 1 ? 's' : ''}</p>
                       )}
                     </div>
                   )
@@ -217,10 +251,10 @@ export default function RiskHeatmap() {
             {/* X-axis labels */}
             <div className="grid grid-cols-3 gap-2 mt-1">
               {URGENCY_LABELS.map(l => (
-                <p key={l} className="text-[10px] font-semibold text-muted-foreground text-center">{l}</p>
+                <p key={l} className="text-[11px] font-semibold text-muted-foreground text-center">{l}</p>
               ))}
             </div>
-            <p className="text-[10px] text-muted-foreground text-center">← Resolution Urgency →</p>
+            <p className="text-[11px] text-muted-foreground text-center">← Resolution Urgency →</p>
           </div>
         </div>
       </div>
@@ -240,12 +274,12 @@ export default function RiskHeatmap() {
                 return (
                   <div key={q.id} className={cn('rounded-lg border p-3 text-xs', col.border, col.bg)}>
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className={cn('text-[9px] font-bold uppercase', col.text)}>{q.severity}</span>
+                      <span className={cn('text-[11px] font-bold uppercase', col.text)}>{q.severity}</span>
                       <span className="text-muted-foreground">{CATEGORY_LABELS[q.category] ?? q.category}</span>
                       <span className="text-muted-foreground">· {q.buyer_type}</span>
                     </div>
                     <p className="text-card-foreground font-medium leading-relaxed">{q.question}</p>
-                    <p className="text-muted-foreground mt-1 text-[10px]">Prepare: {q.data_needed}</p>
+                    <p className="text-muted-foreground mt-1 text-[11px]">Prepare: {q.data_needed}</p>
                   </div>
                 )
               })}
@@ -269,17 +303,17 @@ export default function RiskHeatmap() {
                   {row.worstSev ? <Icon className={cn('w-4 h-4', col.text)} /> : <ShieldAlert className="w-4 h-4 text-emerald-400" />}
                   <div>
                     <p className="text-xs font-medium text-card-foreground">{row.label}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{row.count} question{row.count !== 1 ? 's' : ''} flagged</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{row.count} question{row.count !== 1 ? 's' : ''} flagged</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   {row.worstSev && (
-                    <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase', col.border, col.bg, col.text)}>
+                    <span className={cn('text-[11px] font-bold px-1.5 py-0.5 rounded border uppercase', col.border, col.bg, col.text)}>
                       {row.worstSev}
                     </span>
                   )}
                   <span className={cn(
-                    'text-[10px] font-semibold px-2 py-0.5 rounded',
+                    'text-[11px] font-semibold px-2 py-0.5 rounded',
                     row.urgency === 'Urgent'   ? 'bg-red-500/10 text-red-400' :
                     row.urgency === 'Elevated' ? 'bg-amber-500/10 text-amber-400' :
                     row.count === 0            ? 'bg-emerald-500/10 text-emerald-400' :

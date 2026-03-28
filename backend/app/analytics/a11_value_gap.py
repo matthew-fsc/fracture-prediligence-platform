@@ -65,6 +65,12 @@ class GapItem:
     drs_uplift: float          # DRS points gained if resolved
     ev_uplift: float           # $ uplift at midpoint EV
     priority: int              # 1 = highest
+    category_weight: float = 0.0
+    ebitda_used: float = 0.0
+    drs_before: float = 0.0
+    drs_after_sim: float = 0.0
+    multiple_before: float = 0.0
+    multiple_after: float = 0.0
 
     def to_dict(self) -> dict:
         return {
@@ -76,6 +82,20 @@ class GapItem:
             "drs_uplift":    round(self.drs_uplift, 2),
             "ev_uplift":     round(self.ev_uplift, 0),
             "priority":      self.priority,
+            "methodology": {
+                "summary": (
+                    "Illustrative marginal enterprise value if only this category were raised to the "
+                    f"target score ({self.target_score}), holding other categories constant."
+                ),
+                "formula": "ev_uplift = EV_mid(DRS_simulated) - EV_mid(DRS_current); "
+                "EV_mid(DRS) = EBITDA × interpolated_multiple(DRS) from internal anchor curve.",
+                "ebitda_ttm_used": round(self.ebitda_used, 2),
+                "category_weight_in_drs": round(self.category_weight * 100, 1),
+                "drs_before": round(self.drs_before, 2),
+                "drs_after_category_at_target": round(self.drs_after_sim, 2),
+                "multiple_mid_before": round(self.multiple_before, 3),
+                "multiple_mid_after": round(self.multiple_after, 3),
+            },
         }
 
 
@@ -155,6 +175,8 @@ def compute_value_gap(
 
         drs_uplift = sim_drs.base_drs - current_drs.base_drs
         ev_uplift  = sim_mid - current_mid
+        mb = _drs_to_multiple(current_drs.base_drs)
+        ma = _drs_to_multiple(sim_drs.base_drs)
 
         gaps.append(GapItem(
             category=key,
@@ -164,7 +186,13 @@ def compute_value_gap(
             score_gap=round(_TARGET_SCORE - score, 1),
             drs_uplift=drs_uplift,
             ev_uplift=ev_uplift,
-            priority=0,  # set after sort
+            priority=0,
+            category_weight=meta["weight"],
+            ebitda_used=ebitda,
+            drs_before=current_drs.base_drs,
+            drs_after_sim=sim_drs.base_drs,
+            multiple_before=mb,
+            multiple_after=ma,
         ))
 
     # Sort by EV uplift descending

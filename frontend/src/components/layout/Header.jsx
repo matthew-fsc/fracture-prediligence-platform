@@ -71,7 +71,7 @@ function ClerkUserSection({ sub }) {
         {imageUrl ? (
           <img src={imageUrl} alt="" className="w-7 h-7 rounded-full object-cover" />
         ) : (
-          <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[10px] font-bold">
+          <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[11px] font-bold">
             {initials}
           </div>
         )}
@@ -80,7 +80,7 @@ function ClerkUserSection({ sub }) {
             <p className="text-[11px] font-medium text-card-foreground leading-tight">{displayName}</p>
             {sub?.tier && <PlanBadge tier={sub.tier} />}
           </div>
-          <p className="text-[9px] text-muted-foreground leading-tight">CEPA Advisor</p>
+          <p className="text-[11px] text-muted-foreground leading-tight">CEPA Advisor</p>
         </div>
         <ChevronDown className={cn('w-3 h-3 text-muted-foreground transition-transform', open && 'rotate-180')} />
       </button>
@@ -119,10 +119,10 @@ function ClerkUserSection({ sub }) {
 function StaticUserSection() {
   return (
     <div className="flex items-center gap-2 pl-2">
-      <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[10px] font-bold">U</div>
+      <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[11px] font-bold">U</div>
       <div>
         <p className="text-[11px] font-medium text-card-foreground leading-tight">Advisor</p>
-        <p className="text-[9px] text-muted-foreground leading-tight">CEPA Advisor</p>
+        <p className="text-[11px] text-muted-foreground leading-tight">CEPA Advisor</p>
       </div>
     </div>
   )
@@ -186,7 +186,7 @@ export default function Header({
 
   const drsColor = drs == null
     ? 'text-muted-foreground'
-    : drs >= 75
+    : drs >= 70
       ? 'text-emerald-400'
       : drs >= 55
         ? 'text-amber-400'

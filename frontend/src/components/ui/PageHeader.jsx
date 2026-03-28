@@ -3,7 +3,7 @@ export default function PageHeader({ section, title, subtitle, badge }) {
     <div className="flex items-start justify-between mb-6">
       <div>
         {section && (
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-1">{section}</p>
+          <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-semibold mb-1">{section}</p>
         )}
         <h1 className="text-2xl font-bold text-card-foreground">{title}</h1>
         {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}

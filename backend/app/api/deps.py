@@ -19,10 +19,9 @@ def ensure_company_access(
     row = db.query(Company).filter(Company.id == company_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Company not found")
+    # Unowned companies (demo / shared) are accessible without authentication
     if row.owner_user_id is None:
-        if settings.APP_ENV.lower() == "development":
-            return row
-        raise HTTPException(status_code=403, detail="Company has no owner assigned")
+        return row
     if user is None:
         raise HTTPException(status_code=401, detail="Authorization required")
     if row.owner_user_id != user.user_id:

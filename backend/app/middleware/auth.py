@@ -142,9 +142,12 @@ async def get_current_user(
 async def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> Optional[CurrentUser]:
-    """In development, missing Authorization allows None (demo / local). In production, requires a valid token."""
+    """Return the authenticated user if a token is present, otherwise None.
+
+    Authorization enforcement is deferred to the company-scoping layer
+    (ensure_company_access) so that unowned demo companies remain accessible
+    without a token in every environment.
+    """
     if not credentials:
-        if settings.APP_ENV.lower() == "development":
-            return None
-        raise HTTPException(status_code=401, detail="Authorization header required")
+        return None
     return await authenticate_credentials(credentials)

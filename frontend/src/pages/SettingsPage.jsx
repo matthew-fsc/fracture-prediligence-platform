@@ -21,7 +21,7 @@ export default function SettingsPage() {
             marginBottom: 24,
           }}
         >
-          ← Back to dashboard
+          ? Back to dashboard
         </Link>
         <h1
           style={{

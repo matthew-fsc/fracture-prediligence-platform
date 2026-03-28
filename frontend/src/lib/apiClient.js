@@ -24,7 +24,7 @@ export function setStoredAdminKey(key) {
   localStorage.setItem(ADMIN_KEY_STORAGE, key)
 }
 
-/** Async () => Clerk session JWT or null — set by ClerkAuthBridge when Clerk is active. */
+/** Async () => Clerk session JWT or null � set by ClerkAuthBridge when Clerk is active. */
 let authTokenGetter = null
 
 export function setAuthTokenGetter(fn) {
@@ -42,6 +42,37 @@ async function mergeAuthHeaders(headers = {}) {
     }
   }
   return h
+}
+
+/** POST multipart/form-data (omit Content-Type so the browser sets the boundary). */
+export async function apiPostMultipart(path, formData) {
+  const headers = await mergeAuthHeaders({})
+  delete headers['Content-Type']
+  const response = await fetch(apiUrl(path), { method: 'POST', body: formData, headers })
+  if (!response.ok) {
+    throw await errorFromResponse(response)
+  }
+  const ct = response.headers.get('content-type') || ''
+  if (ct.includes('application/json')) {
+    const text = await response.text()
+    if (!text.trim()) return null
+    try {
+      return JSON.parse(text)
+    } catch {
+      return text
+    }
+  }
+  return null
+}
+
+/** Authenticated GET returning raw bytes (e.g. logo preview). */
+export async function apiGetBlob(path) {
+  const headers = await mergeAuthHeaders({})
+  const response = await fetch(apiUrl(path), { headers })
+  if (!response.ok) {
+    throw await errorFromResponse(response)
+  }
+  return response.blob()
 }
 
 /**
@@ -88,7 +119,7 @@ export function messageFromErrorBody(text, status) {
   } catch {
     /* not JSON */
   }
-  return text.length > 500 ? `${text.slice(0, 500)}…` : text
+  return text.length > 500 ? `${text.slice(0, 500)}�` : text
 }
 
 /**
@@ -146,6 +177,8 @@ export const apiClient = {
       method: 'DELETE',
       headers,
     }),
+  postMultipart: (path, formData) => apiPostMultipart(path, formData),
+  getBlob: (path) => apiGetBlob(path),
 }
 
 export function withAdminHeader(headers = {}) {

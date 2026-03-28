@@ -68,7 +68,7 @@ export default function DataRoom() {
         title="Data Room (VDR)"
         subtitle="Virtual data room readiness — document audit, gap identification, and buyer preparation"
         action={
-          <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-400">
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-400">
             {presentCount}/{totalDocs.length} documents ready
           </span>
         }
@@ -84,13 +84,13 @@ export default function DataRoom() {
                 p.status === 'connected' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-muted text-muted-foreground')}>
                 {p.abbr}
               </div>
-              <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase',
+              <span className={cn('text-[11px] font-bold px-1.5 py-0.5 rounded border uppercase',
                 p.status === 'connected' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400' : 'border-border bg-muted/30 text-muted-foreground')}>
                 {p.status}
               </span>
             </div>
             <p className="text-sm font-semibold text-card-foreground">{p.name}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{p.description}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{p.description}</p>
           </div>
         ))}
       </div>
@@ -106,7 +106,7 @@ export default function DataRoom() {
             s.color === 'emerald' ? 'border-emerald-500/20 bg-emerald-500/5' :
             s.color === 'amber' ? 'border-amber-500/20 bg-amber-500/5' :
             'border-red-500/20 bg-red-500/5')}>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{s.label}</p>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{s.label}</p>
             <p className={cn('text-2xl font-bold',
               s.color === 'emerald' ? 'text-emerald-400' : s.color === 'amber' ? 'text-amber-400' : 'text-red-400')}>
               {s.value}
@@ -126,7 +126,7 @@ export default function DataRoom() {
             <div className="px-4 py-3 border-b border-border flex items-center gap-2">
               <FolderOpen className="w-4 h-4 text-muted-foreground" />
               <p className="text-sm font-semibold text-card-foreground">{cat.category}</p>
-              <span className="text-[10px] text-muted-foreground ml-auto">{cat.docs.filter(d => d.status === 'present').length}/{cat.docs.length} ready</span>
+              <span className="text-[11px] text-muted-foreground ml-auto">{cat.docs.filter(d => d.status === 'present').length}/{cat.docs.length} ready</span>
             </div>
             <div className="divide-y divide-border">
               {cat.docs.map((doc, i) => {
@@ -136,9 +136,9 @@ export default function DataRoom() {
                     <Icon className={cn('w-4 h-4 flex-shrink-0', statusColor[doc.status])} />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-card-foreground">{doc.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{doc.note}</p>
+                      <p className="text-[11px] text-muted-foreground">{doc.note}</p>
                     </div>
-                    <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase flex-shrink-0', statusBadge[doc.status])}>
+                    <span className={cn('text-[11px] font-bold px-1.5 py-0.5 rounded border uppercase flex-shrink-0', statusBadge[doc.status])}>
                       {doc.status}
                     </span>
                   </div>

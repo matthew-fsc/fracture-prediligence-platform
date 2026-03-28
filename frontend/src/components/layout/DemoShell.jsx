@@ -1,21 +1,50 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { Outlet, useSearchParams } from 'react-router-dom'
+import { useQueryClient, useQuery } from '@tanstack/react-query'
+import { fmtM, cn } from '../../lib/utils'
 import DemoSidebar from './DemoSidebar'
 import ConversionModal from '../demo/ConversionModal'
 import { DemoDashboardExitLink } from '../demo/DemoDashboardExit'
 import { DemoContext } from '../../context/DemoContext'
+import { useCompany } from '../../context/CompanyContext'
 import { Bell, Search, Share2, Check, ArrowLeft } from 'lucide-react'
 import { usePageTitle } from '../../hooks/usePageTitle'
 import { apiClient } from '../../lib/apiClient'
+
+const DEMO_COMPANY = { id: 1, name: 'ABC Company Inc' }
 
 // ---------------------------------------------------------------------------
 // Demo-specific header
 // ---------------------------------------------------------------------------
 function DemoHeader({ demoData, slug, personalized }) {
-  const drs = demoData?.drs?.base
-  const tier = demoData?.drs?.tier
-  const ev = demoData?.enterprise_value?.midpoint
+  // Prefer live-computed scores; fall back to the demo data payload when backend is unavailable
+  const scorePlaceholder =
+    demoData?.drs != null && demoData?.enterprise_value != null
+      ? {
+          drs: { base: demoData.drs.base, tier: demoData.drs.tier },
+          enterprise_value: { midpoint: demoData.enterprise_value.midpoint },
+        }
+      : undefined
+
+  const { data: liveScores } = useQuery({
+    queryKey: ['analytics-scores', 1],
+    queryFn: () => apiClient.get('/api/analytics/scores/1'),
+    retry: false,
+    staleTime: 120_000,
+    placeholderData: scorePlaceholder,
+    meta: { suppressErrorToast: true },
+  })
+
+  const drs  = liveScores?.drs?.base  ?? demoData?.drs?.base
+  const tier = liveScores?.drs?.tier  ?? demoData?.drs?.tier
+  const ev   = liveScores?.enterprise_value?.midpoint ?? demoData?.enterprise_value?.midpoint
   const companyName = demoData?.company?.name ?? 'Demo Company'
+
+  const drsColor = drs == null ? 'text-muted-foreground'
+    : drs >= 70 ? 'text-emerald-400'
+    : drs >= 55 ? 'text-amber-400'
+    : 'text-red-400'
+
   const [copied, setCopied] = useState(false)
 
   const handleShare = useCallback(() => {
@@ -51,14 +80,15 @@ function DemoHeader({ demoData, slug, personalized }) {
           <span className="text-muted-foreground max-w-[160px] truncate">{companyName}</span>
         </div>
         {drs != null && (
-          <span className="text-xs text-muted-foreground font-medium">
-            {drs}/100 Readiness{tier ? ` · ${tier}` : ''}
+          <span className={cn('text-xs font-semibold', drsColor)}>
+            {Math.round(drs)}/100
+            <span className="text-muted-foreground font-normal ml-1">
+              Readiness{tier ? ` · ${tier}` : ''}
+            </span>
           </span>
         )}
-        {ev != null && (
-          <span className="text-xs font-semibold text-primary">
-            ${(ev / 1_000_000).toFixed(1)}M EV
-          </span>
+        {ev != null && ev > 0 && (
+          <span className="text-xs font-semibold text-primary">{fmtM(ev)} EV</span>
         )}
       </div>
 
@@ -83,12 +113,12 @@ function DemoHeader({ demoData, slug, personalized }) {
           <Bell className="w-4 h-4 text-muted-foreground" />
         </button>
         <div className="flex items-center gap-2 pl-2">
-          <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[10px] font-bold">
+          <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[11px] font-bold">
             D
           </div>
           <div>
             <p className="text-[11px] font-medium text-card-foreground leading-tight">Demo User</p>
-            <p className="text-[9px] text-muted-foreground leading-tight">CEPA Advisor</p>
+            <p className="text-[11px] text-muted-foreground leading-tight">CEPA Advisor</p>
           </div>
         </div>
       </div>
@@ -105,6 +135,52 @@ export default function DemoShell({ slug = null }) {
   const [spotsRemaining, setSpotsRemaining] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [searchParams] = useSearchParams()
+  const queryClient = useQueryClient()
+  const { setCompanyId } = useCompany()
+
+  // Pre-seed company data so all demo pages see ABC Company Inc instead of an empty list
+  useEffect(() => {
+    queryClient.setQueryData(['companies'], [DEMO_COMPANY])
+    queryClient.setQueryData(['company', 1], DEMO_COMPANY)
+    setCompanyId(1)
+  }, [queryClient, setCompanyId])
+
+  /** Start heavy ABC (company 1) analytics before the outlet paints so Home/header share one request. */
+  useLayoutEffect(() => {
+    const demoStale = 120_000
+    const quiet = { meta: { suppressErrorToast: true } }
+    queryClient.prefetchQuery({
+      queryKey: ['analytics-scores', 1],
+      queryFn: () => apiClient.get('/api/analytics/scores/1'),
+      staleTime: demoStale,
+      ...quiet,
+    })
+    queryClient.prefetchQuery({
+      queryKey: ['analytics-buyer-questions', 1],
+      queryFn: () => apiClient.get('/api/analytics/buyer-questions/1'),
+      staleTime: demoStale,
+      ...quiet,
+    })
+    queryClient.prefetchQuery({
+      queryKey: ['analytics-value-gap', 1],
+      queryFn: () => apiClient.get('/api/analytics/value-gap/1'),
+      staleTime: demoStale,
+      ...quiet,
+    })
+    queryClient.prefetchQuery({
+      queryKey: ['ingestion-jobs', 1],
+      queryFn: () =>
+        apiClient.get('/api/ingestion/jobs/1').then((d) => (Array.isArray(d) ? d : [])),
+      staleTime: 60_000,
+      ...quiet,
+    })
+    queryClient.prefetchQuery({
+      queryKey: ['advisory-workflow', 1],
+      queryFn: () => apiClient.get('/api/analytics/advisory-workflow/1'),
+      staleTime: demoStale,
+      ...quiet,
+    })
+  }, [queryClient])
 
   const basePrefix = slug ? `/demo/${slug}` : '/demo'
 

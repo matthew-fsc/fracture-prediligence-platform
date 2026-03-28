@@ -10,7 +10,7 @@ from app.api.deps import get_company_scope
 from app.core.config import settings
 from app.core.database import get_db
 from app.ontology.models import Company
-from app.ingestion.pipeline import run_pipeline
+from app.ingestion.pipeline import run_pipeline, rerun_pipeline_job, resume_pipeline_after_mapping_review
 from app.ontology.ingestion_models import IngestionJob, PhaseStatus
 
 router = APIRouter()
@@ -166,9 +166,56 @@ def update_mappings(
 
     job.column_mappings = mappings
 
-    # Re-trigger P6 if previously waiting for review
-    if job.current_status == PhaseStatus.AWAITING_REVIEW.value:
-        job.current_status = PhaseStatus.COMPLETE.value
+    if str(job.current_status) == PhaseStatus.AWAITING_REVIEW.value:
+        try:
+            resume_pipeline_after_mapping_review(job, company.id, db)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Could not resume pipeline: {e}") from e
 
     db.commit()
-    return {"message": "Mappings updated.", "mappings": job.column_mappings}
+    db.refresh(job)
+    return {
+        "message": "Mappings updated.",
+        "mappings": job.column_mappings,
+        "status": job.current_status,
+        "phase": job.current_phase.value if hasattr(job.current_phase, "value") else str(job.current_phase),
+    }
+
+
+@router.post("/jobs/{company_id}/{job_id}/retry")
+def retry_job(company: CompanyScoped, job_id: int, db: Session = Depends(get_db)):
+    """Re-run ingestion from the stored raw file (FAILED or QUARANTINED only)."""
+    try:
+        job = rerun_pipeline_job(job_id, company.id, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    db.commit()
+    db.refresh(job)
+    return {
+        "job_id": job.id,
+        "ingestion_id": job.ingestion_id,
+        "filename": job.filename,
+        "status": job.current_status.value if hasattr(job.current_status, "value") else str(job.current_status),
+        "phase": job.current_phase.value if hasattr(job.current_phase, "value") else str(job.current_phase),
+        "row_count": job.row_count,
+        "mapped_count": job.mapped_count,
+        "error_count": job.error_count,
+    }
+
+
+@router.delete("/jobs/{company_id}/{job_id}", status_code=204)
+def delete_job(company: CompanyScoped, job_id: int, db: Session = Depends(get_db)):
+    """Delete an ingestion job and its data."""
+    job = (
+        db.query(IngestionJob)
+        .filter(IngestionJob.id == job_id, IngestionJob.company_id == company.id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Ingestion job not found.")
+    db.delete(job)
+    db.commit()

@@ -99,6 +99,29 @@
     overscroll-behavior: none;
   }
 
+  /*
+   * Native inputs/textareas often ignore inherited color (UA stylesheet uses black).
+   * :where() keeps specificity at 0 so per-component utilities (e.g. CommandPalette) still win.
+   */
+  input:where(
+      :not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='submit']):not(
+          [type='button']
+        ):not([type='reset']):not([type='hidden']):not([type='image']):not([type='color'])
+    ),
+  textarea,
+  select {
+    @apply text-muted-foreground placeholder:text-muted-foreground/45;
+  }
+  input:where(
+      :not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='submit']):not(
+          [type='button']
+        ):not([type='reset']):not([type='hidden']):not([type='image']):not([type='color'])
+    ):focus,
+  textarea:focus,
+  select:focus {
+    @apply text-foreground;
+  }
+
   a:focus-visible,
   button:focus-visible,
   input:focus-visible,

@@ -12,7 +12,7 @@ const variants = {
 
 export default function StatusBadge({ variant = 'medium', children, className }) {
   return (
-    <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize', variants[variant] ?? variants.medium, className)}>
+    <span className={cn('px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize', variants[variant] ?? variants.medium, className)}>
       {children}
     </span>
   )

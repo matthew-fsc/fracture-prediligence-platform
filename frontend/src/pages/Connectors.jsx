@@ -1,15 +1,15 @@
 import { useState, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Upload, AlertCircle, FileText, RefreshCw, ChevronRight, CheckCircle, Circle, Database } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Upload, AlertCircle, FileText, RefreshCw, ChevronRight, Trash2, RotateCcw } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { useCompanyId } from '../context/CompanyContext'
-import { apiUrl } from '../lib/apiClient'
+import { apiUrl, apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
 
 function useSiblingPath(segment) {
   const { pathname } = useLocation()
-  // Replace the last path segment (or append if at demo root)
   return pathname.replace(/\/[^/]*$/, '') + '/' + segment
 }
 
@@ -25,19 +25,11 @@ const SOURCE_TYPES = [
   { value: 'unknown',        label: 'Unknown / Other' },
 ]
 
-const MOCK_CONNECTORS = [
-  { type: 'quickbooks', name: 'QuickBooks Online', category: 'accounting', status: 'connected', records: 1917, lastSync: '1h ago', icon: '📊' },
-  { type: 'gusto',      name: 'Gusto Payroll',     category: 'payroll',    status: 'connected', records: 379,  lastSync: '1h ago', icon: '👥' },
-  { type: 'hubspot',    name: 'HubSpot CRM',       category: 'crm',        status: 'connected', records: 31,   lastSync: '1h ago', icon: '🔗' },
-  { type: 'plaid',      name: 'Plaid Banking',     category: 'banking',    status: 'available', records: 0,    lastSync: null,     icon: '🏦' },
-  { type: 'xero',       name: 'Xero',              category: 'accounting', status: 'available', records: 0,    lastSync: null,     icon: '📋' },
-  { type: 'salesforce', name: 'Salesforce',        category: 'crm',        status: 'available', records: 0,    lastSync: null,     icon: '☁️' },
-]
-
-const CATEGORIES = ['all', 'accounting', 'payroll', 'crm', 'banking']
-
-function statusVariant(status) {
-  return { COMPLETE: 'adequate', AWAITING_REVIEW: 'watch', QUARANTINED: 'critical', FAILED: 'critical' }[status] ?? 'medium'
+function jobNeedsPolling(jobs) {
+  if (!Array.isArray(jobs) || jobs.length === 0) return false
+  return jobs.some(j =>
+    j.status === 'RUNNING' || j.status === 'PENDING',
+  )
 }
 
 function phaseLabel(phase, status) {
@@ -50,17 +42,29 @@ function phaseLabel(phase, status) {
 
 export default function Connectors() {
   const companyId = useCompanyId()
-  const fieldMappingPath = useSiblingPath('field-mapping')
-  const [jobs, setJobs]             = useState([])
+  const qc = useQueryClient()
+  const fieldMappingBase = useSiblingPath('field-mapping')
   const [uploading, setUploading]   = useState(false)
   const [dragOver, setDragOver]     = useState(false)
   const [sourceType, setSourceType] = useState('unknown')
   const [error, setError]           = useState(null)
-  const [activeCategory, setActiveCategory] = useState('all')
+  const [retryingId, setRetryingId] = useState(null)
   const fileRef = useRef()
 
+  const companyReady = companyId != null && companyId >= 1
+
+  const {
+    data: jobs = [],
+    isLoading: jobsLoading,
+  } = useQuery({
+    queryKey: ['ingestion-jobs', companyId],
+    queryFn: () => apiClient.get(`/api/ingestion/jobs/${companyId}`),
+    enabled: companyReady,
+    refetchInterval: (query) => (jobNeedsPolling(query.state.data) ? 2500 : 8000),
+  })
+
   async function uploadFile(file) {
-    if (companyId == null || companyId < 1) {
+    if (!companyReady) {
       toast.error('Select or create a client in the header before uploading.')
       return
     }
@@ -73,8 +77,8 @@ export default function Connectors() {
       const res = await fetch(apiUrl(`/api/ingestion/upload/${companyId}`), { method: 'POST', body: form })
       const json = await res.json()
       if (!res.ok) throw new Error(json.detail || 'Upload failed')
-      setJobs(prev => [json, ...prev])
-      toast.success('File uploaded — pipeline started')
+      await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
+      toast.success('File uploaded — pipeline finished')
     } catch (e) {
       const msg = e.message || 'Upload failed'
       setError(msg)
@@ -84,9 +88,41 @@ export default function Connectors() {
     }
   }
 
-  const connectedCount = MOCK_CONNECTORS.filter(c => c.status === 'connected').length
-  const totalRecords = MOCK_CONNECTORS.reduce((s, c) => s + c.records, 0)
-  const filtered = activeCategory === 'all' ? MOCK_CONNECTORS : MOCK_CONNECTORS.filter(c => c.category === activeCategory)
+  async function deleteJob(jobId) {
+    try {
+      await fetch(apiUrl(`/api/ingestion/jobs/${companyId}/${jobId}`), { method: 'DELETE' })
+      await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
+    } catch (e) {
+      toast.error('Could not delete job')
+    }
+  }
+
+  async function retryJob(jobId) {
+    setRetryingId(jobId)
+    try {
+      const res = await fetch(apiUrl(`/api/ingestion/jobs/${companyId}/${jobId}/retry`), { method: 'POST' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.detail || 'Retry failed')
+      await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
+      await qc.invalidateQueries({ queryKey: ['ingestion-job', companyId, jobId] })
+      toast.success('Pipeline re-run started')
+    } catch (e) {
+      toast.error(e.message || 'Retry failed')
+    } finally {
+      setRetryingId(null)
+    }
+  }
+
+  const totalRecords = jobs.reduce((s, j) => s + (j.row_count ?? 0), 0)
+  const completeJobs = jobs.filter(j => j.status === 'COMPLETE').length
+  const pipelineStatus = jobs.length === 0
+    ? 'No uploads yet'
+    : jobs.some(j => j.status === 'FAILED') ? 'Has errors'
+    : jobs.some(j => j.status === 'AWAITING_REVIEW') ? 'Needs review'
+    : 'Processing'
+  const pipelineColor = jobs.length === 0 || jobs.some(j => j.status === 'FAILED') ? 'red'
+    : jobs.some(j => j.status === 'AWAITING_REVIEW') ? 'amber'
+    : 'emerald'
 
   return (
     <div className="space-y-5 max-w-[1400px]">
@@ -105,74 +141,29 @@ export default function Connectors() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: 'Connected Sources', value: `${connectedCount}`, sub: 'of 6 available', color: 'emerald' },
-          { label: 'Total Records',     value: totalRecords.toLocaleString(), sub: 'ingested & mapped', color: 'blue' },
-          { label: 'Pipeline Status',   value: 'Healthy', sub: 'last sync 1h ago', color: 'emerald' },
-        ].map(c => (
-          <div key={c.label} className={cn('rounded-xl border p-4',
-            c.color === 'emerald' ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-blue-500/20 bg-blue-500/5')}>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{c.label}</p>
-            <p className={cn('text-xl font-bold', c.color === 'emerald' ? 'text-emerald-400' : 'text-blue-400')}>{c.value}</p>
-            <p className="text-[10px] text-muted-foreground">{c.sub}</p>
-          </div>
-        ))}
+        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Files Uploaded</p>
+          <p className="text-xl font-bold text-blue-400">{jobsLoading ? '—' : jobs.length}</p>
+          <p className="text-[11px] text-muted-foreground">{completeJobs} complete</p>
+        </div>
+        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Total Records</p>
+          <p className="text-xl font-bold text-blue-400">{jobsLoading ? '—' : totalRecords.toLocaleString()}</p>
+          <p className="text-[11px] text-muted-foreground">across all uploads</p>
+        </div>
+        <div className={cn('rounded-xl border p-4',
+          pipelineColor === 'emerald' ? 'border-emerald-500/20 bg-emerald-500/5'
+          : pipelineColor === 'amber' ? 'border-amber-500/20 bg-amber-500/5'
+          : 'border-red-500/20 bg-red-500/5')}>
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Pipeline Status</p>
+          <p className={cn('text-xl font-bold',
+            pipelineColor === 'emerald' ? 'text-emerald-400'
+            : pipelineColor === 'amber' ? 'text-amber-400'
+            : 'text-red-400')}>{pipelineStatus}</p>
+          <p className="text-[11px] text-muted-foreground">{jobs.length} job{jobs.length !== 1 ? 's' : ''} total</p>
+        </div>
       </div>
 
-      <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-200/90" role="status">
-        <strong className="text-amber-100">Integrations below are illustrative.</strong>{' '}
-        Native QuickBooks, HubSpot, Plaid, and similar connectors are not wired yet — data enters via manual CSV/Excel upload only.
-      </div>
-
-      {/* Category filter */}
-      <div className="flex items-center gap-2">
-        {CATEGORIES.map(cat => (
-          <button key={cat} onClick={() => setActiveCategory(cat)}
-            className={cn('text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors capitalize',
-              activeCategory === cat ? 'border-primary/20 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted/30')}>
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      {/* Connector grid (demo UI — not live OAuth) */}
-      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Sample connectors (coming soon)</p>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        {filtered.map(c => (
-          <div key={c.type} className={cn('rounded-xl border bg-card p-4 opacity-90',
-            c.status === 'connected' ? 'border-emerald-500/20' : 'border-border')}>
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">{c.icon}</span>
-                <div>
-                  <p className="text-sm font-semibold text-card-foreground">{c.name}</p>
-                  <p className="text-[10px] text-muted-foreground capitalize">{c.category}</p>
-                </div>
-              </div>
-              <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase',
-                c.status === 'connected' ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' : 'border-border bg-muted text-muted-foreground')}>
-                {c.status === 'connected' ? 'demo' : 'soon'}
-              </span>
-            </div>
-            {c.status === 'connected' ? (
-              <div className="space-y-1 text-[11px] text-muted-foreground">
-                <div className="flex justify-between">
-                  <span>Records</span>
-                  <span className="font-semibold text-card-foreground">{c.records.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Last sync</span>
-                  <span className="font-semibold text-emerald-400">{c.lastSync}</span>
-                </div>
-              </div>
-            ) : (
-              <button className="w-full text-xs text-center py-1.5 rounded-lg border border-border hover:bg-muted/30 transition-colors text-muted-foreground">
-                Connect
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
 
       {/* Upload area */}
       <div className="rounded-xl border border-border bg-card p-5">
@@ -193,7 +184,7 @@ export default function Connectors() {
                 ? <RefreshCw className="w-8 h-8 text-primary animate-spin mb-3" />
                 : <Upload className="w-8 h-8 text-muted-foreground mb-3" />}
               <p className="text-sm font-medium text-card-foreground">
-                {uploading ? 'Running pipeline P2–P6...' : 'Drop file here or click to upload'}
+                {uploading ? 'Running pipeline P2–P11...' : 'Drop file here or click to upload'}
               </p>
               <p className="text-[11px] text-muted-foreground mt-1">CSV · Excel (.xlsx / .xls) · TSV</p>
             </div>
@@ -214,11 +205,11 @@ export default function Connectors() {
               {SOURCE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
             <div className="mt-auto pt-3 border-t border-border">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-2">Pipeline Phases</p>
+              <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-semibold mb-2">Pipeline Phases</p>
               {['P2 Raw Storage', 'P3 Validation', 'P4 Schema Profiling', 'P5 Column Mapping', 'P6 Row Extraction'].map(p => (
                 <div key={p} className="flex items-center gap-1.5 mb-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
-                  <span className="text-[10px] text-muted-foreground">{p}</span>
+                  <span className="text-[11px] text-muted-foreground">{p}</span>
                 </div>
               ))}
             </div>
@@ -229,28 +220,52 @@ export default function Connectors() {
       {/* Jobs list */}
       {jobs.length > 0 && (
         <div className="space-y-2">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Ingestion Jobs</p>
-          {jobs.map((job, i) => (
-            <div key={i} className="rounded-xl border border-border bg-card p-4">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Ingestion Jobs</p>
+          {jobs.map(job => (
+            <div key={job.job_id} className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-center gap-3 mb-2">
                 <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm font-medium text-card-foreground flex-1 truncate">{job.filename}</span>
-                <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase',
+                <span className={cn('text-[11px] font-bold px-1.5 py-0.5 rounded border uppercase',
                   job.status === 'COMPLETE' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400' :
                   job.status === 'AWAITING_REVIEW' ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' :
                   'border-red-500/20 bg-red-500/10 text-red-400')}>
                   {job.status}
                 </span>
+                {(job.status === 'FAILED' || job.status === 'QUARANTINED') && (
+                  <button
+                    type="button"
+                    onClick={() => retryJob(job.job_id)}
+                    disabled={retryingId === job.job_id}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold border border-border bg-muted/50 hover:bg-muted text-card-foreground disabled:opacity-50"
+                    title="Re-run pipeline from stored file"
+                  >
+                    {retryingId === job.job_id
+                      ? <RefreshCw className="w-3 h-3 animate-spin" />
+                      : <RotateCcw className="w-3 h-3" />}
+                    Retry
+                  </button>
+                )}
+                <button
+                  onClick={() => deleteJob(job.job_id)}
+                  className="p-1 rounded text-muted-foreground/40 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                  title="Delete job"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
               <div className="flex items-center gap-5 text-[11px] text-muted-foreground flex-wrap">
                 <span>{job.row_count ?? '—'} rows</span>
                 <span>{job.mapped_count ?? '—'} columns mapped</span>
                 {job.error_count > 0 && <span className="text-amber-400">{job.error_count} parse errors</span>}
-                <span className="font-mono text-[10px] opacity-60">{job.ingestion_id}</span>
+                <span className="font-mono text-[11px] opacity-60">{job.ingestion_id}</span>
               </div>
               <p className="text-[11px] text-primary mt-1">{phaseLabel(job.phase, job.status)}</p>
               {job.status === 'AWAITING_REVIEW' && (
-                <Link to={fieldMappingPath} className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary font-medium">
+                <Link
+                  to={`${fieldMappingBase}?jobId=${job.job_id}`}
+                  className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary font-medium"
+                >
                   Review column mappings <ChevronRight className="w-3 h-3" />
                 </Link>
               )}
@@ -259,7 +274,7 @@ export default function Connectors() {
         </div>
       )}
 
-      {jobs.length === 0 && !uploading && (
+      {jobs.length === 0 && !uploading && !jobsLoading && (
         <div className="rounded-xl border border-border bg-card p-8 text-center space-y-3">
           <p className="text-muted-foreground text-sm">No ingestion jobs yet.</p>
           <p className="text-xs text-muted-foreground">Upload a QuickBooks P&amp;L export or other CSV above to start the pipeline.</p>
