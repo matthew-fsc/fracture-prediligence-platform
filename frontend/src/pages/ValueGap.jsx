@@ -271,6 +271,7 @@ export default function ValueGap() {
             onClick={() => {
               liveQuery.refetch()
               gapQuery.refetch()
+              triggeredQuery.refetch()
             }}
             className="text-xs font-semibold px-3 py-2 rounded-lg border border-border bg-card hover:bg-muted/50"
           >
@@ -293,6 +294,13 @@ export default function ValueGap() {
   const rawUpliftSum = gapData?.gaps?.reduce((s, g) => s + g.ev_uplift, 0) ?? 0
   const gapTotal     = gapData?.total_value_gap ?? rawUpliftSum
   const upliftScale  = rawUpliftSum > 0 ? gapTotal / rawUpliftSum : 1
+
+  const vgCtx = gapData?.value_gap_context
+  const companyProfile = vgCtx?.company
+  const headcount =
+    companyProfile?.total_headcount != null ? companyProfile.total_headcount : vgCtx?.effective_headcount
+  const ttmRevenue = vgCtx?.ttm_revenue
+  const revPerEmployee = vgCtx?.revenue_per_employee
 
   const drivers = (gapData?.gaps?.length
     ? gapData.gaps.map(g => ({
@@ -325,6 +333,38 @@ export default function ValueGap() {
         }
       />
 
+      {/* Client profile + operating context (aligned with value-gap API) */}
+      {companyProfile && (
+        <div className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3 space-y-1.5">
+          <p className="text-sm font-semibold text-foreground">{companyProfile.name || 'Client'}</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+            {companyProfile.industry ? <span>{companyProfile.industry}</span> : null}
+            {companyProfile.founded != null ? <span>Founded {companyProfile.founded}</span> : null}
+            {companyProfile.entity_type ? <span>{companyProfile.entity_type.replace(/_/g, ' ')}</span> : null}
+            {companyProfile.state ? <span>{companyProfile.state}</span> : null}
+            {headcount != null ? <span className="text-foreground/90 font-medium">{headcount} employees</span> : null}
+            {ttmRevenue != null && Number(ttmRevenue) > 0 ? (
+              <span>TTM revenue {fmtM(ttmRevenue)}</span>
+            ) : null}
+            {revPerEmployee != null && Number(revPerEmployee) > 0 ? (
+              <span>Rev / employee {fmtM(revPerEmployee)}</span>
+            ) : null}
+          </div>
+          {(companyProfile.market_rate_replacement_annual != null
+            || companyProfile.depreciation_amortization_ttm != null) && (
+            <p className="text-[10px] text-muted-foreground/70 pt-1 border-t border-border/40">
+              EBITDA profile:{' '}
+              {companyProfile.market_rate_replacement_annual != null && (
+                <span className="mr-3">Market-rate replacement {fmtM(companyProfile.market_rate_replacement_annual)}</span>
+              )}
+              {companyProfile.depreciation_amortization_ttm != null && (
+                <span>D&amp;A {fmtM(companyProfile.depreciation_amortization_ttm)}</span>
+              )}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* ── Top 3 EV cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-5 space-y-3">
@@ -332,6 +372,9 @@ export default function ValueGap() {
           <p className="text-3xl font-bold text-blue-400">{fmtM(currentEV)}</p>
           <div className="space-y-1.5 text-xs border-t border-border pt-3">
             <div className="flex justify-between"><span className="text-muted-foreground">EBITDA (TTM)</span><span className="font-bold text-card-foreground">{fmtM(ebitda)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Employees</span><span className="font-bold text-card-foreground">{headcount != null ? `${headcount}` : '—'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">TTM revenue</span><span className="font-bold text-card-foreground">{ttmRevenue != null && Number(ttmRevenue) > 0 ? fmtM(ttmRevenue) : '—'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Rev / employee</span><span className="font-bold text-card-foreground">{revPerEmployee != null && Number(revPerEmployee) > 0 ? fmtM(revPerEmployee) : '—'}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Implied Multiple</span><span className="font-bold text-blue-400">{ev?.multiple_used ?? '—'}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">DRS Tier</span><span className="text-muted-foreground text-[11px]">{(liveData?.drs?.tier ?? '').replace(/_/g, ' ')}</span></div>
           </div>
@@ -356,6 +399,7 @@ export default function ValueGap() {
           <p className="text-3xl font-bold text-emerald-400">{fmtM(ceilingEV)}</p>
           <div className="space-y-1.5 text-xs border-t border-border pt-3">
             <div className="flex justify-between"><span className="text-muted-foreground">EBITDA (base)</span><span className="font-bold text-card-foreground">{fmtM(ebitda)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">TTM revenue</span><span className="font-bold text-card-foreground">{ttmRevenue != null && Number(ttmRevenue) > 0 ? fmtM(ttmRevenue) : '—'}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Ceiling Multiple</span><span className="font-bold text-emerald-400">{ceilingMultiple}×</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">All initiatives complete</span><span className="text-muted-foreground text-[11px]">18–24 months</span></div>
           </div>

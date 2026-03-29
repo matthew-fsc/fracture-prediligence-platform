@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   NotebookPen, Save, CheckCircle, AlertCircle, Clock, Circle,
   DollarSign, Target, Users, ArrowRight, Briefcase, TrendingUp,
@@ -189,6 +190,7 @@ const numInputCls = 'text-sm bg-muted/60 border border-border rounded-lg px-3 py
 export default function EngagementIntake() {
   usePageTitle('Client Profile')
   const companyId = useCompanyId()
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { pathname } = useLocation()
 
@@ -346,7 +348,20 @@ export default function EngagementIntake() {
             : Promise.resolve()
         })(),
       ])
-      toast.success('Client profile saved — DRS will recompute on next page load')
+      queryClient.invalidateQueries({ queryKey: ['analytics-value-gap', companyId] })
+      queryClient.invalidateQueries({ queryKey: ['analytics-scores', companyId] })
+      queryClient.invalidateQueries({ queryKey: ['analytics-metrics', companyId] })
+      queryClient.invalidateQueries({ queryKey: ['company', companyId] })
+      apiClient.get(`/api/companies/${companyId}`)
+        .then((c) => {
+          if (c) {
+            setEmployeeCount(c.total_headcount != null ? String(c.total_headcount) : '')
+            setFoundedYear(c.founded != null ? String(c.founded) : '')
+            setIndustry(c.industry ?? '')
+          }
+        })
+        .catch(() => {})
+      toast.success('Client profile saved')
       setSaved(true)
       setLastSavedAt(new Date())
     } catch (e) {

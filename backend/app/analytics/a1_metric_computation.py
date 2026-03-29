@@ -19,6 +19,18 @@ from sqlalchemy import func
 from app.ontology.models import Company, RevenueStream, Customer, Employee, Expense, Contract, RevenueType, ExpenseCategory, EmployeeStatus
 
 
+def effective_total_headcount(company_row: Optional[Company], ingested_count: int) -> int:
+    """
+    Advisor-entered companies.total_headcount (client profile / intake) overrides
+    payroll-ingested rows when set to a positive integer.
+    """
+    if company_row is not None:
+        th = company_row.total_headcount
+        if th is not None and th > 0:
+            return int(th)
+    return ingested_count
+
+
 def _add_months(d: date, months: int) -> date:
     """Calendar month arithmetic; clamps day to last day of target month."""
     m_idx = d.year * 12 + d.month - 1 + months
@@ -225,9 +237,7 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
     active_emps = db.query(Employee).filter(Employee.company_id == company_id, Employee.status == EmployeeStatus.ACTIVE).all()
     ingested_headcount = len(active_emps)
     company_row = db.query(Company).filter(Company.id == company_id).first()
-    manual_headcount = company_row.total_headcount if company_row and company_row.total_headcount else 0
-    # Advisor-entered headcount is the authoritative override; fall back to ingested records
-    m.total_headcount = manual_headcount if manual_headcount > 0 else ingested_headcount
+    m.total_headcount = effective_total_headcount(company_row, ingested_headcount)
     if m.total_headcount and m.total_revenue_ttm:
         m.revenue_per_employee = m.total_revenue_ttm / m.total_headcount
     emp_tenures = [(today - e.hire_date).days / 365 for e in active_emps if e.hire_date]

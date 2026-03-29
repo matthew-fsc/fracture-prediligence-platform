@@ -11,6 +11,7 @@ from typing import Annotated, Optional
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_company_scope
+from app.api.routes.companies import company_to_dict
 from app.core.database import get_db
 from app.analytics.a1_metric_computation import compute_metrics
 from app.analytics.a2_ebitda_recast import compute_ebitda_recast, ChallengeLikelihood
@@ -779,6 +780,14 @@ def get_value_gap(company: CompanyScoped, db: Session = Depends(get_db)):
                 ]
             else:
                 gap["weak_sub_scores"] = []
+
+        m = compute_metrics(company.id, db)
+        result_dict["value_gap_context"] = {
+            "company": company_to_dict(company),
+            "ttm_revenue": float(m.total_revenue_ttm or 0),
+            "revenue_per_employee": float(m.revenue_per_employee) if m.revenue_per_employee else None,
+            "effective_headcount": m.total_headcount,
+        }
 
         return result_dict
     except Exception as e:

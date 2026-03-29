@@ -1,18 +1,46 @@
 """Company CRUD routes — scoped by Clerk user (owner_user_id)."""
 
-from typing import Optional
+from decimal import Decimal
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import ensure_company_access
-from app.core.config import settings
 from app.core.database import get_db
 from app.middleware.auth import CurrentUser, get_current_user, get_current_user_optional  # get_current_user used by create_company
 from app.ontology.models import Company
 
 router = APIRouter()
+
+
+def _json_num(v: Optional[Decimal]) -> Optional[float]:
+    if v is None:
+        return None
+    return float(v)
+
+
+def company_to_dict(row: Company) -> dict[str, Any]:
+    """Stable JSON for SPA: every advisor-editable company profile field."""
+    return {
+        "id": row.id,
+        "name": row.name,
+        "owner_user_id": row.owner_user_id,
+        "industry": row.industry,
+        "founded": row.founded,
+        "ein": row.ein,
+        "state": row.state,
+        "entity_type": row.entity_type,
+        "total_headcount": row.total_headcount,
+        "market_rate_replacement_annual": _json_num(row.market_rate_replacement_annual),
+        "depreciation_amortization_ttm": _json_num(row.depreciation_amortization_ttm),
+        "interest_expense_ttm": _json_num(row.interest_expense_ttm),
+        "income_tax_expense_ttm": _json_num(row.income_tax_expense_ttm),
+        "report_firm_name": row.report_firm_name,
+        "report_cover_blurb": row.report_cover_blurb,
+        "report_logo_url": row.report_logo_url,
+    }
 
 
 class CompanyCreate(BaseModel):
@@ -52,7 +80,8 @@ def list_companies(
     else:
         # No token: return only unowned (demo/shared) companies
         q = q.filter(Company.owner_user_id.is_(None))
-    return q.order_by(Company.id).all()
+    rows = q.order_by(Company.id).all()
+    return [company_to_dict(r) for r in rows]
 
 
 @router.post("/")
@@ -73,7 +102,7 @@ def create_company(
     db.add(company)
     db.commit()
     db.refresh(company)
-    return company
+    return company_to_dict(company)
 
 
 @router.get("/{company_id}")
@@ -82,7 +111,8 @@ def get_company(
     user: Optional[CurrentUser] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
-    return ensure_company_access(company_id, user, db)
+    row = ensure_company_access(company_id, user, db)
+    return company_to_dict(row)
 
 
 @router.patch("/{company_id}")
@@ -98,14 +128,4 @@ def patch_company(
         setattr(row, k, v)
     db.commit()
     db.refresh(row)
-    return {
-        "id": row.id,
-        "name": row.name,
-        "industry": row.industry,
-        "founded": row.founded,
-        "ein": row.ein,
-        "state": row.state,
-        "entity_type": row.entity_type,
-        "total_headcount": row.total_headcount,
-        "owner_user_id": row.owner_user_id,
-    }
+    return company_to_dict(row)
