@@ -231,7 +231,7 @@ def build_benchmarks_payload(
             .filter(Employee.company_id == company_id, Employee.status == EmployeeStatus.ACTIVE)
             .all()
         )
-        total_payroll = sum(float(e.comp_annual or 0) * 12 for e in emps)
+        total_payroll = sum(float(e.comp_annual or 0) for e in emps)  # comp_annual is already annual
         payroll_ratio = (
             (total_payroll / float(metrics.total_revenue_ttm) * 100) if metrics.total_revenue_ttm and float(metrics.total_revenue_ttm) > 0 else None
         )

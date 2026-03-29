@@ -110,7 +110,8 @@ def compute_customer_risk(company_id: int, db: Session) -> CustomerRiskScore:
             top_cust_name = cust_obj.name
 
     if top_pct >= 50:
-        s_conc = 10 + max(0, (50 - top_pct))
+        # Gradient from 10 (at 50%) down to 0 (at 100%) — no flat floor above 50%
+        s_conc = max(0, 10 - (top_pct - 50) / 50 * 10)
     elif top_pct >= 30:
         s_conc = 40 + (50 - top_pct) / 20 * 30
     elif top_pct >= 20:
