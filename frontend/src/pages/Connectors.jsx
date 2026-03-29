@@ -66,8 +66,8 @@ export default function Connectors() {
     refetchInterval: (query) => (jobNeedsPolling(query.state.data) ? 2500 : 8000),
   })
 
-  /** Demo: one upload for ABC Company Inc.; no extra uploads; no deleting the job (prevents reset). */
-  const demoUploadLocked = isDemo && jobs.length >= 1
+  /** Demo tour: ABC file is pre-seeded server-side; no uploads; no delete. */
+  const demoReadOnly = isDemo
   const demoDeleteDisabled = isDemo
 
   async function uploadFile(file) {
@@ -75,8 +75,8 @@ export default function Connectors() {
       toast.error('Select or create a client in the header before uploading.')
       return
     }
-    if (demoUploadLocked) {
-      toast.error('Demo mode allows one sample upload for ABC Company Inc.')
+    if (demoReadOnly) {
+      toast.error('Uploads are disabled in the demo — data is pre-loaded for ABC Company Inc.')
       return
     }
     setUploading(true)
@@ -139,9 +139,7 @@ export default function Connectors() {
           <div className="text-sm text-card-foreground space-y-1">
             <p className="font-medium">Demo mode — ABC Company Inc.</p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              {demoUploadLocked
-                ? 'This demo uses a single ingestion job for ABC Company Inc. Additional uploads are disabled.'
-                : 'You may upload one sample file for ABC Company Inc. After that, uploads are disabled for the tour.'}
+              QuickBooks P&amp;L sample is pre-loaded for this client. Uploads are turned off so the tour stays read-only.
             </p>
           </div>
         </div>
@@ -151,18 +149,20 @@ export default function Connectors() {
         title="Data Sources"
         subtitle={
           isDemo
-            ? 'Demo: one optional CSV for ABC Company Inc. (full product supports unlimited sources)'
+            ? 'Demo: pre-loaded QuickBooks-style P&L for ABC Company Inc. (full product supports uploads)'
             : 'Upload raw files — QuickBooks exports, CRM exports, payroll registers, contracts'
         }
         action={
-          <button
-            type="button"
-            disabled={demoUploadLocked || uploading}
-            onClick={() => fileRef.current?.click()}
-            className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:pointer-events-none"
-          >
-            <Upload className="w-3.5 h-3.5" /> Upload CSV
-          </button>
+          demoReadOnly ? null : (
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => fileRef.current?.click()}
+              className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            >
+              <Upload className="w-3.5 h-3.5" /> Upload CSV
+            </button>
+          )
         }
       />
 
@@ -192,69 +192,81 @@ export default function Connectors() {
       </div>
 
 
-      {/* Upload area */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <p className="text-sm font-semibold text-card-foreground mb-4">Manual CSV Upload</p>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="col-span-2">
-            <div
-              onDragOver={e => { if (!demoUploadLocked) { e.preventDefault(); setDragOver(true) } }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={e => {
-                e.preventDefault()
-                setDragOver(false)
-                if (demoUploadLocked) return
-                const f = e.dataTransfer.files[0]
-                if (f) uploadFile(f)
-              }}
-              onClick={() => { if (!demoUploadLocked) fileRef.current?.click() }}
-              className={cn('border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center transition-colors',
-                demoUploadLocked ? 'border-border/60 bg-muted/10 cursor-not-allowed opacity-70' : 'cursor-pointer',
-                !demoUploadLocked && dragOver ? 'border-primary bg-primary/5' : !demoUploadLocked && 'border-border hover:border-primary/50 hover:bg-muted/20')}
-            >
-              <input ref={fileRef} type="file" className="hidden" accept=".csv,.xlsx,.xls,.tsv" disabled={demoUploadLocked}
-                onChange={e => { const f = e.target.files[0]; if (f) uploadFile(f) }} />
-              {uploading
-                ? <RefreshCw className="w-8 h-8 text-primary animate-spin mb-3" />
-                : <Upload className="w-8 h-8 text-muted-foreground mb-3" />}
-              <p className="text-sm font-medium text-card-foreground">
-                {demoUploadLocked
-                  ? 'Additional uploads disabled in demo mode'
-                  : uploading
-                    ? 'Running pipeline P2–P11...'
-                    : 'Drop file here or click to upload'}
-              </p>
-              <p className="text-[11px] text-muted-foreground mt-1">CSV · Excel (.xlsx / .xls) · TSV</p>
-            </div>
-            {error && (
-              <div className="mt-2 flex items-center gap-2 text-xs text-red-400">
-                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
+      {/* Upload area — full uploader only outside demo */}
+      {demoReadOnly ? (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-sm font-semibold text-card-foreground mb-2">Pre-loaded source file</p>
+          <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+            The demo includes a completed QuickBooks P&amp;L export for <span className="text-card-foreground font-medium">ABC Company Inc.</span> No
+            manual upload is required.
+          </p>
+          <div className="rounded-lg border border-border bg-muted/20 p-4">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-semibold mb-2">Pipeline Phases</p>
+            {['P2 Raw Storage', 'P3 Validation', 'P4 Schema Profiling', 'P5 Column Mapping', 'P6 Row Extraction'].map(p => (
+              <div key={p} className="flex items-center gap-1.5 mb-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                <span className="text-[11px] text-muted-foreground">{p}</span>
               </div>
-            )}
+            ))}
           </div>
-
-          <div className="rounded-lg border border-border bg-muted/20 p-4 flex flex-col gap-3">
-            <p className="text-xs font-semibold text-card-foreground">Source Type</p>
-            <select
-              value={sourceType}
-              onChange={e => setSourceType(e.target.value)}
-              disabled={demoUploadLocked}
-              className="bg-muted border border-border rounded-md px-3 py-2 text-xs text-card-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {SOURCE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-            <div className="mt-auto pt-3 border-t border-border">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-semibold mb-2">Pipeline Phases</p>
-              {['P2 Raw Storage', 'P3 Validation', 'P4 Schema Profiling', 'P5 Column Mapping', 'P6 Row Extraction'].map(p => (
-                <div key={p} className="flex items-center gap-1.5 mb-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
-                  <span className="text-[11px] text-muted-foreground">{p}</span>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-sm font-semibold text-card-foreground mb-4">Manual CSV Upload</p>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-2">
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={e => {
+                  e.preventDefault()
+                  setDragOver(false)
+                  const f = e.dataTransfer.files[0]
+                  if (f) uploadFile(f)
+                }}
+                onClick={() => fileRef.current?.click()}
+                className={cn('border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer transition-colors',
+                  dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/20')}
+              >
+                <input ref={fileRef} type="file" className="hidden" accept=".csv,.xlsx,.xls,.tsv"
+                  onChange={e => { const f = e.target.files[0]; if (f) uploadFile(f) }} />
+                {uploading
+                  ? <RefreshCw className="w-8 h-8 text-primary animate-spin mb-3" />
+                  : <Upload className="w-8 h-8 text-muted-foreground mb-3" />}
+                <p className="text-sm font-medium text-card-foreground">
+                  {uploading ? 'Running pipeline P2–P11...' : 'Drop file here or click to upload'}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1">CSV · Excel (.xlsx / .xls) · TSV</p>
+              </div>
+              {error && (
+                <div className="mt-2 flex items-center gap-2 text-xs text-red-400">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
                 </div>
-              ))}
+              )}
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/20 p-4 flex flex-col gap-3">
+              <p className="text-xs font-semibold text-card-foreground">Source Type</p>
+              <select
+                value={sourceType}
+                onChange={e => setSourceType(e.target.value)}
+                className="bg-muted border border-border rounded-md px-3 py-2 text-xs text-card-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                {SOURCE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+              <div className="mt-auto pt-3 border-t border-border">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-semibold mb-2">Pipeline Phases</p>
+                {['P2 Raw Storage', 'P3 Validation', 'P4 Schema Profiling', 'P5 Column Mapping', 'P6 Row Extraction'].map(p => (
+                  <div key={p} className="flex items-center gap-1.5 mb-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                    <span className="text-[11px] text-muted-foreground">{p}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Jobs list */}
       {jobs.length > 0 && (
@@ -271,7 +283,7 @@ export default function Connectors() {
                   'border-red-500/20 bg-red-500/10 text-red-400')}>
                   {job.status}
                 </span>
-                {(job.status === 'FAILED' || job.status === 'QUARANTINED') && (
+                {(job.status === 'FAILED' || job.status === 'QUARANTINED') && !demoReadOnly && (
                   <button
                     type="button"
                     onClick={() => retryJob(job.job_id)}
@@ -320,17 +332,18 @@ export default function Connectors() {
           <p className="text-muted-foreground text-sm">No ingestion jobs yet.</p>
           <p className="text-xs text-muted-foreground">
             {isDemo
-              ? 'Upload one sample CSV for ABC Company Inc. to run the pipeline (demo allows a single upload).'
+              ? 'The demo API should pre-load a QuickBooks P&L job for ABC Company Inc. Restart the backend or run the seed script if this stays empty.'
               : 'Upload a QuickBooks P&L export or other CSV above to start the pipeline.'}
           </p>
-          <button
-            type="button"
-            disabled={demoUploadLocked}
-            onClick={() => fileRef.current?.click()}
-            className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:pointer-events-none"
-          >
-            Upload a file
-          </button>
+          {!demoReadOnly && (
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              Upload a file
+            </button>
+          )}
         </div>
       )}
     </div>

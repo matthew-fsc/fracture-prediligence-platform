@@ -30,6 +30,12 @@ async def upload_file(
     Returns the IngestionJob with validation report, schema profile, column mappings,
     and extraction error summary.
     """
+    if settings.DEMO_BLOCK_INGESTION_UPLOAD_FOR_COMPANY_1 and company.id == 1:
+        raise HTTPException(
+            status_code=403,
+            detail="Ingestion uploads are disabled for the ABC demo company (pre-seeded file).",
+        )
+
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")

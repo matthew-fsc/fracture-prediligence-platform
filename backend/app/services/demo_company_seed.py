@@ -44,8 +44,12 @@ from app.ontology.models import (
     EmployeeStatus,
     ConfidenceLevel,
 )
+from app.ontology.ingestion_models import IngestionJob, PipelinePhase, PhaseStatus
 
 COMPANY_ID = 1
+
+# Pre-loaded demo ingestion (Data Sources UI) — QuickBooks-style P&L for ABC Company Inc.
+DEMO_INGESTION_ID = "seed-demo-abc-qb-pl-v1"
 
 # ── Annual revenue totals ─────────────────────────────────────────────────────
 ANNUAL_REVENUE = {2023: Decimal("2793233"), 2024: Decimal("2746003"), 2025: Decimal("3259172")}
@@ -418,6 +422,39 @@ def verify(db):
     print(f"  EBITDA       : ${ebitda:>12,.0f}  (target:   $806,357)")
 
 
+def ensure_demo_ingestion_job_if_missing(db: Session) -> bool:
+    """
+    Insert one completed ingestion job for company_id=1 if none exist.
+    Demo Data Sources expects this row so the tour shows ABC Company Inc. file without uploads.
+    Idempotent.
+    """
+    n = (
+        db.query(func.count(IngestionJob.id))
+        .filter(IngestionJob.company_id == COMPANY_ID)
+        .scalar()
+        or 0
+    )
+    if n > 0:
+        return False
+    db.add(
+        IngestionJob(
+            company_id=COMPANY_ID,
+            ingestion_id=DEMO_INGESTION_ID,
+            filename="ABC_Company_Inc_QuickBooks_PnL_TTM.csv",
+            source_type="quickbooks_pl",
+            file_path=None,
+            current_phase=PipelinePhase.P6_EXTRACTION,
+            current_status=PhaseStatus.COMPLETE,
+            row_count=1247,
+            mapped_count=18,
+            error_count=0,
+        )
+    )
+    db.commit()
+    logger.info("Seeded demo ingestion job for company_id=1 (ABC Company Inc. P&L).")
+    return True
+
+
 def ensure_demo_company_seeded(db: Session) -> bool:
     """
     Seed ABC Company data when company_id=1 has no revenue streams (idempotent).
@@ -437,6 +474,7 @@ def ensure_demo_company_seeded(db: Session) -> bool:
     seed_employee(db)
     db.commit()
     verify(db)
+    ensure_demo_ingestion_job_if_missing(db)
     return True
 
 
@@ -452,6 +490,7 @@ def run_seed_abc_company():
         seed_employee(db)
         db.commit()
         verify(db)
+        ensure_demo_ingestion_job_if_missing(db)
         print("\n  Seeding complete.")
     except Exception as e:
         db.rollback()
