@@ -3,7 +3,8 @@ import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { CheckCircle, Circle, Save, ClipboardList, ChevronDown, ChevronRight, History } from 'lucide-react'
 import { useCompanyId } from '../context/CompanyContext'
-import { apiUrl, apiClient } from '../lib/apiClient'
+import { apiClient } from '../lib/apiClient'
+import { toast } from '../lib/notify'
 
 const MARKET_OPTIONS = [
   { value: 'defined',          label: 'Defined ICP + clear differentiation + repeatable sales motion', score: 80 },
@@ -33,8 +34,7 @@ export default function QualitativeInputs() {
   const [auditEntries, setAuditEntries] = useState([])
 
   useEffect(() => {
-    fetch(apiUrl(`/api/analytics/qualitative/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get(`/api/analytics/qualitative/${companyId}`)
       .then(d => {
         if (d?.inputs) {
           setForm({
@@ -87,12 +87,10 @@ export default function QualitativeInputs() {
         customer_contract_type: form.customer_contract_type || null,
         key_person_revenue_pct: Number(form.key_person_revenue_pct),
       }
-      await fetch(apiUrl(`/api/analytics/qualitative/${companyId}`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
+      await apiClient.post(`/api/analytics/qualitative/${companyId}`, payload)
       setSaved(true)
+    } catch (e) {
+      toast.error(e?.message || 'Save failed')
     } finally { setSaving(false) }
   }
 

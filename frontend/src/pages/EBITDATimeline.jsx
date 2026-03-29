@@ -487,8 +487,10 @@ function extractLiveState(scores) {
     ev_floor: ev.floor,
     ev_midpoint: ev.midpoint,
     ev_ceiling: ev.ceiling,
-    multiple_floor: ev.drs_multiple_floor,
-    multiple_ceiling: ev.drs_multiple_ceiling,
+    // Use actual applied multiples (blended when market context is available)
+    // falling back to DRS-tier multiples if the blended fields aren't present
+    multiple_floor: ev.multiple_floor ?? ev.drs_multiple_floor,
+    multiple_ceiling: ev.multiple_ceiling ?? ev.drs_multiple_ceiling,
   }
 }
 

@@ -186,7 +186,7 @@ const numInputCls = 'text-sm bg-muted/60 border border-border rounded-lg px-3 py
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function EngagementIntake() {
-  usePageTitle('Engagement Intake')
+  usePageTitle('Client Profile')
   const companyId = useCompanyId()
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -345,7 +345,7 @@ export default function EngagementIntake() {
             : Promise.resolve()
         })(),
       ])
-      toast.success('Engagement intake saved — DRS will recompute on next page load')
+      toast.success('Client profile saved — DRS will recompute on next page load')
       setSaved(true)
       setLastSavedAt(new Date())
     } catch (e) {
@@ -357,7 +357,7 @@ export default function EngagementIntake() {
   if (!ready) {
     return (
       <div className="space-y-5 max-w-[960px]">
-        <SectionHeader title="Engagement Intake" subtitle="All advisor-sourced context that financial data cannot capture." />
+        <SectionHeader title="Client Profile" subtitle="All advisor-sourced context that financial data cannot capture." />
         <div className="rounded-xl border border-border bg-card p-8 text-center">
           <NotebookPen className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-sm font-medium text-foreground">No client selected</p>
@@ -380,7 +380,7 @@ export default function EngagementIntake() {
   return (
     <div className="space-y-5 max-w-[960px]">
       <SectionHeader
-        title="Engagement Intake"
+        title="Client Profile"
         subtitle="Owner objectives, qualitative business context, and operational detail that financial data cannot capture. These inputs directly drive DRS scoring, valuation, and buyer targeting."
         action={
           <div className="flex items-center gap-3">

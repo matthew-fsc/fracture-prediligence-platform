@@ -15,7 +15,7 @@ import { cn } from '../lib/utils'
 import { AlertCircle, AlertTriangle, Info, ShieldAlert } from 'lucide-react'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useCompanyId } from '../context/CompanyContext'
-import { apiUrl } from '../lib/apiClient'
+import { apiClient } from '../lib/apiClient'
 
 const CATEGORY_LABELS = {
   revenue_quality:          'Revenue Quality',
@@ -96,8 +96,7 @@ export default function RiskHeatmap() {
   useEffect(() => {
     if (!companyReady) { setLoading(false); return }
     setLoading(true)
-    fetch(apiUrl(`/api/analytics/buyer-questions/${companyId}`))
-      .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json() })
+    apiClient.get(`/api/analytics/buyer-questions/${companyId}`)
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
   }, [companyId, companyReady])

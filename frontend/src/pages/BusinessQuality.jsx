@@ -8,7 +8,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell
 } from 'recharts'
-import { apiUrl } from '../lib/apiClient'
+import { apiClient } from '../lib/apiClient'
 import { useCompanyId } from '../context/CompanyContext'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -16,6 +16,7 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 function buildChartData(monthly24m) {
   if (!monthly24m) return []
   return Object.entries(monthly24m)
+    .sort(([a], [b]) => a.localeCompare(b))
     .filter(([, v]) => v > 100)
     .map(([k, v]) => {
       const [yr, mo] = k.split('-')
@@ -62,12 +63,10 @@ export default function BusinessQuality() {
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   useEffect(() => {
-    fetch(apiUrl(`/api/analytics/scores/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get(`/api/analytics/scores/${companyId}`)
       .then(setScores)
       .catch(() => {})
-    fetch(apiUrl(`/api/analytics/metrics/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get(`/api/analytics/metrics/${companyId}`)
       .then(setMetrics)
       .catch(() => {})
   }, [companyId])
@@ -100,8 +99,12 @@ export default function BusinessQuality() {
 
   const totalRevenue   = metrics?.total_revenue_ttm ?? 0
   const ebitda         = metrics?.ebitda_ttm ?? 0
-  // Prefer the DRS sub-score value (uses behavioral detection); metrics API only counts explicit tags
-  const recurringRate  = cats.revenue_quality?.sub_scores?.recurring_rate?.value ?? metrics?.recurring_revenue_pct ?? 0
+  // Use explicit contract tagging from metrics as primary; DRS sub-score (behavioral detection) as fallback
+  const recurringRateExplicit = metrics?.recurring_revenue_pct ?? 0
+  const recurringRateBehavioral = cats.revenue_quality?.sub_scores?.recurring_rate?.value ?? 0
+  // Show explicit if meaningful (>0), otherwise show behavioral with a note
+  const recurringRate = recurringRateExplicit > 0 ? recurringRateExplicit : recurringRateBehavioral
+  const recurringIsBehavioral = recurringRateExplicit === 0 && recurringRateBehavioral > 0
 
   // Use API headcount when > 1; fall back to known company headcount from mockData
   const headcount      = (metrics?.total_headcount ?? 0) > 1 ? metrics.total_headcount : mockCompany.employees
@@ -201,7 +204,12 @@ export default function BusinessQuality() {
           percentile={recurringRate >= 40 ? 75 : recurringRate >= 20 ? 50 : 25}
           status={recurringStatus}
           trendDir={recurringRate >= 20 ? 'up' : 'flat'}
-          trendLabel={recurringRate === 0 ? 'Project-based model — no recurring contracts' : recurringRate >= 20 ? 'Above field services median' : 'Below field services median'}
+          trendLabel={
+            recurringRate === 0 ? 'No explicitly-tagged recurring revenue — project-based model'
+            : recurringIsBehavioral ? `~${recurringRate.toFixed(0)}% estimated behavioral recurring (no explicit tags)`
+            : recurringRate >= 20 ? 'Above field services median'
+            : 'Below field services median'
+          }
         >
           <div className="space-y-1.5 mt-1">
             <div className="h-2 bg-muted rounded-full">

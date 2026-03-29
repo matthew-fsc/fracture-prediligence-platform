@@ -22,7 +22,7 @@ const colorCfg = {
 }
 
 const MODULES = [
-  { label: 'Engagement Intake',   path: '/EngagementIntake',  icon: NotebookPen, color: 'primary', desc: 'Owner goals, exit timeline, buyer fit' },
+  { label: 'Client Profile',       path: '/EngagementIntake',  icon: NotebookPen, color: 'primary', desc: 'Owner goals, exit timeline, buyer fit' },
   { label: 'Company Workspace',   path: '/CompanyWorkspace',  icon: Building2,  color: 'blue',    desc: 'Entity-centric intelligence hub' },
   { label: 'Buyer Risk Profile',  path: '/BuyerLens',         icon: Shield,     color: 'red',     desc: null },
   { label: 'Value Gap Analysis',  path: '/ValueGap',          icon: Target,     color: 'emerald', desc: 'Addressable value creation opportunity' },
@@ -33,7 +33,7 @@ const MODULES = [
 ]
 
 const quickActions = [
-  { label: 'Capture engagement intake', path: '/EngagementIntake', color: 'text-primary' },
+  { label: 'Capture client profile', path: '/EngagementIntake', color: 'text-primary' },
   { label: 'Generate Readiness Report', path: '/Reports',          color: 'text-primary' },
   { label: 'Review Buyer Risk Flags',   path: '/BuyerLens',        color: 'text-red-400' },
   { label: 'Run Scenario Simulation',   path: '/ScenarioSimulator', color: 'text-amber-400' },
@@ -254,6 +254,48 @@ export default function Home() {
                   <p className="text-lg font-bold text-red-400">{fmtM(financialGap)}</p>
                 </div>
               )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Owner Personal Readiness (PRE) Score */}
+      {liveData?.owner_readiness && (() => {
+        const pre = liveData.owner_readiness
+        const tierColor =
+          pre.tier === 'Aligned'       ? 'emerald' :
+          pre.tier === 'Mostly Ready'  ? 'blue'    :
+          pre.tier === 'Moderate Gap'  ? 'amber'   : 'red'
+        const barColor =
+          pre.tier === 'Aligned'       ? 'bg-emerald-500' :
+          pre.tier === 'Mostly Ready'  ? 'bg-blue-500'    :
+          pre.tier === 'Moderate Gap'  ? 'bg-amber-500'   : 'bg-red-500'
+        return (
+          <div className={cn('rounded-xl border p-4', colorCfg[tierColor])}>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5" />
+              Owner Personal Readiness (PRE)
+            </p>
+            <div className="flex items-end gap-4 mb-3">
+              <div>
+                <p className="text-3xl font-black">{pre.pre_score.toFixed(0)}<span className="text-base font-semibold text-muted-foreground">/100</span></p>
+                <p className="text-xs font-semibold mt-0.5">{pre.tier}</p>
+              </div>
+              <div className="flex-1 pb-1">
+                <div className="h-2 rounded-full bg-muted/30 overflow-hidden">
+                  <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${pre.pre_score}%` }} />
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1.5 leading-snug">{pre.summary}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {pre.dimensions.map(d => (
+                <div key={d.name} className="rounded-lg bg-background/30 border border-border/40 px-2.5 py-2">
+                  <p className="text-[10px] font-semibold text-muted-foreground">{d.name}</p>
+                  <p className="text-sm font-bold mt-0.5">{d.score.toFixed(0)}<span className="text-[10px] text-muted-foreground">/100</span></p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{d.label}</p>
+                </div>
+              ))}
             </div>
           </div>
         )

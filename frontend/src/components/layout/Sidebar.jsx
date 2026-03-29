@@ -15,7 +15,7 @@ const groups = [
     items: [
       { label: 'Home',               href: '/Home',             icon: House },
       { label: 'Company Workspace',  href: '/CompanyWorkspace', icon: Building },
-      { label: 'Engagement Intake',  href: '/EngagementIntake', icon: NotebookPen },
+      { label: 'Client Profile',      href: '/EngagementIntake', icon: NotebookPen },
       { label: 'Advisory Workflow',  href: '/AdvisoryWorkflow', icon: Workflow },
     ],
   },

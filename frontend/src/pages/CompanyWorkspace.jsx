@@ -4,7 +4,7 @@ import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } 
 import { ArrowRight, NotebookPen, Edit2, Check, X } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
-import { apiUrl, apiClient } from '../lib/apiClient'
+import { apiClient } from '../lib/apiClient'
 
 // Map API category keys → display category for color coding
 const CAT_PRIORITY_TO_SEVERITY = (p) => p === 1 ? 'critical' : p <= 3 ? 'high' : 'medium'
@@ -73,28 +73,22 @@ export default function CompanyWorkspace() {
   const [headcountInput, setHeadcountInput] = useState('')
 
   useEffect(() => {
-    fetch(apiUrl(`/api/analytics/scores/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get(`/api/analytics/scores/${companyId}`)
       .then(setLiveScores)
       .catch(() => {})
-    fetch(apiUrl(`/api/analytics/metrics/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get(`/api/analytics/metrics/${companyId}`)
       .then(setMetrics)
       .catch(() => {})
-    fetch(apiUrl(`/api/analytics/buyer-questions/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get(`/api/analytics/buyer-questions/${companyId}`)
       .then(setBqData)
       .catch(() => {})
-    fetch(apiUrl(`/api/analytics/value-gap/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get(`/api/analytics/value-gap/${companyId}`)
       .then(setGapData)
       .catch(() => {})
-    fetch(apiUrl(`/api/analytics/market-benchmarks/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get(`/api/analytics/market-benchmarks/${companyId}`)
       .then(setMarketBench)
       .catch(() => { setMarketBench(null) })
-    fetch(apiUrl(`/api/companies/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get(`/api/companies/${companyId}`)
       .then(setCompanyData)
       .catch(() => {})
   }, [companyId])
@@ -396,7 +390,7 @@ export default function CompanyWorkspace() {
             { label: 'Customers',      value: metrics ? String(metrics.total_customer_count) : '—',  sub: 'active base' },
             { label: 'Avg Tenure',     value: metrics ? `${metrics.avg_customer_tenure_years.toFixed(1)}yr` : '—', sub: 'retention signal' },
             { label: (() => { const d = liveScores?.category_scores?.revenue_quality?.sub_scores?.durability; return d?.source === 'advisor_input' ? 'Contract Cov.' : 'Recurring Rev' })(),
-              value: (() => { const subs = liveScores?.category_scores?.revenue_quality?.sub_scores ?? {}; const d = subs.durability; if (d?.source === 'advisor_input' && d.value != null) return `${parseFloat(d.value).toFixed(0)}%`; const v = subs.recurring_rate?.value ?? metrics?.recurring_revenue_pct; return v != null ? `${parseFloat(v).toFixed(0)}%` : '—' })(),
+              value: (() => { const subs = liveScores?.category_scores?.revenue_quality?.sub_scores ?? {}; const d = subs.durability; if (d?.source === 'advisor_input' && d.value != null) return `${parseFloat(d.value).toFixed(0)}%`; const explicit = metrics?.recurring_revenue_pct; const v = (explicit != null && explicit > 0) ? explicit : (subs.recurring_rate?.value ?? explicit); return v != null ? `${parseFloat(v).toFixed(0)}%` : '—' })(),
               sub: (() => { const d = liveScores?.category_scores?.revenue_quality?.sub_scores?.durability; return d?.source === 'advisor_input' ? 'advisor input' : 'of TTM revenue' })() },
             { label: 'Concentration',  value: custScores.concentration?.score != null ? `${custScores.concentration.score.toFixed(0)}` : '—', sub: 'HHI score /100' },
           ]
@@ -495,7 +489,12 @@ export default function CompanyWorkspace() {
           const contractLabel = isAdvisorContract ? 'Contract Coverage' : 'Recurring Rev.'
           const contractValue = isAdvisorContract
             ? (durabilitySub.value != null ? Number(durabilitySub.value) : null)
-            : (revQualSubs.recurring_rate?.value ?? metrics?.recurring_revenue_pct ?? null)
+            : (() => {
+                // Prefer explicit contract tagging; fall back to behavioral detection
+                const explicit = metrics?.recurring_revenue_pct
+                if (explicit != null && explicit > 0) return explicit
+                return revQualSubs.recurring_rate?.value ?? explicit ?? null
+              })()
 
           const multipleBasis = ev.multiple_basis ?? 'drs_tier_heuristic'
           const drsMultFloor = ev.drs_multiple_floor

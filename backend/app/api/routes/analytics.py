@@ -26,6 +26,7 @@ from app.analytics.market_benchmarks import build_benchmarks_payload, get_market
 from app.analytics.a11_value_gap import compute_value_gap
 from app.analytics.ebitda_basis import ebitda_basis_for_company
 from app.analytics.a13_buyer_questions import generate_buyer_questions
+from app.analytics.owner_readiness import compute_owner_readiness
 from app.core.config import settings
 from app.core.scoring_rules import SCORING_RULES, SCORING_RULES_VERSION
 from app.ontology.models import (
@@ -473,6 +474,29 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
         qual_complete = ops_qual_complete and growth_qual_complete and rev_qual_complete
         has_overrides = bool(override_map)
 
+        # --- PRE: Owner Personal Readiness Score ---
+        pre_result = None
+        try:
+            ep = db.query(EngagementProfile).filter(
+                EngagementProfile.company_id == company.id
+            ).first()
+            import json as _json
+            pre_result = compute_owner_readiness(
+                exit_timeline=ep.exit_timeline if ep else None,
+                target_valuation=float(ep.target_valuation) if ep and ep.target_valuation else None,
+                personal_financial_gap=float(ep.personal_financial_gap) if ep and ep.personal_financial_gap else None,
+                transaction_type=ep.transaction_type if ep else None,
+                post_exit_plans=ep.post_exit_plans if ep else None,
+                owner_motivations=(_json.loads(ep.owner_motivations_json) if ep and ep.owner_motivations_json else None),
+                ev_midpoint=float(ev.ev_midpoint),
+                owner_hours_per_week=float(qual.owner_hours_per_week) if qual and qual.owner_hours_per_week is not None else None,
+                key_person_revenue_pct=float(qual.key_person_revenue_pct) if qual and qual.key_person_revenue_pct is not None else None,
+                sop_pct=float(qual.sop_pct) if qual and qual.sop_pct is not None else None,
+                automation_pct=float(qual.automation_pct) if qual and qual.automation_pct is not None else None,
+            )
+        except Exception:
+            pass
+
         return {
             "company_id": company.id,
             "drs": {
@@ -497,6 +521,8 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
                 "midpoint":      float(ev.ev_midpoint),
                 "ceiling":       float(ev.ev_ceiling),
                 "multiple_used": f"{ev.multiple_floor}–{ev.multiple_ceiling}",
+                "multiple_floor": ev.multiple_floor,
+                "multiple_ceiling": ev.multiple_ceiling,
                 "ebitda_base":   float(ebitda_dec),
                 "multiple_basis": ev.multiple_basis,
                 "drs_multiple_floor": ev.drs_multiple_floor,
@@ -505,6 +531,21 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
                 "valuation_summary": valuation_summary,
                 "source_citation": valuation_summary,
             },
+            "owner_readiness": {
+                "pre_score": pre_result.pre_score,
+                "tier": pre_result.tier,
+                "summary": pre_result.summary,
+                "dimensions": [
+                    {
+                        "name": d.name,
+                        "score": d.score,
+                        "weight": d.weight,
+                        "label": d.label,
+                        "detail": d.detail,
+                    }
+                    for d in pre_result.dimensions
+                ],
+            } if pre_result else None,
             "rules": {"version": SCORING_RULES_VERSION, "category_weights": SCORING_RULES.category_weights},
             "methodology": {
                 "version": SCORING_RULES_VERSION,
@@ -770,16 +811,20 @@ def get_library_triggered_items(company: CompanyScoped, db: Session = Depends(ge
             cat_score = cat.get(item.category)
             if cat_score is not None and item.score_trigger is not None:
                 if float(cat_score) < float(item.score_trigger):
+                    cat_score_f = round(float(cat_score), 1)
                     triggered.append({
                         "id": item.id,
                         "item_type": item.item_type,
                         "title": item.title,
+                        "content": item.description,
                         "description": item.description,
                         "category": item.category,
                         "severity": item.severity,
                         "buyer_type": item.buyer_type,
                         "score_trigger": float(item.score_trigger),
-                        "current_score": round(float(cat_score), 1),
+                        "category_score": cat_score_f,
+                        "current_score": cat_score_f,
+                        "score_gap": round(float(item.score_trigger) - cat_score_f, 1),
                         "effort": item.effort,
                         "timeline": item.timeline,
                         "ev_impact": item.ev_impact,

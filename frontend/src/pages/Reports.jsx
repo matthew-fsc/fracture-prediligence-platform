@@ -3,7 +3,7 @@ import { FileText, Download, RefreshCw, CheckCircle, Upload, Trash2 } from 'luci
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
 import { useCompanyId } from '../context/CompanyContext'
-import { apiUrl, apiClient } from '../lib/apiClient'
+import { apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
 
 const REPORT_TEMPLATES = [
@@ -101,15 +101,13 @@ export default function Reports() {
 
   const loadHistory = useCallback(() => {
     if (!companyReady) return
-    fetch(apiUrl(`/api/reports/${companyId}/history`))
-      .then(r => (r.ok ? r.json() : { reports: [] }))
+    apiClient.get(`/api/reports/${companyId}/history`)
       .then(d => setHistory(d.reports ?? []))
       .catch(() => setHistory([]))
   }, [companyId, companyReady])
 
   useEffect(() => {
-    fetch(apiUrl(`/api/analytics/scores/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get(`/api/analytics/scores/${companyId}`)
       .then(d => setScoreData(d))
       .catch(() => {})
   }, [companyId])
@@ -166,9 +164,7 @@ export default function Reports() {
   async function generateReport(templateId) {
     setGenerating(templateId)
     try {
-      const res = await fetch(apiUrl(`/api/reports/${companyId}/generate/${templateId}`))
-      if (!res.ok) throw new Error(await res.text())
-      const blob = await res.blob()
+      const blob = await apiClient.getBlob(`/api/reports/${companyId}/generate/${templateId}`)
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href     = url

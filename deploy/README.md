@@ -42,11 +42,25 @@ Health: `GET /health` (liveness), `GET /health/ready` (DB).
 
 ## Same-origin — Railway
 
-1. **New Project → Deploy from GitHub**, repo root; uses `railway.toml` + `Dockerfile`.
-2. Add **PostgreSQL** (or provision an external DB) and wire **`DATABASE_URL`** into this service (Railway: reference the plugin variable, e.g. `${{ Postgres.DATABASE_URL }}`). The default in code points at `localhost` and will not work in the container until this is set.
-3. Under **Variables**, add the same vars as in `backend/.env.example`, plus **`VITE_CLERK_PUBLISHABLE_KEY`** (and optional `VITE_API_BASE_URL`) so the Docker build receives them.
-4. Deploy; set `CORS_ORIGINS` / `FRONTEND_URL` to the generated public URL or custom domain.
-5. **Healthcheck:** Railway probes `GET /health` (liveness). `/health/ready` checks the database; if the deploy fails with “healthcheck failed” but the build succeeded, open **Deploy Logs** for DB connection errors and confirm `DATABASE_URL` and network access to Postgres.
+1. **New Project → Deploy from GitHub**; uses [`railway.toml`](../railway.toml) + root [`Dockerfile`](../Dockerfile).
+2. **Service root directory:** The build context must be the directory that **contains** `Dockerfile`, `frontend/`, and `backend/`. If your Git repo wraps this app in an extra folder (e.g. only `fracture-prediligence-platform/` holds those paths), set **Service → Settings → Root Directory** to that inner path. If Root Directory is wrong, builds fail or deploy the wrong tree.
+3. Add **PostgreSQL** (or provision an external DB) and wire **`DATABASE_URL`** into this service (Railway: reference the plugin variable, e.g. `${{ Postgres.DATABASE_URL }}`). The default in code points at `localhost` and will not work in the container until this is set. Use the URL Railway provides (often includes `sslmode=require` for managed Postgres). Set **`RUN_MIGRATIONS=true`** for the first deploy (or whenever schema must be upgraded); set **`RUN_MIGRATIONS=false`** afterward if you prefer migrations only from CI or manual jobs—when `true`, Alembic failure aborts startup (see `backend/docker-entrypoint.sh`).
+4. Under **Variables**, add the same vars as in `backend/.env.example`, plus **`VITE_CLERK_PUBLISHABLE_KEY`** (and optional `VITE_API_BASE_URL`) so the Docker build receives them.
+5. Deploy; set `CORS_ORIGINS` / `FRONTEND_URL` to the generated public URL or custom domain.
+6. **Healthcheck:** Railway probes `GET /health` (liveness). `/health/ready` checks the database; if the deploy fails with “healthcheck failed” but the build succeeded, open **Deploy Logs** for DB connection errors and confirm `DATABASE_URL` and network access to Postgres.
+
+### Port and 502 Bad Gateway
+
+The container listens on **`0.0.0.0:$PORT`** (`docker-entrypoint.sh`); Railway injects **`PORT`**. Do **not** pin a conflicting `PORT` in variables unless it matches both what uvicorn logs on startup and what **Networking → Public** targets. A **502** from the edge usually means the proxy could not reach the process (wrong public port, crash, or nothing listening)—not an HTTP error from FastAPI. Confirm deploy logs show `[entrypoint] starting uvicorn on 0.0.0.0:<port>` and that `<port>` matches public networking.
+
+### Debugging: what to look for in logs
+
+| Symptom | Where to look |
+|--------|----------------|
+| Migrations fail on boot | `[entrypoint] ERROR: alembic failed` when `RUN_MIGRATIONS=true` |
+| DB unreachable | `readiness check failed` (runtime) or connection errors near `alembic upgrade` |
+| Wrong listen port | No `starting uvicorn` line, or port mismatch vs **Networking** |
+| OOM / restarts | Exit code / restart loops in **Deployments** |
 
 ---
 
@@ -68,6 +82,21 @@ export VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 docker compose up --build
 # → http://localhost:8000
 ```
+
+### Same image as Railway (smoke test)
+
+From repo root (directory with `Dockerfile`):
+
+```bash
+docker build -t prediligence:test .
+docker run --rm -e PORT=8080 -e DATABASE_URL="sqlite:////tmp/smoke.db" -e RUN_MIGRATIONS=false -p 8080:8080 prediligence:test
+# In another shell:
+curl -s http://127.0.0.1:8080/health
+```
+
+You should see JSON with `"status":"ok"`. If `PORT` is not `8000` and `/health` still returns 200, the image matches Railway’s dynamic port behavior.
+
+Repeatable scripts (Docker on PATH): [`smoke-docker.ps1`](smoke-docker.ps1) (Windows) or [`smoke-docker.sh`](smoke-docker.sh) (Unix).
 
 ---
 

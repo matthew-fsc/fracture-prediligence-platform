@@ -1,6 +1,7 @@
-# Railway — deploy from Dockerfile at repo root.
+# Railway — deploy from Dockerfile at repo root (directory that contains Dockerfile + frontend/ + backend/).
 # Create project → connect repo → add PostgreSQL → set env vars in UI.
 # Required for a working SPA: VITE_CLERK_PUBLISHABLE_KEY (and VITE_API_BASE_URL if API is on another host).
+# Runtime: uvicorn listens on 0.0.0.0:$PORT — do not override PORT unless it matches Railway networking.
 
 [build]
 builder = "DOCKERFILE"

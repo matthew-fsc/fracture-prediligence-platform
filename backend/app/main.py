@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from app.api.routes import ingestion, analytics, companies, reports, demo, library
 from app.api.routes import payments, webhooks
+from app.api.routes import copilot
 from app.core.config import settings
 from app.core.database import engine, SessionLocal, Base
 
@@ -85,6 +86,34 @@ def _bootstrap_db():
             conn.execute(text('CREATE INDEX IF NOT EXISTS ix_score_snapshots_created_at ON score_snapshots (created_at)'))
             conn.commit()
 
+    if 'advisory_library_items' not in inspector.get_table_names():
+        with engine.connect() as conn:
+            conn.execute(text(
+                """CREATE TABLE IF NOT EXISTS advisory_library_items (
+                    id SERIAL PRIMARY KEY,
+                    item_type VARCHAR(32) NOT NULL,
+                    title VARCHAR(512) NOT NULL,
+                    description TEXT,
+                    category VARCHAR(64),
+                    severity VARCHAR(16),
+                    buyer_type VARCHAR(32),
+                    tags_json TEXT,
+                    data_needed TEXT,
+                    score_trigger NUMERIC(5,1),
+                    effort VARCHAR(32),
+                    timeline VARCHAR(128),
+                    ev_impact VARCHAR(32),
+                    source VARCHAR(32) DEFAULT 'system',
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )"""
+            ))
+            conn.execute(text('CREATE INDEX IF NOT EXISTS ix_advisory_library_items_item_type ON advisory_library_items (item_type)'))
+            conn.execute(text('CREATE INDEX IF NOT EXISTS ix_advisory_library_items_category ON advisory_library_items (category)'))
+            conn.commit()
+            logger.info('Created advisory_library_items table (additive migration).')
+
     if 'generated_reports' in inspector.get_table_names():
         gr_cols = {c['name'] for c in inspector.get_columns('generated_reports')}
         if 'ev_at_generation' not in gr_cols:
@@ -127,9 +156,14 @@ def _bootstrap_db():
 
         _ensure_spots_setting(db)
         seed_curated_benchmarks_if_empty(db)
-        from app.api.routes.library import seed_library_if_empty
-        seed_library_if_empty(db)
-        db.commit()
+        try:
+            from app.api.routes.library import seed_library_if_empty
+            seeded = seed_library_if_empty(db)
+            if seeded:
+                logger.info(f'Advisory library seeded with {seeded} items.')
+            db.commit()
+        except Exception:
+            logger.exception('Advisory library seed failed — table may not exist yet; will retry on next startup.')
     finally:
         db.close()
 
@@ -179,6 +213,7 @@ app.include_router(library.router,    prefix="/api/library",    tags=["library"]
 app.include_router(demo.router,       prefix="/api",            tags=["demo"])
 app.include_router(payments.router,   prefix="/api",            tags=["payments"])
 app.include_router(webhooks.router,   prefix="/api",            tags=["webhooks"])
+app.include_router(copilot.router,    prefix="/api/copilot",    tags=["copilot"])
 
 
 @app.get("/health")

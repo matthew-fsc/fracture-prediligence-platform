@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
-import { ChevronDown, ChevronRight, Edit2, Check, X, Info } from 'lucide-react'
+import { ChevronDown, ChevronRight, Edit2, Check, X, Info, Shield } from 'lucide-react'
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine,
@@ -666,6 +666,96 @@ export default function Readiness() {
               </div>
             )
           })}
+        </div>
+      </div>
+
+      {/* Owner PRE Score */}
+      {data?.owner_readiness && (() => {
+        const pre = data.owner_readiness
+        const tierColor =
+          pre.tier === 'Aligned'       ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-400' :
+          pre.tier === 'Mostly Ready'  ? 'border-blue-500/20 bg-blue-500/5 text-blue-400'    :
+          pre.tier === 'Moderate Gap'  ? 'border-amber-500/20 bg-amber-500/5 text-amber-400'  :
+                                         'border-red-500/20 bg-red-500/5 text-red-400'
+        const barColor =
+          pre.tier === 'Aligned'       ? 'bg-emerald-500' :
+          pre.tier === 'Mostly Ready'  ? 'bg-blue-500'    :
+          pre.tier === 'Moderate Gap'  ? 'bg-amber-500'   : 'bg-red-500'
+        return (
+          <div className={cn('rounded-xl border p-5', tierColor)}>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5" />
+              Owner Personal Readiness (PRE) Score
+            </p>
+            <div className="flex items-end gap-6 mb-4">
+              <div className="flex-shrink-0">
+                <p className="text-4xl font-black">{pre.pre_score.toFixed(0)}<span className="text-sm font-semibold text-muted-foreground">/100</span></p>
+                <p className="text-sm font-bold mt-0.5">{pre.tier}</p>
+              </div>
+              <div className="flex-1 pb-1">
+                <div className="h-2.5 rounded-full bg-muted/30 overflow-hidden">
+                  <div className={cn('h-full rounded-full', barColor)} style={{ width: `${pre.pre_score}%` }} />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2 leading-snug">{pre.summary}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {pre.dimensions.map(d => (
+                <div key={d.name} className="rounded-lg bg-background/30 border border-border/40 px-3 py-2.5">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{d.name}</p>
+                  <p className="text-lg font-bold mt-1">{d.score.toFixed(0)}<span className="text-xs text-muted-foreground">/100</span></p>
+                  <p className="text-[10px] font-semibold mt-0.5">{d.label}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{d.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* DRS Industry Benchmarks */}
+      <div className="rounded-xl border border-border bg-card p-5">
+        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">DRS Industry Benchmarks</p>
+        <p className="text-[11px] text-muted-foreground mb-4">Reference percentile distribution across SMB sell-side engagements (n ≈ 2,400+)</p>
+        <div className="space-y-2.5">
+          {[
+            { label: 'P90 — Top Performers',   score: 84, pct: '90th',  note: 'Institutional-grade, competitive process',      color: 'emerald' },
+            { label: 'P75 — Investment Grade',  score: 73, pct: '75th',  note: 'Standard diligence, limited friction',           color: 'emerald' },
+            { label: 'P50 — Median Engagement', score: 58, pct: '50th',  note: 'Conditional — 12–18 month runway to optimize',   color: 'amber'   },
+            { label: 'P25 — High Risk',         score: 44, pct: '25th',  note: 'Material gaps — price adjustments likely',       color: 'amber'   },
+            { label: 'P10 — Pre-Diligence',     score: 31, pct: '10th',  note: 'Structural issues — value creation required',    color: 'red'     },
+          ].map(b => {
+            const isAbove = drs >= b.score
+            const colorCls = b.color === 'emerald' ? 'text-emerald-400' : b.color === 'amber' ? 'text-amber-400' : 'text-red-400'
+            const barCls   = b.color === 'emerald' ? 'bg-emerald-500/40' : b.color === 'amber' ? 'bg-amber-500/40' : 'bg-red-500/40'
+            return (
+              <div key={b.pct} className={cn('flex items-center gap-3', isAbove ? 'opacity-100' : 'opacity-50')}>
+                <span className="text-[11px] font-mono text-muted-foreground w-8 flex-shrink-0">{b.pct}</span>
+                <div className="relative h-5 rounded flex-1 bg-muted/20 overflow-hidden">
+                  <div className={cn('absolute left-0 top-0 h-full rounded', barCls)} style={{ width: `${b.score}%` }} />
+                  {isAbove && (
+                    <div className="absolute left-0 top-0 h-full rounded bg-primary/20" style={{ width: `${drs}%` }} />
+                  )}
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground">{b.score}</span>
+                </div>
+                <div className="w-48 flex-shrink-0">
+                  <p className={cn('text-[11px] font-semibold', isAbove ? colorCls : 'text-muted-foreground')}>{b.label}</p>
+                  <p className="text-[10px] text-muted-foreground leading-tight">{b.note}</p>
+                </div>
+                {isAbove && <span className="text-[10px] font-bold text-primary flex-shrink-0">✓</span>}
+              </div>
+            )
+          })}
+          <div className="flex items-center gap-3 pt-1 border-t border-border/40 mt-1">
+            <span className="text-[11px] font-mono text-muted-foreground w-8 flex-shrink-0">YOU</span>
+            <div className="relative h-5 rounded flex-1 bg-muted/20 overflow-hidden">
+              <div className="absolute left-0 top-0 h-full rounded bg-primary/50" style={{ width: `${drs}%` }} />
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold">{drs.toFixed(1)}</span>
+            </div>
+            <div className="w-48 flex-shrink-0">
+              <p className="text-[11px] font-bold text-primary">Current Score</p>
+            </div>
+          </div>
         </div>
       </div>
 

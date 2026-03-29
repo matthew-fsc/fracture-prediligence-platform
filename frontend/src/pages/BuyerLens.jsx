@@ -5,7 +5,7 @@ import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useCompanyId } from '../context/CompanyContext'
-import { apiUrl, apiClient } from '../lib/apiClient'
+import { apiClient } from '../lib/apiClient'
 import { withCompanyQuery, resolvePath } from '../lib/navLinks'
 import { toast } from '../lib/notify'
 
@@ -136,10 +136,7 @@ export default function BuyerLens() {
     setLoading(true)
     setError(null)
     Promise.all([
-      fetch(apiUrl(`/api/analytics/buyer-questions/${companyId}`)).then(r => {
-        if (!r.ok) throw new Error(r.statusText)
-        return r.json()
-      }),
+      apiClient.get(`/api/analytics/buyer-questions/${companyId}`),
       apiClient.get(`/api/analytics/engagement-profile/${companyId}`).catch(() => ({ preferred_buyer_types: [] })),
       apiClient.get(`/api/analytics/initiatives/${companyId}`).catch(() => ({ initiatives: [] })),
     ])

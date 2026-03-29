@@ -5,7 +5,7 @@ import { Upload, AlertCircle, FileText, RefreshCw, ChevronRight, Trash2, RotateC
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { useCompanyId } from '../context/CompanyContext'
-import { apiUrl, apiClient } from '../lib/apiClient'
+import { apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
 
 function useSiblingPath(segment) {
@@ -74,9 +74,7 @@ export default function Connectors() {
     form.append('file', file)
     form.append('source_type', sourceType)
     try {
-      const res = await fetch(apiUrl(`/api/ingestion/upload/${companyId}`), { method: 'POST', body: form })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.detail || 'Upload failed')
+      await apiClient.postMultipart(`/api/ingestion/upload/${companyId}`, form)
       await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
       toast.success('File uploaded — pipeline finished')
     } catch (e) {
@@ -90,7 +88,7 @@ export default function Connectors() {
 
   async function deleteJob(jobId) {
     try {
-      await fetch(apiUrl(`/api/ingestion/jobs/${companyId}/${jobId}`), { method: 'DELETE' })
+      await apiClient.del(`/api/ingestion/jobs/${companyId}/${jobId}`)
       await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
     } catch (e) {
       toast.error('Could not delete job')
@@ -100,9 +98,7 @@ export default function Connectors() {
   async function retryJob(jobId) {
     setRetryingId(jobId)
     try {
-      const res = await fetch(apiUrl(`/api/ingestion/jobs/${companyId}/${jobId}/retry`), { method: 'POST' })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(json.detail || 'Retry failed')
+      await apiClient.post(`/api/ingestion/jobs/${companyId}/${jobId}/retry`, {})
       await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
       await qc.invalidateQueries({ queryKey: ['ingestion-job', companyId, jobId] })
       toast.success('Pipeline re-run started')

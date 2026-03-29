@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Cloud, CheckCircle, Circle } from 'lucide-react'
 import { useCompanyId } from '../context/CompanyContext'
-import { apiUrl } from '../lib/apiClient'
+import { apiUrl, apiClient } from '../lib/apiClient'
 import { withCompanyQuery } from '../lib/navLinks'
 import { marketingColors as COLORS } from '../theme/marketingColors'
 
@@ -419,20 +419,16 @@ function Step3({ onNext, onSkip }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await fetch(apiUrl(`/api/analytics/qualitative/${companyId}`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          owner_hours_per_week:   form.owner_hours_per_week !== '' ? Number(form.owner_hours_per_week) : null,
-          sop_pct:                Number(form.sop_pct),
-          mgmt_qualified:         form.mgmt_qualified !== '' ? Number(form.mgmt_qualified) : null,
-          mgmt_total_functions:   form.mgmt_total_functions !== '' ? Number(form.mgmt_total_functions) : null,
-          contract_pct:           Number(form.contract_pct),
-          customer_contract_type: form.customer_contract_type || null,
-          key_person_revenue_pct: Number(form.key_person_revenue_pct),
-          pipeline_value:         form.pipeline_value !== '' ? Number(form.pipeline_value) : null,
-          market_positioning:     form.market_positioning || null,
-        }),
+      await apiClient.post(`/api/analytics/qualitative/${companyId}`, {
+        owner_hours_per_week:   form.owner_hours_per_week !== '' ? Number(form.owner_hours_per_week) : null,
+        sop_pct:                Number(form.sop_pct),
+        mgmt_qualified:         form.mgmt_qualified !== '' ? Number(form.mgmt_qualified) : null,
+        mgmt_total_functions:   form.mgmt_total_functions !== '' ? Number(form.mgmt_total_functions) : null,
+        contract_pct:           Number(form.contract_pct),
+        customer_contract_type: form.customer_contract_type || null,
+        key_person_revenue_pct: Number(form.key_person_revenue_pct),
+        pipeline_value:         form.pipeline_value !== '' ? Number(form.pipeline_value) : null,
+        market_positioning:     form.market_positioning || null,
       })
     } catch (_) { /* non-blocking */ }
     setSaving(false)

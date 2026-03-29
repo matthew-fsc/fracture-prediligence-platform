@@ -98,4 +98,14 @@ def patch_company(
         setattr(row, k, v)
     db.commit()
     db.refresh(row)
-    return row
+    return {
+        "id": row.id,
+        "name": row.name,
+        "industry": row.industry,
+        "founded": row.founded,
+        "ein": row.ein,
+        "state": row.state,
+        "entity_type": row.entity_type,
+        "total_headcount": row.total_headcount,
+        "owner_user_id": row.owner_user_id,
+    }

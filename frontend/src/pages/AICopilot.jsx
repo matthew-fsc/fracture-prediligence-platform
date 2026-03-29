@@ -89,9 +89,19 @@ export default function AICopilot() {
     setMessages(prev => [...prev, { role: 'user', content: userMsg }])
     setLoading(true)
 
-    // In Phase 2 this calls /api/copilot/chat with Anthropic API
-    await new Promise(r => setTimeout(r, 600))
-    const answer = buildLocalAnswer(userMsg, scores)
+    let answer
+    try {
+      const history = messages
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .map(m => ({ role: m.role, content: m.content }))
+      const data = await apiClient.post(`/api/copilot/chat/${companyId}`, {
+        message: userMsg,
+        history,
+      })
+      answer = data.reply
+    } catch {
+      answer = buildLocalAnswer(userMsg, scores)
+    }
     setMessages(prev => [...prev, { role: 'assistant', content: answer }])
     setLoading(false)
   }

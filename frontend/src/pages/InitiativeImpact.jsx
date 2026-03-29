@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { cn, fmtM } from '../lib/utils'
 import { Target, CheckCircle, Circle, Clock } from 'lucide-react'
 import { useCompanyId } from '../context/CompanyContext'
-import { apiUrl, apiClient } from '../lib/apiClient'
+import { apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
 
 // Static initiative library for gap categories (live API fallback)
@@ -55,8 +55,7 @@ export default function InitiativeImpact() {
   const [newCat, setNewCat] = useState('revenue_quality')
 
   useEffect(() => {
-    fetch(apiUrl(`/api/analytics/value-gap/${companyId}`))
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get(`/api/analytics/value-gap/${companyId}`)
       .then(setGapData)
       .catch(() => {})
   }, [companyId])
