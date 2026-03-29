@@ -91,9 +91,24 @@ def compute_growth_drivers(company_id: int, db: Session) -> GrowthDriversScore:
         s_cagr = max(0, 20 + (cagr_pct + 10) / 20 * 20)
 
     # 2. New customer acquisition rate
+    # Prefer CRM tenure_start when present; otherwise first attributed revenue date (ingestion
+    # often omits tenure on QuickBooks/CRM feeds even when revenue rows exist per customer).
+    first_rev_by_customer: dict[int, date] = {}
+    for r in revenue:
+        if r.customer_id and r.revenue_period:
+            cid = r.customer_id
+            prev = first_rev_by_customer.get(cid)
+            if prev is None or r.revenue_period < prev:
+                first_rev_by_customer[cid] = r.revenue_period
+
+    def _customer_acquisition_start(c: Customer) -> date | None:
+        if c.tenure_start is not None:
+            return c.tenure_start
+        return first_rev_by_customer.get(c.id)
+
     new_customers = sum(
         1 for c in customers
-        if c.tenure_start and c.tenure_start >= twelve_months_ago
+        if (s := _customer_acquisition_start(c)) is not None and s >= twelve_months_ago
     )
     total_customers = len(customers)
     new_pct = (new_customers / total_customers * 100) if total_customers > 0 else 0.0

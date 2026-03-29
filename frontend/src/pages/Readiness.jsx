@@ -113,7 +113,12 @@ function SubScoreRow({ subKey, sub, meta }) {
             <span className="text-[11px] text-muted-foreground/60">Financial Data</span>
           )}
         </div>
-        <p className="text-muted-foreground">{sub.label}</p>
+        <p className="text-muted-foreground">
+          {sub.label}
+          {subKey === 'concentration' && sub.value != null && (
+            <span className="text-muted-foreground/80"> — index {Number(sub.value).toLocaleString()}</span>
+          )}
+        </p>
       </div>
       <div className="text-right flex-shrink-0 ml-2">
         <p className={cn('font-bold', scoreColor(sub.score ?? 0))}>{(sub.score ?? 0).toFixed(0)}</p>

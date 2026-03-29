@@ -280,7 +280,7 @@ class RevenueQualityScore:
             "composite":  self.composite,
             "sub_scores": {
                 "recurring_rate":   {"score": self.recurring_rate_score,  "value": self.recurring_pct,           "label": f"{self.recurring_pct:.0f}% recurring"},
-                "concentration":    {"score": self.concentration_score,   "value": self.hhi,                     "label": f"HHI {self.hhi:.0f}"},
+                "concentration":    {"score": self.concentration_score,   "value": self.hhi,                     "label": "HHI"},
                 "durability":       {"score": self.durability_score,      "value": self.contract_durability_pct, "label": f"{self.contract_durability_pct:.0f}% under durable contract"},
                 "consistency":      {"score": self.consistency_score,     "value": self.revenue_cv_pct,          "label": f"CV {self.revenue_cv_pct:.1f}%"},
                 "nrr":              {"score": self.nrr_score,             "value": self.estimated_nrr,           "label": f"NRR ~{self.estimated_nrr:.0f}%"},

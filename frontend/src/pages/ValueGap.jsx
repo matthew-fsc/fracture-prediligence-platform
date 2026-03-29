@@ -117,7 +117,9 @@ function GapCategoryCard({ d, rank, totalGap }) {
                     sub.score < 65 ? 'border-amber-500/20 bg-amber-500/5 text-amber-400' :
                     'border-border bg-muted/30 text-muted-foreground',
                   )}>
-                    {sub.label}: {sub.score.toFixed(0)}
+                    {sub.key === 'concentration' && sub.value != null
+                      ? <>HHI <span className="tabular-nums">{Number(sub.value).toLocaleString()}</span> · {sub.score.toFixed(0)}</>
+                      : <>{sub.label} · {sub.score.toFixed(0)}</>}
                   </span>
                 ))}
                 {weakSubs.length > 4 && (
@@ -141,7 +143,11 @@ function GapCategoryCard({ d, rank, totalGap }) {
                 {weakSubs.map(sub => (
                   <div key={sub.key} className="rounded-lg border border-border/50 bg-secondary/20 p-3 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-foreground">{sub.label}</span>
+                      <span className="text-xs font-semibold text-foreground">
+                        {sub.key === 'concentration' && sub.value != null
+                          ? <>HHI <span className="text-muted-foreground font-normal">(index {Number(sub.value).toLocaleString()})</span></>
+                          : sub.label}
+                      </span>
                       <span className={cn('text-xs font-bold',
                         sub.score < 50 ? 'text-red-400' : sub.score < 65 ? 'text-amber-400' : 'text-muted-foreground')}>
                         {sub.score.toFixed(0)}/100

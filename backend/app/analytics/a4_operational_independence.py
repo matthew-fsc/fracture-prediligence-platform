@@ -19,7 +19,8 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.ontology.models import Employee, EmployeeStatus
+from app.analytics.a1_metric_computation import effective_total_headcount
+from app.ontology.models import Company, Employee, EmployeeStatus
 
 
 @dataclass
@@ -36,13 +37,14 @@ class OperationalIndependenceScore:
     management_layer_count: int
     active_employee_pct: float
     data_confidence: str
+    owner_comp_label: str
 
     def to_dict(self) -> dict:
         return {
             "company_id": self.company_id,
             "composite":  self.composite,
             "sub_scores": {
-                "owner_comp":       {"score": self.owner_comp_score,      "value": self.owner_comp_pct,        "label": f"Owner comp {self.owner_comp_pct:.0f}% of payroll"},
+                "owner_comp":       {"score": self.owner_comp_score,      "value": self.owner_comp_pct,        "label": self.owner_comp_label},
                 "key_person":       {"score": self.key_person_score,      "value": self.key_person_count,      "label": f"{self.key_person_count} key persons identified"},
                 "management_depth": {"score": self.management_depth_score, "value": self.management_layer_count, "label": f"{self.management_layer_count} management layer(s)"},
                 "staff_stability":  {"score": self.staff_stability_score,  "value": self.active_employee_pct,  "label": f"{self.active_employee_pct:.0f}% active workforce"},
@@ -70,17 +72,32 @@ def compute_operational_independence(company_id: int, db: Session) -> Operationa
             owner_comp_pct=0.0, key_person_count=0, total_employees=0,
             management_layer_count=0, active_employee_pct=100.0,
             data_confidence="LOW",
+            owner_comp_label="No payroll records",
         )
 
+    company_row = db.query(Company).filter(Company.id == company_id).first()
     total = len(employees)
     active = [e for e in employees if e.status == EmployeeStatus.ACTIVE]
     owners = [e for e in employees if e.is_owner]
     key_persons = [e for e in employees if e.is_key_person or e.is_owner]
 
-    # 1. Owner comp concentration
-    total_comp = sum(float(e.comp_annual or 0) for e in employees)
-    owner_comp = sum(float(e.comp_annual or 0) for e in owners)
+    # 1. Owner comp concentration — use active employees only (terminated rows distort %)
+    owners_active = [e for e in active if e.is_owner]
+    total_comp = sum(float(e.comp_annual or 0) for e in active)
+    owner_comp = sum(float(e.comp_annual or 0) for e in owners_active)
     owner_comp_pct = (owner_comp / total_comp * 100) if total_comp > 0 else 0.0
+    eff_headcount = effective_total_headcount(company_row, len(active))
+    payroll_incomplete = len(active) < eff_headcount and eff_headcount > 1
+
+    if total_comp <= 0:
+        owner_comp_label = "No compensation on active payroll records"
+    elif payroll_incomplete:
+        owner_comp_label = (
+            f"Owner {owner_comp_pct:.0f}% of wages on file "
+            f"({len(active)} of {eff_headcount} employees on payroll vs client profile)"
+        )
+    else:
+        owner_comp_label = f"Owner {owner_comp_pct:.0f}% of active payroll"
 
     if owner_comp_pct >= 70:
         s_owner = 10
@@ -147,4 +164,5 @@ def compute_operational_independence(company_id: int, db: Session) -> Operationa
         management_layer_count=depth,
         active_employee_pct=round(active_pct, 1),
         data_confidence=confidence,
+        owner_comp_label=owner_comp_label,
     )
