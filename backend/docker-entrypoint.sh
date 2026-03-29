@@ -1,5 +1,14 @@
 #!/bin/sh
 set -e
+# Pre-deploy / one-off: Railway may invoke `alembic ...` or `sh -c '...'` against this image.
+# Pass through without starting uvicorn (see railway.toml preDeployCommand).
+if [ "${1:-}" = "alembic" ]; then
+  exec "$@"
+fi
+if [ "${1:-}" = "sh" ] || [ "${1:-}" = "/bin/sh" ]; then
+  exec "$@"
+fi
+
 # Railway injects PORT; the app must listen on 0.0.0.0:$PORT or the edge proxy returns 502.
 LISTEN_PORT="${PORT:-8000}"
 echo "[entrypoint] cwd=$(pwd) PORT=${LISTEN_PORT} RUN_MIGRATIONS=${RUN_MIGRATIONS:-}"

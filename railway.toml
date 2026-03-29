@@ -8,6 +8,10 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
+# Migrations run here (separate step before the web container) so uvicorn can bind immediately
+# and GET /health returns 200 during the deploy healthcheck. Set service variable RUN_MIGRATIONS=false
+# so the entrypoint does not run alembic again before uvicorn (duplicate + delayed listen).
+preDeployCommand = ["alembic", "upgrade", "head"]
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
