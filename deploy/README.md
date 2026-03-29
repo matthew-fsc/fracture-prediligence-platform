@@ -53,10 +53,17 @@ Health: `GET /health` (liveness), `GET /health/ready` (DB).
 
 The container listens on **`0.0.0.0:$PORT`** (`docker-entrypoint.sh`); Railway injects **`PORT`**. Do **not** pin a conflicting `PORT` in variables unless it matches both what uvicorn logs on startup and what **Networking → Public** targets. A **502** from the edge usually means the proxy could not reach the process (wrong public port, crash, or nothing listening)—not an HTTP error from FastAPI. Confirm deploy logs show `[entrypoint] starting uvicorn on 0.0.0.0:<port>` and that `<port>` matches public networking.
 
+**Edge logs showing `connection refused` and empty `upstreamAddress`:** the load balancer could not open a TCP connection to your replica at all (process not listening, exited, or wrong target port). This is **not** a response from FastAPI. Fix:
+
+1. **Service → Settings → Deploy → Custom Start Command** must be **empty** so Railway uses the image **`ENTRYPOINT`** (`docker-entrypoint.sh`). If you set e.g. `uvicorn` manually without `cd /app/backend` and `PYTHONPATH`, the process can exit immediately → connection refused.
+2. **Networking →** your **public port** must match the **`PORT`** value Railway injects (and the port in the deploy log line `starting uvicorn on 0.0.0.0:<port>`). Use **Generate Domain** / default wiring unless you know you need a custom mapping.
+3. Open **Deployments →** latest deploy → **Deploy Logs** (not build logs): confirm **`[entrypoint] starting uvicorn`** appears and there is no exit right after (migration failure, import error, OOM). If the container restarts in a loop, fix the crash first.
+
 ### Debugging: what to look for in logs
 
 | Symptom | Where to look |
 |--------|----------------|
+| Edge `connection refused` / empty upstream | **Custom Start Command** set (clear it), or crash before listen — **Deploy Logs** |
 | Migrations fail on boot | `[entrypoint] ERROR: alembic failed` when `RUN_MIGRATIONS=true` |
 | DB unreachable | `readiness check failed` (runtime) or connection errors near `alembic upgrade` |
 | Wrong listen port | No `starting uvicorn` line, or port mismatch vs **Networking** |

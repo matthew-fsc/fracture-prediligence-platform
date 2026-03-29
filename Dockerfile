@@ -37,3 +37,5 @@ WORKDIR /app/backend
 EXPOSE 8000
 
 ENTRYPOINT ["/app/backend/docker-entrypoint.sh"]
+# Explicit empty CMD: some hosts pass a start command as container args; keep entrypoint in control.
+CMD []

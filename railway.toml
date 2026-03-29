@@ -8,6 +8,9 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
+# Do not set a Custom Start Command in the Railway dashboard unless you know what you're doing.
+# A wrong start command overrides the Dockerfile ENTRYPOINT and often causes 502 + "connection refused"
+# (nothing listening on $PORT). Leave empty to use backend/docker-entrypoint.sh.
 # Migrations run here (separate step before the web container) so uvicorn can bind immediately
 # and GET /health returns 200 during the deploy healthcheck. Set service variable RUN_MIGRATIONS=false
 # so the entrypoint does not run alembic again before uvicorn (duplicate + delayed listen).
