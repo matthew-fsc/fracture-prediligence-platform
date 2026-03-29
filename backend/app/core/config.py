@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     DEMO_ACCESS_CODE: str = ""
     # When True, POST /api/ingestion/upload/1 and PATCH mappings for company 1 are rejected (ABC demo is read-only).
     DEMO_BLOCK_INGESTION_UPLOAD_FOR_COMPANY_1: bool = True
+    # Company id=1: EV uses Investment-grade DRS multiple band blended with market (aligns ~$9.8M at ~$1.74M EBITDA).
+    # Set False to use live-computed DRS tier for EV (may be lower tier from financials).
+    DEMO_CANONICAL_VALUATION: bool = True
 
     # Optional: set to your Clerk user id (sub) to assign demo company id=1 on bootstrap (local dev).
     SEED_COMPANY_1_OWNER_USER_ID: str = ""

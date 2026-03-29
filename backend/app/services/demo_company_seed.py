@@ -8,7 +8,7 @@ manual resets.
 If live analytics do not match verify() targets, company 1 may have extra connector
 ingests overlapping this seed — wipe and re-seed so TTM follows one P&L path.
 
-TTM targets (2025 monthly sum): ~\$4.20M revenue, ~\$1.74M EBITDA proxy (COGS/OPEX
+TTM targets (2025 monthly sum): ~$4.20M revenue, ~$1.74M EBITDA proxy (COGS/OPEX
 unchanged from QuickBooks-style seed). EV uses DRS tier × blended market multiples.
 
 Populates:
@@ -161,8 +161,10 @@ def _demo_column_mappings() -> dict:
 
 
 # ── Annual revenue totals ─────────────────────────────────────────────────────
-# 2025 scaled so TTM revenue − 2025 COGS − 2025 OpEx ≈ \$1.74M EBITDA (matches analytics proxy).
+# 2025 scaled so TTM revenue − 2025 COGS − 2025 OpEx ≈ $1.74M EBITDA (matches analytics proxy).
 ANNUAL_REVENUE = {2023: Decimal("2793233"), 2024: Decimal("2746003"), 2025: Decimal("4196172")}
+# Used to detect stale installs where startup seed never ran again after we changed targets.
+EXPECTED_2025_REVENUE = ANNUAL_REVENUE[2025]
 TOTAL_3YR = sum(ANNUAL_REVENUE.values())
 
 # 2023/2024 split weight (used when deriving per-year from 2yr remainder)
@@ -170,8 +172,8 @@ SPLIT_23 = ANNUAL_REVENUE[2023] / (ANNUAL_REVENUE[2023] + ANNUAL_REVENUE[2024])
 SPLIT_24 = ANNUAL_REVENUE[2024] / (ANNUAL_REVENUE[2023] + ANNUAL_REVENUE[2024])
 
 # ── Top-10 customers: 3-year totals + explicit 2025 amounts ───────────────────
-# 2025 TOP5 scaled so concentration % are unchanged at the ~\$4.20M 2025 column total
-# at the new ~\$4.20M 2025 column total (see ANNUAL_REVENUE[2025]).
+# 2025 TOP5 scaled so concentration % are unchanged at the ~$4.20M 2025 column total
+# (see ANNUAL_REVENUE[2025]).
 #   COMPANY 1 ~49.4% · COMPANY 2 ~19% · COMPANY 3 ~4.9% · COMPANY 4 ~3.3% · COMPANY 5 ~2.4%
 # Format: (name, 3yr_total, explicit_2025 or None)
 TOP10 = [
@@ -439,9 +441,36 @@ def seed_customers_and_revenue(db) -> list[int]:
 
 
 def seed_expenses(db):
-    """Create annual expense records for 2023, 2024, 2025."""
+    """
+    Create expense records: 2023/2024 as annual Jan-1 rows; 2025 as monthly rows so rolling
+    TTM (ref_date = latest revenue) always includes a full year of COGS/OPEX/OWNER that matches
+    monthly 2025 revenue (Jan-1-only rows can fall outside the last-365-days window).
+    """
     exp_count = 0
     for year, items in EXPENSES.items():
+        if year == 2025:
+            for desc, amount, category in items:
+                if amount == Decimal("0"):
+                    continue
+                monthly = (amount / Decimal("12")).quantize(Decimal("0.01"), ROUND_HALF_UP)
+                running = Decimal(0)
+                for i, mo_end in enumerate(MONTH_ENDS_2025):
+                    if i == 11:
+                        amt = (amount - running).quantize(Decimal("0.01"), ROUND_HALF_UP)
+                    else:
+                        amt = monthly
+                        running += amt
+                    db.add(Expense(
+                        company_id=COMPANY_ID,
+                        amount=amt,
+                        category=category,
+                        description=f"{desc} ({mo_end.strftime('%b %Y')})",
+                        period=mo_end,
+                        is_recurring=(category in (ExpenseCategory.COGS, ExpenseCategory.OPEX)),
+                        confidence_level=ConfidenceLevel.HIGH,
+                    ))
+                    exp_count += 1
+            continue
         period = date(year, 1, 1)
         for desc, amount, category in items:
             if amount == Decimal("0"):
@@ -456,7 +485,7 @@ def seed_expenses(db):
                 confidence_level=ConfidenceLevel.HIGH,
             ))
             exp_count += 1
-    print(f"  Created {exp_count} expense records (3 years × COGS/OPEX/OWNER).")
+    print(f"  Created {exp_count} expense records (2023/2024 annual; 2025 monthly).")
 
 
 def seed_employee(db):
@@ -502,19 +531,22 @@ def verify(db):
     cogs_25 = db.query(func.sum(Expense.amount)).filter(
         Expense.company_id == COMPANY_ID,
         Expense.category == ExpenseCategory.COGS,
-        Expense.period == date(2025, 1, 1),
+        Expense.period >= date(2025, 1, 1),
+        Expense.period <= date(2025, 12, 31),
     ).scalar() or Decimal(0)
 
     opex_25 = db.query(func.sum(Expense.amount)).filter(
         Expense.company_id == COMPANY_ID,
         Expense.category == ExpenseCategory.OPEX,
-        Expense.period == date(2025, 1, 1),
+        Expense.period >= date(2025, 1, 1),
+        Expense.period <= date(2025, 12, 31),
     ).scalar() or Decimal(0)
 
     owner_25 = db.query(func.sum(Expense.amount)).filter(
         Expense.company_id == COMPANY_ID,
         Expense.category == ExpenseCategory.OWNER,
-        Expense.period == date(2025, 1, 1),
+        Expense.period >= date(2025, 1, 1),
+        Expense.period <= date(2025, 12, 31),
     ).scalar() or Decimal(0)
 
     gross_profit = total_2025 - cogs_25
@@ -583,19 +615,41 @@ def ensure_demo_ingestion_job_if_missing(db: Session) -> bool:
     return True
 
 
+def _demo_2025_revenue_matches(db: Session) -> bool:
+    total_2025 = (
+        db.query(func.sum(RevenueStream.revenue_gross))
+        .filter(
+            RevenueStream.company_id == COMPANY_ID,
+            RevenueStream.revenue_period >= date(2025, 1, 1),
+            RevenueStream.revenue_period <= date(2025, 12, 31),
+        )
+        .scalar()
+    )
+    if total_2025 is None:
+        return False
+    diff = abs(Decimal(str(total_2025)) - EXPECTED_2025_REVENUE)
+    return diff < Decimal("5000")
+
+
 def ensure_demo_company_seeded(db: Session) -> bool:
     """
-    Seed ABC Company data when company_id=1 has no revenue streams (idempotent).
-    Returns True if seeding ran, False if data was already present.
+    Seed ABC Company when company_id=1 has no revenue, or when 2025 revenue does not match
+    the current ABC targets (stale DB from an older seed). Idempotent.
+    Returns True if seeding ran, False if data was already correct.
     """
     n = (
         db.query(func.count(RevenueStream.id))
         .filter(RevenueStream.company_id == COMPANY_ID)
         .scalar()
     )
-    if n and n > 0:
+    if n and n > 0 and _demo_2025_revenue_matches(db):
         return False
-    logger.info("Seeding demo company (id=1) with ABC sandbox data...")
+    if n and n > 0:
+        logger.info(
+            "Demo company id=1 has stale or mismatched 2025 revenue — wiping and re-seeding ABC sandbox."
+        )
+    else:
+        logger.info("Seeding demo company (id=1) with ABC sandbox data...")
     wipe_company_data(db, COMPANY_ID)
     seed_customers_and_revenue(db)
     seed_expenses(db)

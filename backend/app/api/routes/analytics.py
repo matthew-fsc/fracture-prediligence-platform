@@ -20,7 +20,7 @@ from app.analytics.a5_customer_risk import compute_customer_risk
 from app.analytics.a6_management_team import compute_management_team
 from app.analytics.a7_growth_drivers import compute_growth_drivers
 from app.analytics.a8_financial_integrity import compute_financial_integrity
-from app.analytics.a9_drs_composite import CategoryScores, compute_drs
+from app.analytics.a9_drs_composite import CategoryScores, DRSTier, compute_drs
 from app.analytics.a10_enterprise_value import compute_enterprise_value, format_ev_valuation_summary
 from app.analytics.market_benchmarks import build_benchmarks_payload, get_market_multiple_context
 from app.analytics.a11_value_gap import compute_value_gap
@@ -468,7 +468,12 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
         basis = _ebitda_basis(company.id, db)
         ebitda_dec = _Decimal(str(round(basis["ebitda_normalized_ttm"], 2)))
         mctx = get_market_multiple_context(db, company.id, float(ebitda_dec))
-        ev = compute_enterprise_value(ebitda_dec, drs.tier, market_context=mctx)
+        tier_for_ev = drs.tier
+        if company.id == 1 and settings.DEMO_CANONICAL_VALUATION:
+            # ABC demo: align EV band with curated narrative (~$9.8M at ~$1.74M EBITDA); live DRS from
+            # financials often lands in a lower tier and understates EV vs. the demo benchmark story.
+            tier_for_ev = DRSTier.INVESTMENT
+        ev = compute_enterprise_value(ebitda_dec, tier_for_ev, market_context=mctx)
         valuation_summary = format_ev_valuation_summary(ev)
 
         qual_complete = ops_qual_complete and growth_qual_complete and rev_qual_complete
