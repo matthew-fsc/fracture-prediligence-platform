@@ -138,31 +138,40 @@ def compute_operational_independence(company_id: int, db: Session) -> Operationa
     total_wages = max(total_comp, pl_wages_total)
     # Owner $: roster owner comp vs explicit owner/personal lines (do not double-count — take max of parallel measures).
     owner_wages = max(owner_comp, pl_owner_draws)
-    if total_wages > 0:
-        owner_comp_pct = min(100.0, (owner_wages / total_wages) * 100.0)
-    else:
-        owner_comp_pct = 0.0
 
     eff_headcount = effective_total_headcount(company_row, len(active))
     payroll_incomplete = len(active) < eff_headcount and eff_headcount > 1
     used_pl = pl_wages_total > total_comp + 1e-6
 
-    if total_wages <= 0:
-        owner_comp_label = "No compensation on active payroll records or P&L wage lines"
-    elif used_pl and payroll_incomplete:
-        owner_comp_label = (
-            f"Owner {owner_comp_pct:.0f}% of wages (TTM P&L + roster; "
-            f"{len(active)} of {eff_headcount} employees on roster vs profile)"
-        )
-    elif used_pl:
-        owner_comp_label = f"Owner {owner_comp_pct:.0f}% of wages (TTM P&L payroll + owner lines vs roster)"
-    elif payroll_incomplete:
-        owner_comp_label = (
-            f"Owner {owner_comp_pct:.0f}% of wages on file "
-            f"({len(active)} of {eff_headcount} employees on payroll vs client profile)"
-        )
+    # Single roster row + full headcount on profile: raw math is 100% owner — scale implied
+    # wage pool so % is not misleading when payroll feed is partial.
+    if (
+        payroll_incomplete
+        and not used_pl
+        and len(active) == 1
+        and eff_headcount > 1
+        and total_comp > 0
+    ):
+        implied_company_payroll = total_comp * eff_headcount
+        total_wages_for_pct = max(total_wages, implied_company_payroll)
     else:
-        owner_comp_label = f"Owner {owner_comp_pct:.0f}% of active payroll (roster)"
+        total_wages_for_pct = total_wages
+
+    if total_wages_for_pct > 0:
+        owner_comp_pct = min(100.0, (owner_wages / total_wages_for_pct) * 100.0)
+    else:
+        owner_comp_pct = 0.0
+
+    if total_wages <= 0:
+        owner_comp_label = "No wage data (roster or P&L)"
+    elif used_pl and payroll_incomplete:
+        owner_comp_label = f"~{owner_comp_pct:.0f}% owner share · P&L + {len(active)}/{eff_headcount} roster"
+    elif used_pl:
+        owner_comp_label = f"~{owner_comp_pct:.0f}% owner share · P&L vs roster"
+    elif payroll_incomplete:
+        owner_comp_label = f"~{owner_comp_pct:.0f}% owner share · roster {len(active)}/{eff_headcount}"
+    else:
+        owner_comp_label = f"~{owner_comp_pct:.0f}% owner share (roster)"
 
     if owner_comp_pct >= 70:
         s_owner = 10
