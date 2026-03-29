@@ -5,14 +5,14 @@ import { cn } from '../lib/utils'
 import {
   CheckCircle, Clock, Circle, AlertCircle, ArrowRight,
   Building2, Plug, ShieldCheck, BarChart2, AlertTriangle,
-  Shield, FileText, Target, TrendingUp,
+  Shield, Target, TrendingUp,
 } from 'lucide-react'
 import { useCompanyId } from '../context/CompanyContext'
 import { apiClient } from '../lib/apiClient'
 import { withCompanyQuery, resolvePath } from '../lib/navLinks'
 import { Skeleton } from '../components/ui/Skeleton'
 
-const ICON_MAP = { Building2, Plug, ShieldCheck, BarChart2, AlertTriangle, Shield, FileText, Target, TrendingUp }
+const ICON_MAP = { Building2, Plug, ShieldCheck, BarChart2, AlertTriangle, Shield, Target, TrendingUp }
 
 const STATUS_CFG = {
   completed:   { icon: CheckCircle, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', label: 'Completed'   },
@@ -40,7 +40,7 @@ export default function AdvisoryWorkflow() {
       <div className="space-y-5 max-w-[1400px]">
         <SectionHeader
           title="Advisory Workflow"
-          subtitle="BEI Value Acceleration Methodology™ — 9-stage certified exit planning engagement framework"
+          subtitle="BEI Value Acceleration Methodology™ — 8-stage certified exit planning engagement framework"
         />
         <p className="text-sm text-muted-foreground">Select a client in the header to load workflow progress.</p>
       </div>
@@ -73,7 +73,7 @@ export default function AdvisoryWorkflow() {
   const stages = data?.stages ?? []
   const overall = data?.overall_pct ?? 0
   const completed = data?.completed_count ?? 0
-  const total = data?.total_stages ?? (stages.length > 0 ? stages.length : 9)
+  const total = data?.total_stages ?? (stages.length > 0 ? stages.length : 8)
   const currentStage = data?.current_stage ?? null
   const firstInProgress = stages.find(s => s.status === 'in_progress')
 
@@ -81,7 +81,7 @@ export default function AdvisoryWorkflow() {
     <div className="space-y-5 max-w-[1400px]">
       <SectionHeader
         title="Advisory Workflow"
-        subtitle="9-stage exit planning engagement framework · stage progress derived from live data"
+        subtitle="8-stage exit planning engagement framework · stage progress derived from live data"
         action={
           <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-primary/20 bg-primary/10 text-primary">
             {completed}/{total} stages complete · {overall}% overall

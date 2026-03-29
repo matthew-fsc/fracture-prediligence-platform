@@ -38,21 +38,21 @@ WORKFLOW_STAGES: list[dict] = [
     },
     {
         "stage": 2,
-        "label": "Valuation Baseline",
-        "desc": "EBITDA normalization, multiple benchmarking, EV range",
-        "cepaRef": "Stage 2 · Valuation",
-        "deliverable": "EV range model",
-        "iconName": "BarChart2",
-        "route": "/Valuation",
-    },
-    {
-        "stage": 3,
         "label": "Data Ingestion",
         "desc": "Connect accounting, CRM, payroll, and banking sources",
-        "cepaRef": "Stage 3 · Ingestion",
+        "cepaRef": "Stage 2 · Ingestion",
         "deliverable": "Clean ontology",
         "iconName": "Plug",
         "route": "/Connectors",
+    },
+    {
+        "stage": 3,
+        "label": "Valuation Baseline",
+        "desc": "EBITDA normalization, multiple benchmarking, EV range",
+        "cepaRef": "Stage 3 · Valuation",
+        "deliverable": "EV range model",
+        "iconName": "BarChart2",
+        "route": "/Valuation",
     },
     {
         "stage": 4,
@@ -65,45 +65,36 @@ WORKFLOW_STAGES: list[dict] = [
     },
     {
         "stage": 5,
-        "label": "Buyer Risk Analysis",
-        "desc": "Identify and quantify diligence flags a buyer will surface",
-        "cepaRef": "Stage 5 · Risk",
-        "deliverable": "Risk heatmap",
-        "iconName": "AlertTriangle",
-        "route": "/BuyerLens",
-    },
-    {
-        "stage": 6,
         "label": "Value Gap Analysis",
         "desc": "Current EV vs achievable EV — initiative impact modeling",
-        "cepaRef": "Stage 6 · Value Gap",
+        "cepaRef": "Stage 5 · Value Gap",
         "deliverable": "Value gap report",
         "iconName": "Target",
         "route": "/ValueGap",
     },
     {
-        "stage": 7,
-        "label": "Data Room Readiness",
-        "desc": "VDR document audit, gap identification, buyer Q prep",
-        "cepaRef": "Stage 7 · Data Room",
-        "deliverable": "Document checklist",
-        "iconName": "FileText",
-        "route": "/DataRoom",
+        "stage": 6,
+        "label": "Buyer Risk Analysis",
+        "desc": "Identify and quantify diligence flags a buyer will surface",
+        "cepaRef": "Stage 6 · Risk",
+        "deliverable": "Risk heatmap",
+        "iconName": "AlertTriangle",
+        "route": "/BuyerLens",
     },
     {
-        "stage": 8,
+        "stage": 7,
         "label": "Report Generation",
         "desc": "Produce advisor-grade exit readiness deliverable package",
-        "cepaRef": "Stage 8 · Reports",
+        "cepaRef": "Stage 7 · Reports",
         "deliverable": "Full report package",
         "iconName": "TrendingUp",
         "route": "/Reports",
     },
     {
-        "stage": 9,
+        "stage": 8,
         "label": "Exit Execution",
         "desc": "Process preparation, buyer targeting, go-to-market readiness",
-        "cepaRef": "Stage 9 · Exit",
+        "cepaRef": "Stage 8 · Exit",
         "deliverable": "Exit execution plan",
         "iconName": "Shield",
         "route": "/EngagementIntake",
@@ -201,28 +192,28 @@ def build_advisory_workflow(company: Company, db: Session) -> dict:
         + (f" · est. {company.founded}" if company.founded else "")
     )
 
-    # 2 — Valuation baseline
-    if ebitda > 0 and ttm_rev > 0:
-        pct2 = 100
-        ev_mid = ebitda * 4.5  # rough mid if full EV not computed here
-        notes[2] = f"Defensible EBITDA {ebitda:,.0f} · illustrative ~{ev_mid:,.0f} EV (see Valuation for range)"
-    elif ebitda > 0:
-        pct2 = 70
-        notes[2] = f"EBITDA basis {ebitda:,.0f} — add revenue history for tighter benchmarking"
-    else:
-        pct2 = 15 if ttm_rev > 0 else 0
-        notes[2] = "Enter financial normalization on Valuation" if pct2 == 0 else "Partial financials — complete EBITDA bridge"
-
-    # 3 — Ingestion
+    # 2 — Data ingestion (was stage 3)
     if complete_jobs:
-        pct3 = min(100, 40 + min(60, len(complete_jobs) * 20))
-        notes[3] = f"{len(complete_jobs)} file(s) committed · {total_rows:,} rows in ontology"
+        pct2 = min(100, 40 + min(60, len(complete_jobs) * 20))
+        notes[2] = f"{len(complete_jobs)} file(s) committed · {total_rows:,} rows in ontology"
     elif jobs:
-        pct3 = 25
-        notes[3] = f"{len(jobs)} pipeline job(s) — complete mapping/review where needed"
+        pct2 = 25
+        notes[2] = f"{len(jobs)} pipeline job(s) — complete mapping/review where needed"
     else:
-        pct3 = 0
-        notes[3] = "Upload QuickBooks / CRM exports under Data Sources"
+        pct2 = 0
+        notes[2] = "Upload QuickBooks / CRM exports under Data Sources"
+
+    # 3 — Valuation baseline (was stage 2)
+    if ebitda > 0 and ttm_rev > 0:
+        pct3 = 100
+        ev_mid = ebitda * 4.5  # rough mid if full EV not computed here
+        notes[3] = f"Defensible EBITDA {ebitda:,.0f} · illustrative ~{ev_mid:,.0f} EV (see Valuation for range)"
+    elif ebitda > 0:
+        pct3 = 70
+        notes[3] = f"EBITDA basis {ebitda:,.0f} — add revenue history for tighter benchmarking"
+    else:
+        pct3 = 15 if ttm_rev > 0 else 0
+        notes[3] = "Enter financial normalization on Valuation" if pct3 == 0 else "Partial financials — complete EBITDA bridge"
 
     # 4 — DRS
     pct4 = min(100, int(round(drs_base)))
@@ -233,48 +224,37 @@ def build_advisory_workflow(company: Company, db: Session) -> dict:
     if qual_complete:
         notes[4] += " · qualitative inputs on file"
 
-    # 5 — Buyer risk
+    # 5 — Value gap (was stage 6)
+    if vg is None or ebitda <= 0:
+        pct5 = 20 if drs_base > 0 else 0
+        notes[5] = "Need EBITDA basis and scores to quantify value gap" if pct5 == 0 else "Partial — open Value Gap when EBITDA is set"
+    else:
+        if n_gaps == 0:
+            pct5 = 100
+            notes[5] = "Categories at or above target — no ranked drivers"
+        else:
+            pct5 = min(100, 35 + min(65, initiative_count * 12 + (25 if initiative_count else 0)))
+            notes[5] = f"{n_gaps} driver(s) · {initiative_count} initiative(s) tracked · +{vg.total_value_gap:,.0f} upside at target DRS"
+    pct5 = min(100, pct5)
+
+    # 6 — Buyer risk (was stage 5)
     if n_q == 0:
-        pct5 = 100 if drs_base >= 65 else 25
-        notes[5] = (
+        pct6 = 100 if drs_base >= 65 else 25
+        notes[6] = (
             "No questions fired in current simulation — scores above common diligence triggers"
             if drs_base >= 65
             else "Limited data — buyer simulation may expand as scores and ingestion improve"
         )
     else:
-        pct5 = int(round(100 * resolved / n_q))
+        pct6 = int(round(100 * resolved / n_q))
         crit = sum(1 for q in questions if q.severity == "CRITICAL")
-        notes[5] = f"{n_q} questions · {resolved} resolved · {crit} critical in library · {critical_open} critical still open"
+        notes[6] = f"{n_q} questions · {resolved} resolved · {crit} critical in library · {critical_open} critical still open"
 
-    # 6 — Value gap
-    if vg is None or ebitda <= 0:
-        pct6 = 20 if drs_base > 0 else 0
-        notes[6] = "Need EBITDA basis and scores to quantify value gap" if pct6 == 0 else "Partial — open Value Gap when EBITDA is set"
-    else:
-        if n_gaps == 0:
-            pct6 = 100
-            notes[6] = "Categories at or above target — no ranked drivers"
-        else:
-            pct6 = min(100, 35 + min(65, initiative_count * 12 + (25 if initiative_count else 0)))
-            notes[6] = f"{n_gaps} driver(s) · {initiative_count} initiative(s) tracked · +{vg.total_value_gap:,.0f} upside at target DRS"
-    pct6 = min(100, pct6)
+    # 7 — Reports (was stage 8)
+    pct7 = min(100, report_count * 34)
+    notes[7] = f"{report_count} PDF export(s) in history" if report_count else "Generate DRS summary or buyer package under Reports"
 
-    # 7 — Data room (proxy: qual + ingestion depth)
-    if complete_jobs and len(complete_jobs) >= 2 and qual is not None:
-        pct7 = 85
-        notes[7] = "Multiple sources ingested + qualitative interview on file — audit VDR checklist in Data Room"
-    elif complete_jobs:
-        pct7 = 50
-        notes[7] = f"{len(complete_jobs)} source(s) committed — expand coverage and qualitative inputs"
-    else:
-        pct7 = 10 if jobs else 0
-        notes[7] = "Ingest core financials and CRM exports first"
-
-    # 8 — Reports
-    pct8 = min(100, report_count * 34)
-    notes[8] = f"{report_count} PDF export(s) in history" if report_count else "Generate DRS summary or buyer package under Reports"
-
-    # 9 — Exit execution (engagement intake)
+    # 8 — Exit execution (engagement intake; was stage 9)
     if profile:
         bits = []
         if profile.exit_timeline:
@@ -283,14 +263,14 @@ def build_advisory_workflow(company: Company, db: Session) -> dict:
             bits.append(f"Target EV: {float(profile.target_valuation):,.0f}")
         if profile.owner_goals_narrative:
             bits.append("Owner goals captured")
-        pct9 = min(100, 25 + (40 if profile.exit_timeline else 0) + (35 if profile.target_valuation else 0))
-        pct9 = min(100, pct9)
-        notes[9] = " · ".join(bits) if bits else "Engagement profile started — add exit horizon and targets"
+        pct8 = min(100, 25 + (40 if profile.exit_timeline else 0) + (35 if profile.target_valuation else 0))
+        pct8 = min(100, pct8)
+        notes[8] = " · ".join(bits) if bits else "Engagement profile started — add exit horizon and targets"
     else:
-        pct9 = 0
-        notes[9] = "Capture exit timeline and valuation targets under Engagement Intake"
+        pct8 = 0
+        notes[8] = "Capture exit timeline and valuation targets under Engagement Intake"
 
-    pcts = {1: pct1, 2: pct2, 3: pct3, 4: pct4, 5: pct5, 6: pct6, 7: pct7, 8: pct8, 9: pct9}
+    pcts = {1: pct1, 2: pct2, 3: pct3, 4: pct4, 5: pct5, 6: pct6, 7: pct7, 8: pct8}
 
     stages_out: list[dict] = []
     for meta in WORKFLOW_STAGES:
