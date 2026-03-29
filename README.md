@@ -156,6 +156,7 @@ The Vite dev server (`npm run dev` on port 5173) proxies `/api` to `http://127.0
 | `CORS_ORIGINS` | Comma-separated allowed browser origins (no trailing slash), e.g. `https://app.example.com`. |
 | `FRONTEND_URL` | Public HTTPS URL of the SPA — used for Stripe redirects and similar. Must match `CORS_ORIGINS` for the SPA origin. |
 | `ADMIN_API_KEY` | Protects admin/demo HTTP routes when set; callers send `X-Admin-Key`. |
+| `DEMO_ACCESS_CODE` | Optional. When set, the generic `/demo` route is gated; visitors use `/request-demo` and exchange this passphrase for a short-lived demo JWT. Empty leaves the generic demo open (typical local dev). Personalized `/demo/:slug` links are unaffected. |
 | `CLERK_SECRET_KEY` / `CLERK_JWKS_URL` | Backend Clerk verification; JWKS URL must match your Clerk Frontend API instance. |
 | `STRIPE_*` / `STRIPE_WEBHOOK_SECRET` | Billing; register the Stripe webhook endpoint on your **public** API origin (e.g. `https://app.example.com/api/webhooks/stripe`). |
 

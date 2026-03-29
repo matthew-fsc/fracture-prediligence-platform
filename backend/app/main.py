@@ -51,6 +51,12 @@ def _bootstrap_db():
         _ensure_spots_setting(db)
         seed_curated_benchmarks_if_empty(db)
         try:
+            from app.analytics.market_benchmarks import ensure_field_services_m1m5_benchmark_multiples
+
+            ensure_field_services_m1m5_benchmark_multiples(db)
+        except Exception:
+            logger.exception("Field services benchmark multiple sync skipped.")
+        try:
             from app.services.demo_company_seed import (
                 ensure_demo_company_seeded,
                 ensure_demo_ingestion_job_if_missing,

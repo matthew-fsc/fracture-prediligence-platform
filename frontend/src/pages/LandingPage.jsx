@@ -104,10 +104,10 @@ function Nav() {
             </Link>
           )}
           <Link
-            to="/demo"
+            to="/request-demo"
             style={{ color: COLORS.gold, fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 500, textDecoration: 'none' }}
           >
-            See Demo
+            Request live demo
           </Link>
         </div>
       </div>
@@ -178,7 +178,7 @@ function Hero() {
           }}
         >
           <Link
-            to="/demo"
+            to="/request-demo"
             style={{
               background: COLORS.gold,
               color: COLORS.bg,
@@ -191,7 +191,7 @@ function Hero() {
               display: 'inline-block',
             }}
           >
-            See Live Demo
+            Request live demo
           </Link>
           <Link
             to="/sign-in"
@@ -676,7 +676,7 @@ function Footer() {
         <div style={{ display: 'flex', gap: 24, marginBottom: 20, flexWrap: 'wrap' }}>
           {[
             { label: 'Log in', to: '/sign-in' },
-            { label: 'Demo', to: '/demo' },
+            { label: 'Request demo', to: '/request-demo' },
             { label: 'Contact', to: 'mailto:matthew@fracturesystems.com' },
           ].map(({ label, to }) => (
             <Link

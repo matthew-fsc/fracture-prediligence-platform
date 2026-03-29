@@ -49,6 +49,8 @@ export default function DataMapping() {
   const [searchParams, setSearchParams] = useSearchParams()
   const urlJobId = searchParams.get('jobId')
   const { pathname } = useLocation()
+  const isDemo = pathname.startsWith('/demo')
+  const readOnlyDemo = isDemo
   const dataSourcesPath = useSiblingPath('data-sources')
   const connectorsPath = withCompanyQuery(resolvePath('/Connectors', pathname), companyId)
   const [selectedJobId, setSelectedJobId] = useState(null)
@@ -112,6 +114,7 @@ export default function DataMapping() {
   }, [selected])
 
   async function saveOverrides() {
+    if (readOnlyDemo) return
     if (!selected || Object.keys(overrides).length === 0) return
     setSaving(true)
     try {
@@ -142,7 +145,11 @@ export default function DataMapping() {
       <div className="space-y-5 max-w-[1400px]">
         <SectionHeader
           title="Field Mapping"
-          subtitle="Review and approve column → ontology field assignments. Override low-confidence mappings before committing."
+          subtitle={
+            readOnlyDemo
+              ? 'Demo: column → ontology mappings for ABC Company Inc. are read-only.'
+              : 'Review and approve column → ontology field assignments. Override low-confidence mappings before committing.'
+          }
         />
         <p className="text-sm text-muted-foreground">
           Select or create a client in the header to edit field mappings.
@@ -155,7 +162,11 @@ export default function DataMapping() {
     <div className="space-y-5 max-w-[1400px]">
       <SectionHeader
         title="Field Mapping"
-        subtitle="Review and approve column → ontology field assignments. Override low-confidence mappings before committing."
+        subtitle={
+          readOnlyDemo
+            ? 'Demo: pre-mapped QuickBooks columns for ABC Company Inc. — view only (overrides disabled).'
+            : 'Review and approve column → ontology field assignments. Override low-confidence mappings before committing.'
+        }
         action={selected ? (
           <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-400">
             {autoMapped.length} auto · {reviewRequired.length} review
@@ -198,7 +209,15 @@ export default function DataMapping() {
 
       {!jobsLoading && !jobsError && jobs.length > 0 && (
         <div className="grid grid-cols-4 gap-4">
-          {urlJobId && selectedJobId === parseInt(urlJobId, 10) && (
+          {readOnlyDemo && (
+            <div className="col-span-4 rounded-lg border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-sm text-card-foreground">
+              <p className="font-semibold text-amber-400 text-xs uppercase tracking-wide mb-1">Demo — read-only mappings</p>
+              <p className="text-xs text-muted-foreground">
+                You can browse all columns and filter by “needs review,” but dropdowns and save are disabled for the tour.
+              </p>
+            </div>
+          )}
+          {!readOnlyDemo && urlJobId && selectedJobId === parseInt(urlJobId, 10) && (
             <div className="col-span-4 rounded-lg border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-sm text-card-foreground">
               <p className="font-semibold text-amber-400 text-xs uppercase tracking-wide mb-1">Mapping review for this upload</p>
               <p className="text-xs text-muted-foreground">
@@ -262,7 +281,12 @@ export default function DataMapping() {
 
                 {/* Mappings */}
                 <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-                  <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                  <label
+                    className={cn(
+                      'flex items-center gap-2 text-xs text-muted-foreground select-none',
+                      readOnlyDemo ? 'cursor-default opacity-90' : 'cursor-pointer',
+                    )}
+                  >
                     <input
                       type="checkbox"
                       checked={reviewOnly}
@@ -275,8 +299,9 @@ export default function DataMapping() {
                 <div className="rounded-xl border border-border bg-card overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                     <p className="text-xs font-semibold text-card-foreground">Column Mappings — {selected.filename}</p>
-                    {Object.keys(overrides).length > 0 && (
+                    {!readOnlyDemo && Object.keys(overrides).length > 0 && (
                       <button
+                        type="button"
                         onClick={saveOverrides}
                         disabled={saving}
                         className="text-xs px-3 py-1 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
@@ -300,8 +325,15 @@ export default function DataMapping() {
                             <select
                               value={overrides[m.source_column] ?? m.ontology_field ?? ''}
                               onChange={e => setOverrides(prev => ({ ...prev, [m.source_column]: e.target.value }))}
+                              disabled={readOnlyDemo}
                               aria-label={`Map column ${m.source_column}`}
-                              className="bg-muted border border-border rounded px-2 py-1 text-xs text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring w-full max-w-xs"
+                              aria-readonly={readOnlyDemo}
+                              className={cn(
+                                'bg-muted border border-border rounded px-2 py-1 text-xs text-card-foreground w-full max-w-xs',
+                                readOnlyDemo
+                                  ? 'cursor-not-allowed opacity-90'
+                                  : 'focus:outline-none focus:ring-2 focus:ring-ring',
+                              )}
                             >
                               <option value="">— unassigned —</option>
                               {ONTOLOGY_FIELDS.map(f => <option key={f} value={f}>{f}</option>)}

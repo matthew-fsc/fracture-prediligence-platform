@@ -33,8 +33,8 @@
       "payroll_ratio_median_pct": 52,
       "recurring_rev_median_pct": 58,
       "top_customer_conc_median_pct": 22,
-      "market_ebitda_multiple_floor": 4.0,
-      "market_ebitda_multiple_ceiling": 6.5
+      "market_ebitda_multiple_floor": 4.55,
+      "market_ebitda_multiple_ceiling": 6.0
     },
     {
       "industry_slug": "business_services",

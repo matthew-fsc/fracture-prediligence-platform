@@ -5,9 +5,12 @@ spots-remaining counter, and admin link management.
 CSV sandbox samples for connectors live under `scripts/generate_sandbox_data.py` (separate narrative).
 """
 
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -24,7 +27,7 @@ _spots_remaining = 18
 TOTAL_SPOTS = settings.DEMO_TOTAL_SPOTS
 
 # ---------------------------------------------------------------------------
-# Static demo data — ABC Company (demo_company_seed.py TTM targets: ~$3.26M rev, ~$806K EBITDA)
+# Static demo data — ABC Company (demo_company_seed.py: ~$4.20M TTM rev, ~$1.74M EBITDA proxy)
 # ---------------------------------------------------------------------------
 DEMO_DATA = {
     "company": {
@@ -34,25 +37,25 @@ DEMO_DATA = {
         "founded": 2009,
         "state": "CA",
         "employees": 13,
-        "ttm_revenue": 3259172,
-        "ebitda": 806357,
-        "ebitda_margin": 24.7,
+        "ttm_revenue": 4196172,
+        "ebitda": 1743357,
+        "ebitda_margin": 41.5,
         "owner": "David Merrill",
         "advisor": "Sarah Chen, CEPA",
         "engagement_stage": "Pre-Diligence",
     },
     "drs": {
-        "base": 48.9,
-        "conservative": 46.5,
-        "optimistic": 51.4,
-        "tier": "High Risk",
+        "base": 72.0,
+        "conservative": 68.5,
+        "optimistic": 75.5,
+        "tier": "Investment Grade",
         "contributions": {
-            "revenue_quality": 13.0,
-            "financial_integrity": 11.6,
-            "operational_independence": 9.6,
-            "customer_risk": 5.25,
-            "management_team": 5.2,
-            "growth_drivers": 4.25,
+            "revenue_quality": 17.5,
+            "financial_integrity": 14.8,
+            "operational_independence": 14.2,
+            "customer_risk": 10.5,
+            "management_team": 7.2,
+            "growth_drivers": 7.8,
         },
     },
     "category_scores": {
@@ -118,21 +121,21 @@ DEMO_DATA = {
         },
     },
     "enterprise_value": {
-        "floor": 2016000,
-        "midpoint": 2419000,
-        "ceiling": 2822000,
-        "multiple_used": "2.5-3.5",
-        "ebitda_base": 806357,
-        "multiple_basis": "drs_tier_heuristic",
-        "drs_multiple_floor": 2.5,
-        "drs_multiple_ceiling": 3.5,
+        "floor": 8320000,
+        "midpoint": 9810000,
+        "ceiling": 11320000,
+        "multiple_used": "4.8–6.5",
+        "ebitda_base": 1743357,
+        "multiple_basis": "blended",
+        "drs_multiple_floor": 5.0,
+        "drs_multiple_ceiling": 7.0,
         "market_reference": None,
         "valuation_summary": (
-            "~$806K EBITDA proxy × High Risk DRS band (2.5x–3.5x per scoring_rules). "
-            "Matches demo_company_seed.py P&L; live /api/analytics may blend market context."
+            "~$1.74M normalized EBITDA × blended DRS Investment band (5.0x–7.0x) with curated "
+            "field_services $1M–$5M market reference (4.55x–6.0x). Live /api/analytics/scores/1 should align after re-seed."
         ),
         "source_citation": (
-            "SCORING_RULES.enterprise_multiples HIGH_RISK (2.5x–3.5x) × rounded EBITDA basis from ABC seed."
+            "Blended per a10_enterprise_value with market_benchmarks field_services band; ABC seed P&L TTM."
         ),
     },
     "flagged_issues": [
@@ -161,7 +164,7 @@ DEMO_DATA = {
             "severity": "MEDIUM",
             "category": "growth_drivers",
             "title": "Growth is project-led — limited premium multiple",
-            "description": "3-year revenue moves from ~$2.79M (2023) to ~$3.26M (2025 TTM) — positive but uneven and below typical buyer expectations for a growth premium without a formal BD engine.",
+            "description": "3-year revenue moves from ~$2.79M (2023) to ~$4.20M (2025 TTM) — positive but uneven and below typical buyer expectations for a growth premium without a formal BD engine.",
             "data_needed": "Revenue forecast by account, market expansion plan",
             "timeline": "9 months",
             "ev_impact": 360000,
@@ -289,18 +292,18 @@ DEMO_DATA = {
         },
     ],
     "monthly_revenue": [
-        {"month": "Jan '25", "revenue": 271598},
-        {"month": "Feb '25", "revenue": 271598},
-        {"month": "Mar '25", "revenue": 271598},
-        {"month": "Apr '25", "revenue": 271598},
-        {"month": "May '25", "revenue": 271598},
-        {"month": "Jun '25", "revenue": 271598},
-        {"month": "Jul '25", "revenue": 271598},
-        {"month": "Aug '25", "revenue": 271598},
-        {"month": "Sep '25", "revenue": 271598},
-        {"month": "Oct '25", "revenue": 271598},
-        {"month": "Nov '25", "revenue": 271598},
-        {"month": "Dec '25", "revenue": 271594},
+        {"month": "Jan '25", "revenue": 349681},
+        {"month": "Feb '25", "revenue": 349681},
+        {"month": "Mar '25", "revenue": 349681},
+        {"month": "Apr '25", "revenue": 349681},
+        {"month": "May '25", "revenue": 349681},
+        {"month": "Jun '25", "revenue": 349681},
+        {"month": "Jul '25", "revenue": 349681},
+        {"month": "Aug '25", "revenue": 349681},
+        {"month": "Sep '25", "revenue": 349681},
+        {"month": "Oct '25", "revenue": 349681},
+        {"month": "Nov '25", "revenue": 349681},
+        {"month": "Dec '25", "revenue": 349681},
     ],
 }
 
@@ -328,6 +331,34 @@ class CreateLinkRequest(BaseModel):
     sender_note: Optional[str] = None
 
 
+class VerifyAccessCodeRequest(BaseModel):
+    code: str
+
+
+# ---------------------------------------------------------------------------
+# Generic demo access (shared passphrase when DEMO_ACCESS_CODE is set)
+# ---------------------------------------------------------------------------
+
+DEMO_ACCESS_TOKEN_EXPIRE_DAYS = 7
+
+
+def _encode_demo_access_token() -> str:
+    expire = datetime.now(timezone.utc) + timedelta(days=DEMO_ACCESS_TOKEN_EXPIRE_DAYS)
+    return jwt.encode(
+        {"sub": "demo_access", "exp": expire},
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+    )
+
+
+def _demo_token_valid(token: str) -> bool:
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return payload.get("sub") == "demo_access"
+    except JWTError:
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -336,6 +367,37 @@ class CreateLinkRequest(BaseModel):
 def get_demo_data():
     """Return full Meridian Consulting Group demo dataset."""
     return DEMO_DATA
+
+
+@router.get("/demo/access-status")
+def demo_access_status(
+    x_demo_access_token: Optional[str] = Header(default=None, alias="X-Demo-Access-Token"),
+):
+    """Whether generic demo access is gated and whether the caller's token is valid."""
+    required = bool(settings.DEMO_ACCESS_CODE)
+    if not required:
+        return {"required": False, "granted": True}
+    if not x_demo_access_token:
+        return {"required": True, "granted": False}
+    return {"required": True, "granted": _demo_token_valid(x_demo_access_token)}
+
+
+@router.post("/demo/verify-access-code")
+def verify_access_code(body: VerifyAccessCodeRequest):
+    """Exchange the configured passphrase for a short-lived demo access JWT."""
+    if not settings.DEMO_ACCESS_CODE:
+        raise HTTPException(
+            status_code=400,
+            detail="Demo access code is not configured on the server",
+        )
+    provided = (body.code or "").strip()
+    if not secrets.compare_digest(provided, settings.DEMO_ACCESS_CODE):
+        raise HTTPException(status_code=401, detail="Invalid access code")
+    token = _encode_demo_access_token()
+    return {
+        "access_token": token,
+        "expires_in": DEMO_ACCESS_TOKEN_EXPIRE_DAYS * 86400,
+    }
 
 
 @router.get("/spots-remaining")

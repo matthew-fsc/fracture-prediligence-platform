@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
-import { Outlet, useSearchParams } from 'react-router-dom'
+import { Outlet, Navigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { fmtM, cn } from '../../lib/utils'
 import DemoSidebar from './DemoSidebar'
@@ -10,6 +10,7 @@ import { useCompany } from '../../context/CompanyContext'
 import { Bell, Search, Share2, Check, ArrowLeft } from 'lucide-react'
 import { usePageTitle } from '../../hooks/usePageTitle'
 import { apiClient } from '../../lib/apiClient'
+import { fetchDemoAccessStatus } from '../../lib/demoAccess'
 
 const DEMO_COMPANY = { id: 1, name: 'ABC Company Inc' }
 
@@ -137,6 +138,28 @@ export default function DemoShell({ slug = null }) {
   const [searchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const { setCompanyId } = useCompany()
+  /** Generic /demo only: wait for access check; slug links skip the gate. */
+  const [accessGate, setAccessGate] = useState(() => (slug ? 'ready' : 'checking'))
+
+  useEffect(() => {
+    if (slug) {
+      setAccessGate('ready')
+      return
+    }
+    let cancelled = false
+    fetchDemoAccessStatus()
+      .then((s) => {
+        if (cancelled || !s) return
+        if (!s.required || s.granted) setAccessGate('ready')
+        else setAccessGate('blocked')
+      })
+      .catch(() => {
+        if (!cancelled) setAccessGate('blocked')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [slug])
 
   // Pre-seed company data so all demo pages see ABC Company Inc instead of an empty list
   useEffect(() => {
@@ -147,6 +170,7 @@ export default function DemoShell({ slug = null }) {
 
   /** Start heavy ABC (company 1) analytics before the outlet paints so Home/header share one request. */
   useLayoutEffect(() => {
+    if (accessGate !== 'ready') return
     const demoStale = 120_000
     const quiet = { meta: { suppressErrorToast: true } }
     queryClient.prefetchQuery({
@@ -180,7 +204,7 @@ export default function DemoShell({ slug = null }) {
       staleTime: demoStale,
       ...quiet,
     })
-  }, [queryClient])
+  }, [queryClient, accessGate])
 
   const basePrefix = slug ? `/demo/${slug}` : '/demo'
 
@@ -191,6 +215,8 @@ export default function DemoShell({ slug = null }) {
   usePageTitle(pageTitle)
 
   useEffect(() => {
+    if (!slug && accessGate !== 'ready') return
+
     // Handle ?ref=REFCODE on generic demo
     const refCode = searchParams.get('ref')
     if (refCode) {
@@ -217,7 +243,7 @@ export default function DemoShell({ slug = null }) {
     apiClient.get('/api/spots-remaining')
       .then((d) => { if (d) setSpotsRemaining(d.spots_remaining) })
       .catch(() => {})
-  }, [slug, searchParams])
+  }, [slug, searchParams, accessGate])
 
   // ---------------------------------------------------------------------------
   // Section tracking — called by DemoHome when sections enter viewport
@@ -242,6 +268,18 @@ export default function DemoShell({ slug = null }) {
     }),
     [demoData, personalized, spotsRemaining, slug, trackSection, openConversionModal],
   )
+
+  if (accessGate === 'checking') {
+    return (
+      <div className="dark flex h-screen items-center justify-center bg-background text-muted-foreground text-sm">
+        Loading demo…
+      </div>
+    )
+  }
+
+  if (accessGate === 'blocked') {
+    return <Navigate to="/request-demo" replace />
+  }
 
   return (
     <DemoContext.Provider value={demoCtx}>

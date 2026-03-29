@@ -186,7 +186,7 @@ export default function PricingPage() {
             <span style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 15 }}>Fracture Systems</span>
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            <Link to="/demo" style={{ color: COLORS.gold, fontFamily: "'DM Sans', sans-serif", fontSize: 14, textDecoration: 'none' }}>See Demo</Link>
+            <Link to="/request-demo" style={{ color: COLORS.gold, fontFamily: "'DM Sans', sans-serif", fontSize: 14, textDecoration: 'none' }}>Request live demo</Link>
             <Link to="/sign-in" style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, textDecoration: 'none' }}>Sign In</Link>
           </div>
         </div>

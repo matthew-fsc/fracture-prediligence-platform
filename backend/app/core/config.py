@@ -40,7 +40,10 @@ class Settings(BaseSettings):
 
     DEMO_TOTAL_SPOTS: int = 20
     DEMO_SLUG_RETRY_COUNT: int = 5
-    # When True, POST /api/ingestion/upload/1 is rejected (ABC demo uses pre-seeded file only). Set False to test uploads locally.
+    # When set, generic /demo requires a successful POST /api/demo/verify-access-code first.
+    # Empty = generic demo is open (typical local dev). Personalized /demo/:slug is unaffected.
+    DEMO_ACCESS_CODE: str = ""
+    # When True, POST /api/ingestion/upload/1 and PATCH mappings for company 1 are rejected (ABC demo is read-only).
     DEMO_BLOCK_INGESTION_UPLOAD_FOR_COMPANY_1: bool = True
 
     # Optional: set to your Clerk user id (sub) to assign demo company id=1 on bootstrap (local dev).

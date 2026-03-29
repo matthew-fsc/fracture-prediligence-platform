@@ -5,9 +5,11 @@ Used by app startup (`ensure_demo_company_seeded`) when the DB has no revenue
 streams for company 1, and by the CLI `scripts/seed_abc_company.py` for
 manual resets.
 
-If live analytics show TTM revenue/EBITDA far above the printed verify() targets,
-company 1 likely has additional `revenue_streams` from connector uploads on top of
-this seed; wipe and re-seed (or trim duplicate ingests) so metrics match one P&L path.
+If live analytics do not match verify() targets, company 1 may have extra connector
+ingests overlapping this seed — wipe and re-seed so TTM follows one P&L path.
+
+TTM targets (2025 monthly sum): ~\$4.20M revenue, ~\$1.74M EBITDA proxy (COGS/OPEX
+unchanged from QuickBooks-style seed). EV uses DRS tier × blended market multiples.
 
 Populates:
   - 3-year P&L (2023 / 2024 / 2025)
@@ -51,26 +53,133 @@ COMPANY_ID = 1
 # Pre-loaded demo ingestion (Data Sources UI) — QuickBooks-style P&L for ABC Company Inc.
 DEMO_INGESTION_ID = "seed-demo-abc-qb-pl-v1"
 
+# Column mapping payload for Field Mapping demo (read-only in UI; matches P5 shape).
+def _demo_column_mappings() -> dict:
+    mid = DEMO_INGESTION_ID
+    rows = [
+        {
+            "source_column": "Date",
+            "ontology_field": "REVENUE_PERIOD",
+            "entity_type": "revenue",
+            "confidence": 98,
+            "match_method": "exact",
+            "match_detail": "Header matched to revenue period",
+            "requires_review": False,
+            "alternative_fields": [],
+        },
+        {
+            "source_column": "Customer",
+            "ontology_field": "CUSTOMER_NAME",
+            "entity_type": "customer",
+            "confidence": 95,
+            "match_method": "exact",
+            "match_detail": "Direct match to customer name",
+            "requires_review": False,
+            "alternative_fields": [],
+        },
+        {
+            "source_column": "Amount",
+            "ontology_field": "REVENUE_GROSS",
+            "entity_type": "revenue",
+            "confidence": 92,
+            "match_method": "fuzzy",
+            "match_detail": "Numeric column inferred as gross revenue",
+            "requires_review": False,
+            "alternative_fields": [],
+        },
+        {
+            "source_column": "Account Number",
+            "ontology_field": "EXPENSE_CATEGORY",
+            "entity_type": "expense",
+            "confidence": 88,
+            "match_method": "fuzzy",
+            "match_detail": "COGS / expense classification from GL account",
+            "requires_review": False,
+            "alternative_fields": [],
+        },
+        {
+            "source_column": "Memo / Description",
+            "ontology_field": "EXPENSE_DESCRIPTION",
+            "entity_type": "expense",
+            "confidence": 72,
+            "match_method": "value_inference",
+            "match_detail": "Low-confidence: could map to revenue description",
+            "requires_review": True,
+            "alternative_fields": [{"field": "REVENUE_DESCRIPTION", "confidence": 55}],
+        },
+        {
+            "source_column": "Split",
+            "ontology_field": None,
+            "entity_type": None,
+            "confidence": 0,
+            "match_method": "excluded",
+            "match_detail": "Administrative column — excluded from ontology",
+            "requires_review": False,
+            "alternative_fields": [],
+        },
+        {
+            "source_column": "Class",
+            "ontology_field": "EXPENSE_CATEGORY",
+            "entity_type": "expense",
+            "confidence": 61,
+            "match_method": "fuzzy",
+            "match_detail": "Class vs department — advisor review suggested",
+            "requires_review": True,
+            "alternative_fields": [{"field": "EMPLOYEE_DEPARTMENT", "confidence": 58}],
+        },
+        {
+            "source_column": "Name",
+            "ontology_field": "EMPLOYEE_NAME",
+            "entity_type": "employee",
+            "confidence": 90,
+            "match_method": "exact",
+            "match_detail": "Payroll name column",
+            "requires_review": False,
+            "alternative_fields": [],
+        },
+        {
+            "source_column": "Hours",
+            "ontology_field": None,
+            "entity_type": "employee",
+            "confidence": 65,
+            "match_method": "value_inference",
+            "match_detail": "Hours not in base ontology — optional custom metric",
+            "requires_review": False,
+            "alternative_fields": [],
+        },
+    ]
+    auto = sum(1 for r in rows if r.get("ontology_field") and not r["requires_review"] and r["match_method"] != "excluded")
+    rev = sum(1 for r in rows if r["requires_review"])
+    exc = sum(1 for r in rows if r["match_method"] == "excluded")
+    return {
+        "ingestion_id": mid,
+        "auto_mapped": auto,
+        "review_required": rev,
+        "excluded": exc,
+        "mappings": rows,
+    }
+
+
 # ── Annual revenue totals ─────────────────────────────────────────────────────
-ANNUAL_REVENUE = {2023: Decimal("2793233"), 2024: Decimal("2746003"), 2025: Decimal("3259172")}
-TOTAL_3YR = sum(ANNUAL_REVENUE.values())  # 8798408
+# 2025 scaled so TTM revenue − 2025 COGS − 2025 OpEx ≈ \$1.74M EBITDA (matches analytics proxy).
+ANNUAL_REVENUE = {2023: Decimal("2793233"), 2024: Decimal("2746003"), 2025: Decimal("4196172")}
+TOTAL_3YR = sum(ANNUAL_REVENUE.values())
 
 # 2023/2024 split weight (used when deriving per-year from 2yr remainder)
 SPLIT_23 = ANNUAL_REVENUE[2023] / (ANNUAL_REVENUE[2023] + ANNUAL_REVENUE[2024])
 SPLIT_24 = ANNUAL_REVENUE[2024] / (ANNUAL_REVENUE[2023] + ANNUAL_REVENUE[2024])
 
 # ── Top-10 customers: 3-year totals + explicit 2025 amounts ───────────────────
-# 2025 amounts for TOP5 set explicitly to match stated TTM concentration:
-#   COMPANY 1: 49.4% ($1,609,997) · COMPANY 2: 19.0% ($619,024)
-#   COMPANY 3: 4.9% ($159,763)   · COMPANY 4: 3.3% ($107,575)
-#   COMPANY 5: 2.4% ($78,207)
+# 2025 TOP5 scaled so concentration % are unchanged at the ~\$4.20M 2025 column total
+# at the new ~\$4.20M 2025 column total (see ANNUAL_REVENUE[2025]).
+#   COMPANY 1 ~49.4% · COMPANY 2 ~19% · COMPANY 3 ~4.9% · COMPANY 4 ~3.3% · COMPANY 5 ~2.4%
 # Format: (name, 3yr_total, explicit_2025 or None)
 TOP10 = [
-    ("COMPANY 1",  Decimal("3241433"), Decimal("1609997")),
-    ("COMPANY 2",  Decimal("2737453"), Decimal("619024")),
-    ("COMPANY 3",  Decimal("719728"),  Decimal("159763")),
-    ("COMPANY 4",  Decimal("428617"),  Decimal("107575")),
-    ("COMPANY 5",  Decimal("312796"),  Decimal("78207")),
+    ("COMPANY 1",  Decimal("3241433"), Decimal("2072865")),
+    ("COMPANY 2",  Decimal("2737453"), Decimal("796991")),
+    ("COMPANY 3",  Decimal("719728"),  Decimal("205694")),
+    ("COMPANY 4",  Decimal("428617"),  Decimal("138502")),
+    ("COMPANY 5",  Decimal("312796"),  Decimal("100691")),
     ("COMPANY 6",  Decimal("251035"),  None),
     ("COMPANY 7",  Decimal("112504"),  None),
     ("COMPANY 8",  Decimal("88250"),   None),
@@ -83,8 +192,8 @@ REMAINING_COUNT = 58
 PER_REMAINING_3YR = REMAINING_3YR / REMAINING_COUNT  # ~12848 each
 
 # 2025 explicitly set for TOP5; compute remainder for COMPANY 6-55
-TOP5_2025_SUM = sum(t[2] for t in TOP10 if t[2] is not None)  # 2,574,566
-OTHERS_2025_BUDGET = ANNUAL_REVENUE[2025] - TOP5_2025_SUM      # 684,606
+TOP5_2025_SUM = sum(t[2] for t in TOP10 if t[2] is not None)  # 3,314,743
+OTHERS_2025_BUDGET = ANNUAL_REVENUE[2025] - TOP5_2025_SUM      # 881,429
 
 # ── P&L expense data (annual) ─────────────────────────────────────────────────
 # Format: {year: [(description, amount, category), ...]}
@@ -414,20 +523,38 @@ def verify(db):
     print("\n  === VERIFICATION ===")
     print(f"  Revenue 2023 : ${total_2023:>12,.0f}  (target: $2,793,233)")
     print(f"  Revenue 2024 : ${total_2024:>12,.0f}  (target: $2,746,003)")
-    print(f"  Revenue 2025 : ${total_2025:>12,.0f}  (target: $3,259,172)")
+    print(f"  Revenue 2025 : ${total_2025:>12,.0f}  (target: $4,196,172)")
     print(f"  COGS 2025    : ${cogs_25:>12,.0f}  (target: $2,334,320)")
     print(f"  OpEx 2025    : ${opex_25:>12,.0f}  (target:   $118,495)")
     print(f"  Owner Comp   : ${owner_25:>12,.0f}  (target:   $202,221)")
-    print(f"  Gross Profit : ${gross_profit:>12,.0f}  (target:   $924,852)")
-    print(f"  EBITDA       : ${ebitda:>12,.0f}  (target:   $806,357)")
+    print(f"  Gross Profit : ${gross_profit:>12,.0f}  (target: $1,861,852)")
+    print(f"  EBITDA       : ${ebitda:>12,.0f}  (target: $1,743,357)")
 
 
 def ensure_demo_ingestion_job_if_missing(db: Session) -> bool:
     """
-    Insert one completed ingestion job for company_id=1 if none exist.
-    Demo Data Sources expects this row so the tour shows ABC Company Inc. file without uploads.
+    Ensure company_id=1 has the demo ingestion job with column_mappings for Field Mapping UI.
+    Inserts when no jobs exist; backfills mappings on the demo job if the row exists but mappings are empty.
     Idempotent.
     """
+    cmap = _demo_column_mappings()
+    job = (
+        db.query(IngestionJob)
+        .filter(IngestionJob.company_id == COMPANY_ID, IngestionJob.ingestion_id == DEMO_INGESTION_ID)
+        .first()
+    )
+    if job:
+        mlist = []
+        if job.column_mappings and isinstance(job.column_mappings, dict):
+            mlist = job.column_mappings.get("mappings") or []
+        if len(mlist) == 0:
+            job.column_mappings = cmap
+            job.mapped_count = len(cmap["mappings"])
+            db.commit()
+            logger.info("Backfilled column_mappings for demo ingestion job (company_id=1).")
+            return True
+        return False
+
     n = (
         db.query(func.count(IngestionJob.id))
         .filter(IngestionJob.company_id == COMPANY_ID)
@@ -446,8 +573,9 @@ def ensure_demo_ingestion_job_if_missing(db: Session) -> bool:
             current_phase=PipelinePhase.P6_EXTRACTION,
             current_status=PhaseStatus.COMPLETE,
             row_count=1247,
-            mapped_count=18,
+            mapped_count=len(cmap["mappings"]),
             error_count=0,
+            column_mappings=cmap,
         )
     )
     db.commit()

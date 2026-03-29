@@ -6,6 +6,7 @@ import { CompanyProvider } from './context/CompanyContext'
 
 // Public / marketing pages
 import LandingPage from './pages/LandingPage'
+import RequestDemoPage from './pages/RequestDemoPage'
 import PricingPage from './pages/PricingPage'
 import NotFoundPage from './pages/NotFoundPage'
 import OnboardingPage from './pages/OnboardingPage'
@@ -86,6 +87,7 @@ export default function App() {
         {/* Marketing / public routes                                         */}
         {/* ---------------------------------------------------------------- */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/request-demo" element={<RequestDemoPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/sign-in/*" element={<SignInPage />} />
         <Route path="/sign-up/*" element={<SignUpPage />} />

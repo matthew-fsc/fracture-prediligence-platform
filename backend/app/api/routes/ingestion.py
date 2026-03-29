@@ -162,6 +162,12 @@ def update_mappings(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found.")
 
+    if settings.DEMO_BLOCK_INGESTION_UPLOAD_FOR_COMPANY_1 and company.id == 1:
+        raise HTTPException(
+            status_code=403,
+            detail="Mapping overrides are disabled for the ABC demo company (read-only tour).",
+        )
+
     mappings = job.column_mappings or {"mappings": []}
     for m in mappings.get("mappings", []):
         if m["source_column"] in overrides:

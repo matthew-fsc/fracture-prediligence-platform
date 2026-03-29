@@ -89,8 +89,8 @@ export default function SignInPage() {
         <p style={{ color: clerkEmbedText.secondary, fontFamily: "'DM Sans', sans-serif", fontSize: 14, lineHeight: 1.6, maxWidth: 380, margin: '0 0 24px 0' }}>
           Set <code style={{ color: C.gold }}>VITE_CLERK_PUBLISHABLE_KEY</code> in <code style={{ color: C.gold }}>frontend/.env.local</code>, then restart the dev server.
         </p>
-        <Link to="/demo" style={{ color: C.gold, fontFamily: "'DM Sans', sans-serif", fontSize: 14, textDecoration: 'none', border: `1px solid ${C.gold}`, borderRadius: 6, padding: '8px 20px' }}>
-          View demo ?
+        <Link to="/request-demo" style={{ color: C.gold, fontFamily: "'DM Sans', sans-serif", fontSize: 14, textDecoration: 'none', border: `1px solid ${C.gold}`, borderRadius: 6, padding: '8px 20px' }}>
+          Request live demo
         </Link>
       </div>
     )

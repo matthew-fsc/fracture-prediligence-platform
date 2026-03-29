@@ -319,3 +319,32 @@ def seed_curated_benchmarks_if_empty(db: Session) -> None:
 
 def validate_multiple_range(lo: float, hi: float) -> bool:
     return 0 < lo <= hi <= 100
+
+
+def ensure_field_services_m1m5_benchmark_multiples(db: Session) -> None:
+    """
+    Sync DB segment row with curated IBBA band for Field Services $1M–$5M (demo EV calibration).
+    Safe to call on every startup; no-op if table missing or row not found.
+    """
+    try:
+        seg = (
+            db.query(MarketSegmentMetric)
+            .filter(
+                MarketSegmentMetric.industry_slug == "field_services",
+                MarketSegmentMetric.ebitda_band_label == "$1M–$5M",
+            )
+            .first()
+        )
+        if not seg:
+            return
+        target_lo, target_hi = 4.55, 6.0
+        cur_lo = float(seg.market_ebitda_multiple_floor or 0)
+        cur_hi = float(seg.market_ebitda_multiple_ceiling or 0)
+        if abs(cur_lo - target_lo) < 0.001 and abs(cur_hi - target_hi) < 0.001:
+            return
+        seg.market_ebitda_multiple_floor = target_lo
+        seg.market_ebitda_multiple_ceiling = target_hi
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise

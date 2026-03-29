@@ -127,11 +127,11 @@ export default function Sidebar({ mobileOpen = false, onNavigate }) {
       {/* Demo link */}
       <div className="px-3 pb-2 border-t border-sidebar-border pt-2">
         <Link
-          to="/demo"
+          to="/request-demo"
           className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium text-amber-400/80 hover:text-amber-400 hover:bg-amber-400/10 transition-colors duration-100 w-full"
         >
           <MonitorPlay className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
-          <span>View Demo</span>
+          <span>Request live demo</span>
         </Link>
       </div>
 

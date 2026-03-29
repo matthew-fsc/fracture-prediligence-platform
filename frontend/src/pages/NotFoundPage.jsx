@@ -31,10 +31,10 @@ export default function NotFoundPage() {
           Go Home ?
         </Link>
         <Link
-          to="/demo"
+          to="/request-demo"
           style={{ border: `1.5px solid ${COLORS.gold}`, color: COLORS.gold, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 14, padding: '12px 28px', borderRadius: 8, textDecoration: 'none' }}
         >
-          View Demo
+          Request live demo
         </Link>
       </div>
     </div>

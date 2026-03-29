@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 
 const COLORS = { bg: '#0A1628', gold: '#C9973A', muted: '#8A9BB0' }
 
@@ -82,8 +82,8 @@ function NoClerkNotice() {
         instance at build time (e.g. in your hosting provider env or <code style={{ color: COLORS.gold }}>frontend/.env</code>{' '}
         locally), then rebuild the SPA.
       </p>
-      <a
-        href="/demo"
+      <Link
+        to="/request-demo"
         style={{
           color: COLORS.gold,
           fontFamily: "'DM Sans', sans-serif",
@@ -94,8 +94,8 @@ function NoClerkNotice() {
           padding: '8px 20px',
         }}
       >
-        View Demo instead
-      </a>
+        Request live demo instead
+      </Link>
     </div>
   )
 }
