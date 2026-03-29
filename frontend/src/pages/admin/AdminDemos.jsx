@@ -121,7 +121,7 @@ function CopyLink({ url }) {
 // Email reminder helper
 // ---------------------------------------------------------------------------
 function EmailReminder({ link }) {
-  const href = `mailto:${link.recipient_email}?subject=Following up � Your Fracture Systems Demo&body=Hi ${link.recipient_name},%0A%0AI wanted to follow up on the Fracture Systems demo I shared with you.%0A%0AYou can access it here: ${window.location.origin}/demo/${link.slug}%0A%0AWe have a limited number of Founding Advisor spots at $179/mo. Happy to answer any questions.%0A%0ABest,%0AMatthew`
+  const href = `mailto:${link.recipient_email}?subject=Following up — Your Fracture Systems Demo&body=Hi ${link.recipient_name},%0A%0AI wanted to follow up on the Fracture Systems demo I shared with you.%0A%0AYou can access it here: ${window.location.origin}/demo/${link.slug}%0A%0AWe have a limited number of Founding Advisor spots at $179/mo. Happy to answer any questions.%0A%0ABest,%0AMatthew`
   return (
     <a href={href} title="Send reminder" style={{ color: COLORS.muted, display: 'flex', alignItems: 'center', gap: 4, fontFamily: "'DM Sans', sans-serif", fontSize: 12, textDecoration: 'none' }}>
       <Mail size={13} /> Remind
@@ -223,13 +223,13 @@ export default function AdminDemos() {
                       <p style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500, margin: '0 0 2px 0' }}>{lnk.recipient_name}</p>
                       <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 11, margin: 0 }}>{lnk.recipient_email}</p>
                     </td>
-                    <td style={{ padding: '13px 16px', color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>{lnk.recipient_firm || '�'}</td>
+                    <td style={{ padding: '13px 16px', color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>{lnk.recipient_firm || '—'}</td>
                     <td style={{ padding: '13px 16px', color: lnk.visit_count > 0 ? COLORS.offWhite : COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: lnk.visit_count > 0 ? 600 : 400 }}>{lnk.visit_count}</td>
                     <td style={{ padding: '13px 16px', color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }}>
-                      {lnk.first_visited_at ? new Date(lnk.first_visited_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '�'}
+                      {lnk.first_visited_at ? new Date(lnk.first_visited_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                     </td>
                     <td style={{ padding: '13px 16px', color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }}>
-                      {lnk.sections_viewed?.length > 0 ? lnk.sections_viewed.join(', ') : '�'}
+                      {lnk.sections_viewed?.length > 0 ? lnk.sections_viewed.join(', ') : '—'}
                     </td>
                     <td style={{ padding: '13px 16px' }}>
                       <span style={{ background: lnk.converted ? 'rgba(74,222,128,0.1)' : 'rgba(139,155,176,0.1)', border: `1px solid ${lnk.converted ? 'rgba(74,222,128,0.25)' : 'rgba(139,155,176,0.2)'}`, color: lnk.converted ? COLORS.green : COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>

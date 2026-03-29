@@ -5,8 +5,12 @@ export const DemoContext = createContext({
   personalized: null,
   spotsRemaining: null,
   slug: null,
+  demoLocked: false,
   trackSection: () => {},
   openConversionModal: () => {},
 })
 
 export const useDemoData = () => useContext(DemoContext)
+
+/** Returns true when the demo is locked (inputs should be read-only for visitors). */
+export const useDemoLocked = () => useContext(DemoContext).demoLocked

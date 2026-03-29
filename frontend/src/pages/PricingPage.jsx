@@ -14,7 +14,7 @@ const TIERS = [
     name: 'Founding Advisor',
     price: '$179',
     per: '/mo',
-    badge: 'Limited � 20 spots',
+    badge: 'Limited — 20 spots',
     highlight: true,
     tagline: 'Rate locked for life',
     features: [
@@ -201,7 +201,7 @@ export default function PricingPage() {
           Lock in your advisor rate today.
         </h1>
         <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 16, maxWidth: 480, margin: '0 auto 12px', lineHeight: 1.7 }}>
-          20 founding spots at $179/mo � rate locked for life. Full access to every feature.
+          20 founding spots at $179/mo — rate locked for life. Full access to every feature.
         </p>
         <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>
           All plans include a 14-day free trial. No credit card required to start.
@@ -223,7 +223,7 @@ export default function PricingPage() {
             {[
               { q: 'What happens after the free trial?', a: "You'll be charged your plan rate automatically. Cancel anytime before the trial ends and you won't be charged." },
               { q: 'Can I switch plans?', a: 'Yes. Upgrade or downgrade at any time from your account settings.' },
-              { q: 'What is a Founding Advisor spot?', a: 'The first 20 advisors who subscribe lock in $179/mo for life � even when the Pro tier increases to market rate.' },
+              { q: 'What is a Founding Advisor spot?', a: 'The first 20 advisors who subscribe lock in $179/mo for life — even when the Pro tier increases to market rate.' },
             ].map(({ q, a }) => (
               <div key={q} style={{ borderBottom: `1px solid ${COLORS.border}`, paddingBottom: 20 }}>
                 <p style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 600, margin: '0 0 6px 0' }}>{q}</p>

@@ -17,6 +17,7 @@ from app.ontology.models import AppSetting, DemoLink, UserSubscription
 
 _SPOTS_TOTAL = 20
 _SPOTS_SETTING_KEY = "spots_remaining"
+_DEMO_LOCKED_KEY = "demo_locked"
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +188,29 @@ def _ensure_spots_setting(db: Session) -> None:
     if not db.query(AppSetting).filter(AppSetting.key == _SPOTS_SETTING_KEY).first():
         db.add(AppSetting(key=_SPOTS_SETTING_KEY, value="18"))
         db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Demo lock
+# ---------------------------------------------------------------------------
+
+def get_demo_locked(db: Session) -> bool:
+    """Return whether the demo is locked (inputs read-only for visitors). Defaults to True."""
+    setting = db.query(AppSetting).filter(AppSetting.key == _DEMO_LOCKED_KEY).first()
+    if setting is None:
+        return True
+    return setting.value.lower() == "true"
+
+
+def set_demo_locked(db: Session, locked: bool) -> bool:
+    """Set the demo lock state. Returns the new state."""
+    setting = db.query(AppSetting).filter(AppSetting.key == _DEMO_LOCKED_KEY).first()
+    if setting is None:
+        db.add(AppSetting(key=_DEMO_LOCKED_KEY, value="true" if locked else "false"))
+    else:
+        setting.value = "true" if locked else "false"
+    db.commit()
+    return locked
 
 
 # ---------------------------------------------------------------------------

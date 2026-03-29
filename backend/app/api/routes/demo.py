@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.db_functions import get_demo_locked, set_demo_locked
 from app.services import demo_service
 
 router = APIRouter()
@@ -368,9 +369,9 @@ def _demo_token_valid(token: str) -> bool:
 # ---------------------------------------------------------------------------
 
 @router.get("/demo/data")
-def get_demo_data():
-    """Return full Meridian Consulting Group demo dataset."""
-    return DEMO_DATA
+def get_demo_data(db: Session = Depends(get_db)):
+    """Return full ABC Company demo dataset with current lock state."""
+    return {**DEMO_DATA, "demo_locked": get_demo_locked(db)}
 
 
 @router.get("/demo/access-status")
@@ -456,7 +457,7 @@ def get_personalized_demo(slug: str, db: Session = Depends(get_db)):
             "recipient_firm": link.recipient_firm,
             "recipient_email": link.recipient_email,
         },
-        "demo_data": DEMO_DATA,
+        "demo_data": {**DEMO_DATA, "demo_locked": get_demo_locked(db)},
     }
 
 
@@ -473,6 +474,30 @@ def mark_demo_converted(slug: str, db: Session = Depends(get_db)):
     """Record that the visitor took a conversion action (e.g. requested Founding license)."""
     demo_service.mark_demo_converted(db, slug)
     return {"status": "ok"}
+
+
+@router.get("/admin/demo-lock")
+def get_demo_lock_status(
+    db: Session = Depends(get_db),
+    _: str = Depends(_check_admin_key),
+):
+    """Return current demo lock state."""
+    return {"locked": get_demo_locked(db)}
+
+
+class SetDemoLockRequest(BaseModel):
+    locked: bool
+
+
+@router.post("/admin/demo-lock")
+def set_demo_lock(
+    body: SetDemoLockRequest,
+    db: Session = Depends(get_db),
+    _: str = Depends(_check_admin_key),
+):
+    """Set demo lock state. When locked=true, all demo inputs are read-only for visitors."""
+    new_state = set_demo_locked(db, body.locked)
+    return {"locked": new_state}
 
 
 @router.get("/admin/demos")

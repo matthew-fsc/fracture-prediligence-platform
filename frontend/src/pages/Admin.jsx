@@ -5,7 +5,7 @@ export default function Admin() {
     <div>
       <PageHeader title="Admin" subtitle="Full implementation coming in Phase 1." />
       <div className="bg-card border border-border rounded-lg p-8 text-center text-muted-foreground text-sm">
-        Page scaffold � wire to backend API in Phase 1.
+        Page scaffold — wire to backend API in Phase 1.
       </div>
     </div>
   )

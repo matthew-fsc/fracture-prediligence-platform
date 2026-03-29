@@ -6,7 +6,7 @@ export default function DemoBanner({ onClaim, onDismiss, spotsRemaining }) {
       <div className="flex items-center gap-2 min-w-0">
         <Zap className="w-3.5 h-3.5 text-warning flex-shrink-0" />
         <p className="text-[12px] text-muted-foreground leading-tight">
-          You're viewing a live demo �{' '}
+          You're viewing a live demo —{' '}
           <span className="text-card-foreground font-medium">
             {spotsRemaining != null ? spotsRemaining : 20} Founding Advisor spots
           </span>{' '}

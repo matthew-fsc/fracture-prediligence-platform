@@ -23,13 +23,13 @@ function buildLocalAnswer(question, scores) {
   const q = question.toLowerCase()
 
   if (q.includes('drs') || q.includes('diligence readiness') || q.includes('score')) {
-    if (!drs) return "I don't have DRS data yet � please upload financial data in Data Sources first."
+    if (!drs) return "I don't have DRS data yet — please upload financial data in Data Sources first."
     return `Your Diligence Readiness Score is **${drs.base}/100** (${drs.tier}). Conservative: ${drs.conservative}, Optimistic: ${drs.optimistic}. The score reflects your readiness for a formal buyer diligence process.`
   }
 
   if (q.includes('value') || q.includes('ev') || q.includes('enterprise') || q.includes('valuation')) {
-    if (!ev) return "No enterprise value data yet � upload P&L and revenue data to compute EV."
-    return `Your estimated enterprise value range is **$${(ev.floor / 1e6).toFixed(2)}M � $${(ev.ceiling / 1e6).toFixed(2)}M**, with a midpoint of **$${(ev.midpoint / 1e6).toFixed(2)}M**. This uses a **${ev.multiple_used}x** EBITDA multiple based on your ${drs?.tier} DRS tier.`
+    if (!ev) return "No enterprise value data yet — upload P&L and revenue data to compute EV."
+    return `Your estimated enterprise value range is **$${(ev.floor / 1e6).toFixed(2)}M — $${(ev.ceiling / 1e6).toFixed(2)}M**, with a midpoint of **$${(ev.midpoint / 1e6).toFixed(2)}M**. This uses a **${ev.multiple_used}x** EBITDA multiple based on your ${drs?.tier} DRS tier.`
   }
 
   if (q.includes('gap') || q.includes('initiative') || q.includes('improve')) {
@@ -38,20 +38,20 @@ function buildLocalAnswer(question, scores) {
       .slice(0, 3)
     if (!weakest.length) return "Upload financial data to identify gaps."
     const list = weakest.map(([k, v]) => `${v.sub_scores ? Object.keys(v.sub_scores)[0] : k}: ${v.composite}/100`).join(', ')
-    return `Your lowest-scoring categories are: ${list}. Focus on the operational independence and revenue quality gaps first � these have the highest EV leverage given their DRS weights (20% and 25%).`
+    return `Your lowest-scoring categories are: ${list}. Focus on the operational independence and revenue quality gaps first — these have the highest EV leverage given their DRS weights (20% and 25%).`
   }
 
   if (q.includes('customer') || q.includes('concentration')) {
     const cr = cats.customer_risk
     if (!cr) return "No customer data ingested yet."
-    return `Customer Risk score: **${cr.composite}/100**. Top customer revenue share: ${cr.sub_scores?.concentration?.label ?? 'unknown'}. Active customers: ${cr.sub_scores?.diversification?.value ?? '�'}. ${cr.composite < 60 ? 'Concentration is a meaningful risk � reducing top-customer dependency should be a priority.' : 'Customer base is reasonably diversified.'}`
+    return `Customer Risk score: **${cr.composite}/100**. Top customer revenue share: ${cr.sub_scores?.concentration?.label ?? 'unknown'}. Active customers: ${cr.sub_scores?.diversification?.value ?? '—'}. ${cr.composite < 60 ? 'Concentration is a meaningful risk — reducing top-customer dependency should be a priority.' : 'Customer base is reasonably diversified.'}`
   }
 
   if (q.includes('question') || q.includes('buyer') || q.includes('pe') || q.includes('due diligence')) {
     return "Navigate to **Buyer Lens** to see all simulated buyer questions ranked by severity. The most critical questions center on contract documentation, key-person risk, and EBITDA normalization."
   }
 
-  return `I can help with: DRS scores, enterprise value, diligence gaps, buyer questions, and initiative planning. For real-time analysis, ensure you've uploaded your financial data in Data Sources.\n\nYou asked: "${question}" � try rephrasing with keywords like 'score', 'value', 'gap', 'customers', or 'buyers'.`
+  return `I can help with: DRS scores, enterprise value, diligence gaps, buyer questions, and initiative planning. For real-time analysis, ensure you've uploaded your financial data in Data Sources.\n\nYou asked: "${question}" — try rephrasing with keywords like 'score', 'value', 'gap', 'customers', or 'buyers'.`
 }
 
 export default function AICopilot() {
@@ -147,7 +147,7 @@ export default function AICopilot() {
         section="Intelligence"
         title="AI Copilot"
         subtitle="Ask questions about your diligence data, scores, gaps, and buyer risks"
-        badge={scoresLoading ? 'Loading scores�' : scoresError ? 'Scores unavailable' : hasAnalytics ? `DRS ${scores.drs?.base ?? '�'}/100 loaded` : 'No analytics loaded'}
+        badge={scoresLoading ? 'Loading scores—' : scoresError ? 'Scores unavailable' : hasAnalytics ? `DRS ${scores.drs?.base ?? '—'}/100 loaded` : 'No analytics loaded'}
       />
 
       {scoresError && (
@@ -171,7 +171,7 @@ export default function AICopilot() {
 
       {!scoresLoading && !scoresError && !hasAnalytics && (
         <div className="mb-4 rounded-xl border border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground" role="status">
-          Load financial data in <strong className="text-card-foreground">Data Sources</strong> first � answers will be more specific once DRS and EV are available.
+          Load financial data in <strong className="text-card-foreground">Data Sources</strong> first — answers will be more specific once DRS and EV are available.
         </div>
       )}
 
@@ -225,7 +225,7 @@ export default function AICopilot() {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKey}
-          placeholder="Ask about your DRS, EV, gaps, buyers�"
+          placeholder="Ask about your DRS, EV, gaps, buyers—"
           rows={2}
           className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-xs text-card-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
         />

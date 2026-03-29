@@ -24,7 +24,7 @@ export function setStoredAdminKey(key) {
   localStorage.setItem(ADMIN_KEY_STORAGE, key)
 }
 
-/** Async () => Clerk session JWT or null � set by ClerkAuthBridge when Clerk is active. */
+/** Async () => Clerk session JWT or null — set by ClerkAuthBridge when Clerk is active. */
 let authTokenGetter = null
 
 export function setAuthTokenGetter(fn) {
@@ -119,7 +119,7 @@ export function messageFromErrorBody(text, status) {
   } catch {
     /* not JSON */
   }
-  return text.length > 500 ? `${text.slice(0, 500)}�` : text
+  return text.length > 500 ? `${text.slice(0, 500)}—` : text
 }
 
 /**

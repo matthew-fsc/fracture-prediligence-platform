@@ -85,9 +85,9 @@ const INDUSTRIES = [
 
 const REVENUE_RANGES = [
   'Under $1M',
-  '$1M�$2.5M',
-  '$2.5M�$5M',
-  '$5M�$10M',
+  '$1M—$2.5M',
+  '$2.5M—$5M',
+  '$5M—$10M',
   '$10M+',
 ]
 
@@ -142,7 +142,7 @@ function ProgressBar({ step }) {
 }
 
 // ---------------------------------------------------------------------------
-// Step 1 � Add first client
+// Step 1 — Add first client
 // ---------------------------------------------------------------------------
 function Step1({ onNext }) {
   const saved = readOnboarding().step1
@@ -240,7 +240,7 @@ function Step1({ onNext }) {
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 � Upload first document
+// Step 2 — Upload first document
 // ---------------------------------------------------------------------------
 function Step2({ onNext, onSkip }) {
   const [file, setFile] = useState(null)
@@ -323,7 +323,7 @@ function Step2({ onNext, onSkip }) {
               Drag & drop or click to browse
             </p>
             <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 12, margin: 0 }}>
-              PDF, XLSX, CSV, DOCX � Max 25MB
+              PDF, XLSX, CSV, DOCX — Max 25MB
             </p>
           </>
         )}
@@ -378,7 +378,7 @@ function SliderRow({ label, value, onChange, min = 0, max = 100, step = 5, leftL
 }
 
 // ---------------------------------------------------------------------------
-// Step 3 � Advisor Interview (qualitative questionnaire)
+// Step 3 — Advisor Interview (qualitative questionnaire)
 // ---------------------------------------------------------------------------
 const CONTRACT_TYPES = [
   { value: 'msa',      label: 'MSA / Annual Contract' },
@@ -389,8 +389,8 @@ const CONTRACT_TYPES = [
 
 const MARKET_OPTS = [
   { value: 'defined',          label: 'Defined ICP + clear differentiation + repeatable sales motion', score: 80 },
-  { value: 'moderate',         label: 'Moderate � some differentiation, inconsistent execution', score: 45 },
-  { value: 'undifferentiated', label: 'Undifferentiated � competing on price or availability', score: 10 },
+  { value: 'moderate',         label: 'Moderate — some differentiation, inconsistent execution', score: 45 },
+  { value: 'undifferentiated', label: 'Undifferentiated — competing on price or availability', score: 10 },
 ]
 
 function Step3({ onNext, onSkip }) {
@@ -472,7 +472,7 @@ function Step3({ onNext, onSkip }) {
         </div>
 
         <SliderRow label="SOP Documentation" value={form.sop_pct}
-          onChange={v => set('sop_pct', v)} leftLabel="0% � none" rightLabel="100% � fully documented" />
+          onChange={v => set('sop_pct', v)} leftLabel="0% — none" rightLabel="100% — fully documented" />
 
         <div style={{ marginBottom: 20 }}>
           <label style={LABEL_STYLE}>Management Depth (qualified managers / total core functions)</label>
@@ -493,7 +493,7 @@ function Step3({ onNext, onSkip }) {
         <SectionTitle>Revenue Contracts &amp; Key Person</SectionTitle>
 
         <SliderRow label="% customers with formal contract or MSA" value={form.contract_pct}
-          onChange={v => set('contract_pct', v)} leftLabel="0% � verbal only" rightLabel="100% � fully contracted" />
+          onChange={v => set('contract_pct', v)} leftLabel="0% — verbal only" rightLabel="100% — fully contracted" />
 
         <div style={{ marginBottom: 20 }}>
           <label style={LABEL_STYLE}>Primary contract type</label>
@@ -517,7 +517,7 @@ function Step3({ onNext, onSkip }) {
         </div>
 
         <SliderRow label="% revenue tied to owner's personal relationships" value={form.key_person_revenue_pct}
-          onChange={v => set('key_person_revenue_pct', v)} leftLabel="0% � institutionalized" rightLabel="100% � fully owner-dependent" />
+          onChange={v => set('key_person_revenue_pct', v)} leftLabel="0% — institutionalized" rightLabel="100% — fully owner-dependent" />
 
         <SectionTitle>Growth</SectionTitle>
 
@@ -561,10 +561,10 @@ function Step3({ onNext, onSkip }) {
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         <button onClick={handleSave} disabled={saving} style={{ ...BTN_PRIMARY, opacity: saving ? 0.7 : 1 }}>
-          {saving ? 'Saving�' : 'Save & Continue ?'}
+          {saving ? 'Saving—' : 'Save & Continue ?'}
         </button>
         <button onClick={onSkip} style={BTN_GHOST}>
-          Skip � complete later ?
+          Skip — complete later ?
         </button>
       </div>
     </div>
@@ -693,7 +693,7 @@ export default function OnboardingPage() {
         </span>
       </div>
 
-      {/* Card � wider on step 3 to accommodate questionnaire */}
+      {/* Card — wider on step 3 to accommodate questionnaire */}
       <div
         style={{
           width: '100%',
@@ -743,7 +743,7 @@ export default function OnboardingPage() {
             textAlign: 'center',
           }}
         >
-          Step {step} of 3 � {step === 3 ? 'Interview answers can be updated later in Engagement Intake' : 'You can always finish this later from Settings'}
+          Step {step} of 3 — {step === 3 ? 'Interview answers can be updated later in Engagement Intake' : 'You can always finish this later from Settings'}
         </p>
       )}
     </div>

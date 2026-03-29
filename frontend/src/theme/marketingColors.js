@@ -1,26 +1,26 @@
 /**
- * Marketing + Clerk auth surfaces � neutral charcoal (aligned with index.css `.dark`, no blue cast).
+ * Marketing + Clerk auth surfaces — neutral charcoal (aligned with index.css `.dark`, no blue cast).
  * Text: off-white primary; muted steps down for hierarchy while staying readable on #0C0E12.
  */
 export const marketingColors = {
   bg: '#0C0E12',
   surface: '#15181E',
-  /** Same as surface � used by landing sections */
+  /** Same as surface — used by landing sections */
   card: '#15181E',
   surfaceElevated: '#1C2128',
   inputBg: '#12151A',
   gold: '#C9973A',
   lightGold: '#E8B96A',
   offWhite: '#E8EAED',
-  /** Secondary body � lighter gray for stronger contrast on #0C0E12 */
+  /** Secondary body — lighter gray for stronger contrast on #0C0E12 */
   muted: '#C8CED6',
-  /** Tertiary / captions � still subdued but readable */
+  /** Tertiary / captions — still subdued but readable */
   mutedDim: '#B0B8C4',
   border: '#2A3038',
 }
 
 /**
- * Clerk embedded UI only � extra-light grays because Clerk layers opacity on secondary text;
+ * Clerk embedded UI only — extra-light grays because Clerk layers opacity on secondary text;
  * values must stay bright on #15181E / #12151A.
  */
 export const clerkEmbedText = {
@@ -31,7 +31,7 @@ export const clerkEmbedText = {
 }
 
 /**
- * Clerk `<SignIn />` / `<SignUp />` appearance � card matches app surfaces; inputs sit on darker inset.
+ * Clerk `<SignIn />` / `<SignUp />` appearance — card matches app surfaces; inputs sit on darker inset.
  */
 export function clerkMarketingAppearance(c = marketingColors, text = clerkEmbedText) {
   return {

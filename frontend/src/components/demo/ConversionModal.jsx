@@ -115,7 +115,7 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '', sl
         <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px 0' }}>
           {FEATURES.map((feat) => (
             <li key={feat} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-              <span style={{ color: COLORS.gold, fontSize: 14, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>?</span>
+              <span style={{ color: COLORS.gold, fontSize: 14, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>&#x2713;</span>
               <span style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontSize: 14, lineHeight: 1.5 }}>
                 {feat}
               </span>
@@ -149,7 +149,7 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '', sl
           </div>
         </div>
 
-        {/* Primary CTA � records conversion for personalized links, then mailto */}
+        {/* Primary CTA — records conversion for personalized links, then mailto */}
         <a
           href={mailtoHref}
           onClick={handleRequestClick}
@@ -175,7 +175,7 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '', sl
             display: 'block', textAlign: 'center',
           }}
         >
-          Not ready � keep exploring
+          Not ready — keep exploring
         </button>
       </div>
     </>

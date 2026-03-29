@@ -53,7 +53,7 @@ function SignInLoadingFallback() {
             marginRight: 12,
           }}
         />
-        Loading sign-in�
+        Loading sign-in—
       </div>
       {slow && (
         <p style={{ textAlign: 'center', lineHeight: 1.5, fontSize: 13, maxWidth: 380, margin: 0 }}>
@@ -74,7 +74,7 @@ function SignInLoadingFallback() {
 export default function SignInPage() {
   usePageTitle('Sign In')
   const [searchParams] = useSearchParams()
-  /** Use fallbackRedirectUrl, not forceRedirectUrl � forceRedirectUrl overrides Clerk OAuth/callback query params and can leave the embedded UI blank. */
+  /** Use fallbackRedirectUrl, not forceRedirectUrl — forceRedirectUrl overrides Clerk OAuth/callback query params and can leave the embedded UI blank. */
   const fallbackRedirectUrl = safePostSignInUrl(searchParams.get('redirect_url'))
 
   if (!HAS_CLERK) {
@@ -98,7 +98,7 @@ export default function SignInPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
-      {/* Logo � match Clerk embed primary text */}
+      {/* Logo — match Clerk embed primary text */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 36 }}>
         <div style={{ background: C.gold, borderRadius: 6, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span style={{ color: C.bg, fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 16 }}>F</span>
