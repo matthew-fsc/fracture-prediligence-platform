@@ -13,6 +13,8 @@ This document turns the **demo-ready** stack into a **hosted product**: clear ho
 
 **Secrets:** inject via each platform’s secret manager (never commit `.env`). Align **Clerk** (publishable + JWKS instance) and **Stripe** webhooks with the **public** URLs you choose.
 
+**Local Windows (Model A, same-origin):** From the repo root, run **`start.bat`** — it creates a Python venv and `backend/.env` when missing, installs deps, builds `frontend/dist` if needed, then serves the UI and API at **http://localhost:8000**. Details: **`README.md`** (Quick Start).
+
 ---
 
 ## 2. One-time checklist (any host)
