@@ -119,18 +119,24 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
         ).scalar() or Decimal(0)
         m.total_revenue_by_year[yr] = total
 
-    # CAGR
+    # CAGR: use full-year endpoints, divide by number of periods (years - 1)
     years = sorted(m.total_revenue_by_year.keys())
     if len(years) >= 2 and m.total_revenue_by_year[years[0]]:
-        n = len(years)
-        m.cagr_3yr = (float(m.total_revenue_ttm / m.total_revenue_by_year[years[0]]) ** (1 / n) - 1) * 100
+        n = len(years) - 1  # periods of growth between first and last full year
+        m.cagr_3yr = (float(m.total_revenue_by_year[years[-1]] / m.total_revenue_by_year[years[0]]) ** (1 / n) - 1) * 100
 
-    # Revenue consistency (coefficient of variation on monthly)
+    # Revenue consistency (coefficient of variation on monthly — uses 24m window, not TTM-only)
+    revenue_24m_start = ref_date - timedelta(days=730)
+    revenue_24m_rows = (
+        db.query(RevenueStream)
+        .filter(RevenueStream.company_id == company_id, RevenueStream.revenue_period >= revenue_24m_start)
+        .all()
+    )
     monthly_vals = []
     for i in range(24):
         mo_start = ref_date.replace(day=1) - timedelta(days=30 * i)
         mo_end = (mo_start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-        mo_rev = sum(r.revenue_gross for r in ttm_revenue_rows if mo_start <= r.revenue_period <= mo_end)
+        mo_rev = sum(r.revenue_gross for r in revenue_24m_rows if mo_start <= r.revenue_period <= mo_end)
         key = mo_start.strftime("%Y-%m")
         m.monthly_revenue_24m[key] = mo_rev
         monthly_vals.append(float(mo_rev))
@@ -143,6 +149,13 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
     m.total_customer_count = db.query(func.count(Customer.id)).filter(Customer.company_id == company_id).scalar() or 0
     if m.active_customer_count_ttm and m.total_revenue_ttm:
         m.avg_customer_revenue_ttm = m.total_revenue_ttm / m.active_customer_count_ttm
+
+    # Customer churn rate: % of all customers who are marked inactive
+    inactive_count = db.query(func.count(Customer.id)).filter(
+        Customer.company_id == company_id, Customer.is_active == False
+    ).scalar() or 0
+    if m.total_customer_count > 0:
+        m.customer_churn_rate = inactive_count / m.total_customer_count * 100
 
     # Tenure
     customers = db.query(Customer).filter(Customer.company_id == company_id, Customer.is_active == True).all()
@@ -178,11 +191,9 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
         m.ebitda_ttm = m.gross_profit - opex
     else:
         # Fall back to payroll data as labor cost proxy.
-        # comp_annual is stored from monthly payroll rows (Gross Pay per period),
-        # so annualize by multiplying by 12.
+        # comp_annual stores the annual compensation figure — use it directly.
         active_emps_all = db.query(Employee).filter(Employee.company_id == company_id, Employee.status == EmployeeStatus.ACTIVE).all()
-        labor_monthly_sum = Decimal(str(sum(float(e.comp_annual or 0) for e in active_emps_all)))
-        labor_est = labor_monthly_sum * 12
+        labor_est = Decimal(str(sum(float(e.comp_annual or 0) for e in active_emps_all)))
         m.ebitda_ttm = m.total_revenue_ttm - labor_est
 
     owner_comp = sum(e.amount for e in expenses if e.category in (ExpenseCategory.OWNER, ExpenseCategory.PERSONAL))

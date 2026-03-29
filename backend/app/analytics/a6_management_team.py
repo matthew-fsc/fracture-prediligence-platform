@@ -95,11 +95,13 @@ def compute_management_team(company_id: int, db: Session) -> ManagementTeamScore
     total  = manual_headcount if manual_headcount > 0 else len(active)
     owners = [e for e in active if e.is_owner]
 
-    # Classify roles
+    # Classify roles — management_level 0=owner, 1=VP, 2=manager (per Employee model).
+    # Only level 1 (VP) is counted by level; owners (0) are already captured by _C_SUITE regex
+    # and are scored separately in the ownership sub-dimension, avoiding double-counting.
     mgmt_count = sum(
         1 for e in active
         if _C_SUITE.search(str(e.role or "")) or _VP_LEVEL.search(str(e.role or ""))
-        or (e.management_level is not None and e.management_level <= 1)
+        or (e.management_level is not None and e.management_level == 1)
     )
 
     has_finance = any(_FINANCE.search(str(e.role or "")) for e in active)
@@ -124,7 +126,14 @@ def compute_management_team(company_id: int, db: Session) -> ManagementTeamScore
         s_comp = 20
 
     # 2. Revenue per employee (benchmark: $150k–$300k is typical for SMB)
-    total_rev = sum(float(r.revenue_gross or 0) for r in revenue)
+    # Use TTM window (matching A1 approach) to avoid all-time revenue diluting current ratios.
+    from datetime import date as _date, timedelta as _timedelta
+    data_dates = [r.revenue_period for r in revenue if r.revenue_period]
+    rev_ref = max(data_dates) if data_dates else _date.today()
+    if rev_ref > _date.today():
+        rev_ref = _date.today()
+    ttm_rev_start = rev_ref - _timedelta(days=365)
+    total_rev = sum(float(r.revenue_gross or 0) for r in revenue if r.revenue_period and r.revenue_period >= ttm_rev_start)
     rev_per_emp = total_rev / total if total > 0 else 0.0
 
     if rev_per_emp >= 300_000:

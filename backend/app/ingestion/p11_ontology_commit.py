@@ -154,6 +154,15 @@ def _commit_revenue_streams(
     ingestion_id: str,
     db: Session,
 ) -> tuple[int, list[str]]:
+    # Pre-build a name→id lookup for customers already in the DB for this company.
+    # P10 resolves REVENUE_CUSTOMER_ID/NAME to a customer name (_resolved_customer_name);
+    # here we convert that name back to the internal customer PK.
+    from app.ontology.models import Customer as _Customer
+    existing_customers = db.query(_Customer.name, _Customer.id).filter(
+        _Customer.company_id == company_id
+    ).all()
+    customer_name_to_id: dict[str, int] = {name: cid for name, cid in existing_customers}
+
     committed, errors = 0, []
     for rec in records:
         try:
@@ -171,8 +180,13 @@ def _commit_revenue_streams(
             if period is None:
                 period = date.today().replace(day=1)  # fallback to current month
 
+            # Resolve customer FK from the name resolved by P10
+            resolved_name = _safe_str(rec.get("_resolved_customer_name"))
+            customer_id: Optional[int] = customer_name_to_id.get(resolved_name) if resolved_name else None
+
             obj = RevenueStream(
                 company_id=company_id,
+                customer_id=customer_id,
                 revenue_gross=amount,
                 revenue_type=rev_type,
                 recurring_flag=_safe_bool(rec.get("REVENUE_RECURRING_FLAG")),

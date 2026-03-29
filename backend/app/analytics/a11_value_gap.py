@@ -9,10 +9,10 @@ identified diligence gaps are resolved. Produces:
   - Priority ranking of initiatives by EV impact
 
 Gap formula:
-  For each weak category (score < 75):
-    simulated_score = min(score + improvement_delta, 85)
+  For each weak category (score < _TARGET_SCORE):
+    simulated_score = _TARGET_SCORE  (currently 80.0, not 85)
     new_DRS         = weighted composite with simulated score
-    new_EV          = compute_ev(ebitda, new_tier)
+    new_EV          = EBITDA × interpolated_multiple(new_DRS)
     uplift          = new_EV.midpoint - current_EV.midpoint
 """
 
@@ -131,7 +131,9 @@ def compute_value_gap(
     current_scores: dict of {category_key: float 0-100}
     ebitda: defensible EBITDA in dollars
     """
-    def _build_cat_scores(overrides: dict[str, float] = {}) -> CategoryScores:
+    def _build_cat_scores(overrides: dict[str, float] | None = None) -> CategoryScores:
+        if overrides is None:
+            overrides = {}
         merged = {**current_scores, **overrides}
         return CategoryScores(
             revenue_quality=merged.get("revenue_quality", 50),

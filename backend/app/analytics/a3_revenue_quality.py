@@ -2,22 +2,27 @@
 A3 — Revenue Quality Score (Blueprint II §A3)
 
 Five sub-dimensions weighted to produce a 0–100 score:
-  1. Recurring Revenue Rate (30%)   — % of total revenue from recurring/subscription streams
-  2. Customer Concentration (25%)   — Herfindahl-Hirschman Index; lower HHI = better
-  3. Contract Durability (20%)      — % of revenue under contracts with >12 months remaining
-  4. Revenue CAGR Consistency (15%) — std-dev of monthly/annual growth rate
-  5. Churn / NRR (10%)              — estimated net revenue retention if calculable
+  1. Recurring Revenue Rate (30%)      — % of TTM revenue from recurring/subscription streams
+  2. Customer Concentration (25%)      — Herfindahl-Hirschman Index on TTM revenue; lower HHI = better
+  3. Contract Durability (20%)         — durable contract value as % of TTM revenue
+  4. Revenue Consistency (15%)         — coefficient of variation of monthly revenue (lower = better)
+  5. Recurring Revenue Growth (10%)    — year-over-year growth in recurring revenue
+                                         (approximation of NRR; not true cohort-based NRR)
 
 DRS weight: Revenue Quality = 25% of composite score.
+
+Note on sub-dimension 5: labeled 'nrr_score' for backward compatibility but measures
+YoY growth in total recurring revenue, not cohort-based Net Revenue Retention.
 """
 
 from __future__ import annotations
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from math import sqrt
 from typing import Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.ontology.models import RevenueStream, Contract
@@ -110,26 +115,26 @@ def _hhi_score(revenue_rows: list) -> tuple[float, float]:
 
 
 def _contract_durability_score(revenue_rows: list, contracts: list) -> tuple[float, float]:
-    """Returns (score_0_100, pct_under_durable_contract)."""
-    if not contracts:
+    """Returns (score_0_100, pct_of_revenue_under_durable_contract).
+
+    Durable = contract with >12 months remaining end_date.
+    Denominator is total TTM revenue (not just contracted value) so the score
+    reflects what fraction of the full revenue base is durably contracted.
+    """
+    today = date.today()
+    total_rev = sum(float(r.revenue_gross or 0) for r in revenue_rows)
+
+    if total_rev == 0:
         return 40.0, 0.0
 
-    today = date.today()
-    total_contract_value = 0.0
     durable_value = 0.0
-
     for c in contracts:
         if not c.annual_value:
             continue
-        val = float(c.annual_value)
-        total_contract_value += val
         if c.end_date and (c.end_date - today).days > 365:
-            durable_value += val
+            durable_value += float(c.annual_value)
 
-    if total_contract_value == 0:
-        return 40.0, 0.0
-
-    pct = durable_value / total_contract_value
+    pct = durable_value / total_rev
     score = min(100, pct * 100 * 1.1)  # slight bonus for any durability
     return round(score, 1), round(pct * 100, 1)
 
@@ -208,8 +213,9 @@ def _cagr_consistency_score(revenue_rows: list) -> tuple[float, float]:
 
 def _nrr_score(revenue_rows: list) -> tuple[float, float]:
     """
-    Approximate NRR from year-over-year recurring revenue change.
-    Returns (score_0_100, estimated_nrr_pct).
+    Year-over-year growth in total recurring revenue (not true cohort-based NRR).
+    True NRR requires per-customer cohort tracking; this is an aggregate proxy.
+    Returns (score_0_100, yoy_recurring_growth_pct).
     """
     if not revenue_rows:
         return 60.0, 100.0
@@ -295,14 +301,27 @@ WEIGHTS = {
 
 
 def compute_revenue_quality(company_id: int, db: Session) -> RevenueQualityScore:
-    revenue_rows = db.query(RevenueStream).filter(RevenueStream.company_id == company_id).all()
-    contracts    = db.query(Contract).filter(Contract.company_id == company_id).all()
+    all_revenue_rows = db.query(RevenueStream).filter(RevenueStream.company_id == company_id).all()
+    contracts        = db.query(Contract).filter(Contract.company_id == company_id).all()
 
-    s_rec,  recurring_pct  = _recurring_rate_score(revenue_rows)
-    s_hhi,  hhi            = _hhi_score(revenue_rows)
-    s_dur,  dur_pct        = _contract_durability_score(revenue_rows, contracts)
-    s_cv,   cv_pct         = _cagr_consistency_score(revenue_rows)
-    s_nrr,  nrr            = _nrr_score(revenue_rows)
+    # Use TTM window for point-in-time metrics (concentration, recurring rate, durability)
+    # to match A1's approach and reflect current business state.
+    data_dates = [r.revenue_period for r in all_revenue_rows if r.revenue_period]
+    ref_date = max(data_dates) if data_dates else date.today()
+    if ref_date > date.today():
+        ref_date = date.today()
+    ttm_start = ref_date - timedelta(days=365)
+    ttm_rows = [r for r in all_revenue_rows if r.revenue_period and r.revenue_period >= ttm_start]
+
+    # TTM data for current-state concentration and recurring metrics
+    s_rec,  recurring_pct  = _recurring_rate_score(ttm_rows)
+    s_hhi,  hhi            = _hhi_score(ttm_rows)
+    s_dur,  dur_pct        = _contract_durability_score(ttm_rows, contracts)
+    # Full history for multi-period metrics
+    s_cv,   cv_pct         = _cagr_consistency_score(all_revenue_rows)
+    s_nrr,  nrr            = _nrr_score(all_revenue_rows)
+
+    revenue_rows = ttm_rows  # use TTM for row_count confidence assessment
 
     composite = (
         s_rec  * WEIGHTS["recurring"]
