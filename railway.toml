@@ -6,6 +6,9 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
+# VITE_* vars are baked into the JS bundle at build time (not runtime).
+# Set these in Railway Variables → they are passed as Docker build args.
+buildArgs = ["VITE_CLERK_PUBLISHABLE_KEY", "VITE_API_BASE_URL"]
 
 [deploy]
 # Do not set a Custom Start Command in the Railway dashboard unless you know what you're doing.

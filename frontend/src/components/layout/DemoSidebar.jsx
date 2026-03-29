@@ -3,8 +3,8 @@ import { DemoDashboardExitLink } from '../demo/DemoDashboardExit'
 import {
   Zap, House, Building, Workflow, Grid3x3, BarChart2,
   Eye, TrendingUp, Target, Activity, LineChart, GitCompare,
-  FileText, BookOpen, Bot, MonitorPlay,
-  Plug, ArrowRightLeft, Folder, NotebookPen,
+  FileText, BookOpen, MonitorPlay,
+  Plug, ArrowRightLeft, NotebookPen,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useDemoData } from '../../context/DemoContext'
@@ -45,7 +45,6 @@ const groups = [
     items: [
       { label: 'Data Sources',         href: 'data-sources',  icon: Plug },
       { label: 'Field Mapping',        href: 'field-mapping', icon: ArrowRightLeft },
-      { label: 'Data Room (VDR)',      href: 'data-room',     icon: Folder },
     ],
   },
   {
@@ -53,7 +52,6 @@ const groups = [
     items: [
       { label: 'Reports',              href: 'reports',          icon: FileText },
       { label: 'Advisory Library',     href: 'advisory-library', icon: BookOpen },
-      { label: 'AI Copilot',           href: 'ai-copilot',       icon: Bot },
     ],
   },
 ]

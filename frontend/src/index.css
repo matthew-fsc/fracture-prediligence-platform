@@ -155,3 +155,27 @@
     scrollbar-color: hsl(220, 18%, 22%) transparent;
   }
 }
+
+/*
+ * Clerk embedded UI — force light text in inputs regardless of browser UA stylesheet.
+ * Clerk's appearance API sets colorInputText but some browsers override with native form color.
+ * These rules target Clerk's generated class names directly with !important.
+ */
+.cl-formFieldInput,
+.cl-formFieldInput:focus,
+.cl-formFieldInput:hover {
+  color: #F2F4F7 !important;
+  -webkit-text-fill-color: #F2F4F7 !important;
+  background-color: #12151A !important;
+  caret-color: #C9973A !important;
+}
+/* Autofill overrides — browser autofill ignores background/color; use box-shadow trick */
+.cl-formFieldInput:-webkit-autofill,
+.cl-formFieldInput:-webkit-autofill:hover,
+.cl-formFieldInput:-webkit-autofill:focus,
+.cl-formFieldInput:-webkit-autofill:active {
+  -webkit-text-fill-color: #F2F4F7 !important;
+  -webkit-box-shadow: 0 0 0 30px #12151A inset !important;
+  box-shadow: 0 0 0 30px #12151A inset !important;
+  caret-color: #C9973A !important;
+}
