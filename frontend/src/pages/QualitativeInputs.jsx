@@ -5,6 +5,7 @@ import { CheckCircle, Circle, Save, ClipboardList, ChevronDown, ChevronRight, Hi
 import { useCompanyId } from '../context/CompanyContext'
 import { apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
+import { getDrsCategoryStyle } from '../lib/drsCategoryColors'
 
 const MARKET_OPTIONS = [
   { value: 'defined',          label: 'Defined ICP + clear differentiation + repeatable sales motion', score: 80 },
@@ -94,13 +95,16 @@ export default function QualitativeInputs() {
     } finally { setSaving(false) }
   }
 
-  const StatusBadge = ({ complete, label }) => (
-    <div className={cn('flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border',
-      complete ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/30 bg-amber-500/10 text-amber-400')}>
-      {complete ? <CheckCircle className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
-      {label}: {complete ? 'Complete' : 'Incomplete'}
-    </div>
-  )
+  const StatusBadge = ({ complete, label, categoryKey }) => {
+    const c = getDrsCategoryStyle(categoryKey)
+    return (
+      <div className={cn('flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border',
+        complete ? cn(c.border, c.bg, c.text) : 'border-amber-500/30 bg-amber-500/10 text-amber-400')}>
+        {complete ? <CheckCircle className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
+        {label}: {complete ? 'Complete' : 'Incomplete'}
+      </div>
+    )
+  }
 
   if (!loaded) return <div className="space-y-4 max-w-[900px]"><div className="h-8 w-64 bg-muted rounded animate-pulse" /></div>
 
@@ -111,9 +115,9 @@ export default function QualitativeInputs() {
         subtitle="Advisor-sourced data for sub-scores that financial data cannot capture. These inputs feed directly into Operational Independence and Growth Drivers scoring."
         action={
           <div className="flex items-center gap-2">
-            <StatusBadge complete={a3Complete} label="Rev Contracts" />
-            <StatusBadge complete={a4Complete} label="Ops Independence" />
-            <StatusBadge complete={a7Complete} label="Growth Drivers" />
+            <StatusBadge complete={a3Complete} label="Rev Contracts" categoryKey="revenue_quality" />
+            <StatusBadge complete={a4Complete} label="Ops Independence" categoryKey="operational_independence" />
+            <StatusBadge complete={a7Complete} label="Growth Drivers" categoryKey="growth_drivers" />
           </div>
         }
       />
@@ -124,14 +128,16 @@ export default function QualitativeInputs() {
       </div>
 
       {/* Section A: Revenue Contracts & Key Person */}
-      <div className="rounded-xl border border-border bg-card p-5 space-y-5">
+      <div className={cn('rounded-xl border border-border bg-card p-5 space-y-5 border-l-2', getDrsCategoryStyle('revenue_quality').accentLine)}>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-foreground uppercase tracking-wider">Revenue Contracts &amp; Key Person Risk</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">Maps to DRS category: Revenue Quality · Captures contract formalization and owner-dependency that financials cannot show</p>
           </div>
           <div className={cn('flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border',
-            a3Complete ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/30 bg-amber-500/10 text-amber-400')}>
+            a3Complete
+              ? cn(getDrsCategoryStyle('revenue_quality').border, getDrsCategoryStyle('revenue_quality').bg, getDrsCategoryStyle('revenue_quality').text)
+              : 'border-amber-500/30 bg-amber-500/10 text-amber-400')}>
             {a3Complete ? <CheckCircle className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
             {a3Complete ? 'Complete' : 'Incomplete'}
           </div>
@@ -231,14 +237,16 @@ export default function QualitativeInputs() {
       </div>
 
       {/* Section B: Operational Independence */}
-      <div className="rounded-xl border border-border bg-card p-5 space-y-5">
+      <div className={cn('rounded-xl border border-border bg-card p-5 space-y-5 border-l-2', getDrsCategoryStyle('operational_independence').accentLine)}>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-foreground uppercase tracking-wider">Operational Independence</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">Maps to DRS category weight: 20% · Sub-score weights: owner hours 35%, SOPs 30%, automation 15%, management depth 20%</p>
           </div>
           <div className={cn('flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border',
-            a4Complete ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/30 bg-amber-500/10 text-amber-400')}>
+            a4Complete
+              ? cn(getDrsCategoryStyle('operational_independence').border, getDrsCategoryStyle('operational_independence').bg, getDrsCategoryStyle('operational_independence').text)
+              : 'border-amber-500/30 bg-amber-500/10 text-amber-400')}>
             {a4Complete ? <CheckCircle className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
             {a4Complete ? 'Complete' : 'Incomplete'}
           </div>
@@ -347,15 +355,17 @@ export default function QualitativeInputs() {
         </div>
       </div>
 
-      {/* Section B: Growth Drivers */}
-      <div className="rounded-xl border border-border bg-card p-5 space-y-5">
+      {/* Section C: Growth Drivers */}
+      <div className={cn('rounded-xl border border-border bg-card p-5 space-y-5 border-l-2', getDrsCategoryStyle('growth_drivers').accentLine)}>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-foreground uppercase tracking-wider">Growth Drivers</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">Maps to DRS category weight: 10% · Sub-score weights: pipeline 30%, market positioning 20%, repeatability 15% (CAGR 35% from financial data)</p>
           </div>
           <div className={cn('flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border',
-            a7Complete ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/30 bg-amber-500/10 text-amber-400')}>
+            a7Complete
+              ? cn(getDrsCategoryStyle('growth_drivers').border, getDrsCategoryStyle('growth_drivers').bg, getDrsCategoryStyle('growth_drivers').text)
+              : 'border-amber-500/30 bg-amber-500/10 text-amber-400')}>
             {a7Complete ? <CheckCircle className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
             {a7Complete ? 'Complete' : 'Incomplete'}
           </div>

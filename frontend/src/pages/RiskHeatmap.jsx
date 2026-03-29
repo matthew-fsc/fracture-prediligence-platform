@@ -16,6 +16,7 @@ import { AlertCircle, AlertTriangle, Info, ShieldAlert } from 'lucide-react'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useCompanyId } from '../context/CompanyContext'
 import { apiClient } from '../lib/apiClient'
+import { getDrsCategoryStyle } from '../lib/drsCategoryColors'
 
 const CATEGORY_LABELS = {
   revenue_quality:          'Revenue Quality',
@@ -301,7 +302,10 @@ export default function RiskHeatmap() {
                 <div className="flex items-center gap-3">
                   {row.worstSev ? <Icon className={cn('w-4 h-4', col.text)} /> : <ShieldAlert className="w-4 h-4 text-emerald-400" />}
                   <div>
-                    <p className="text-xs font-medium text-card-foreground">{row.label}</p>
+                    <p className="text-xs font-medium text-card-foreground flex items-center gap-2">
+                      <span className={cn('w-2 h-2 rounded-full flex-shrink-0', getDrsCategoryStyle(row.key).dot)} />
+                      {row.label}
+                    </p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">{row.count} question{row.count !== 1 ? 's' : ''} flagged</p>
                   </div>
                 </div>

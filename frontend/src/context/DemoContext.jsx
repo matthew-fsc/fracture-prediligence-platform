@@ -5,7 +5,7 @@ export const DemoContext = createContext({
   personalized: null,
   spotsRemaining: null,
   slug: null,
-  demoLocked: false,
+  demoLocked: true,
   trackSection: () => {},
   openConversionModal: () => {},
 })

@@ -1,4 +1,5 @@
 import { useDemoData } from '../../context/DemoContext'
+import { drsCategoryStyles } from '../../lib/drsCategoryColors'
 import {
   AreaChart,
   Area,
@@ -83,20 +84,21 @@ function StatCard({ label, value, sub, accent }) {
 // ---------------------------------------------------------------------------
 // DRS Category bar
 // ---------------------------------------------------------------------------
-function CategoryBar({ label, score }) {
-  const color = scoreColor(score)
+function CategoryBar({ catKey, label, score }) {
+  const scoreTint = scoreColor(score)
+  const barFill = drsCategoryStyles[catKey]?.chartFill ?? '#60a5fa'
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <span style={{ color: '#F0EDE8', fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>{label}</span>
-        <span style={{ color: color, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600 }}>{score}</span>
+        <span style={{ color: scoreTint, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600 }}>{score}</span>
       </div>
       <div style={{ height: 6, background: '#1E3A5F', borderRadius: 3, overflow: 'hidden' }}>
         <div
           style={{
             height: '100%',
             width: `${score}%`,
-            background: color,
+            background: barFill,
             borderRadius: 3,
             transition: 'width 0.6s ease',
           }}
@@ -354,6 +356,7 @@ export default function DemoHome() {
           {Object.entries(category_scores).map(([key, val]) => (
             <CategoryBar
               key={key}
+              catKey={key}
               label={CATEGORY_LABELS[key] || key}
               score={val.composite}
             />

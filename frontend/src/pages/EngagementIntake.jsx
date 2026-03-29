@@ -13,6 +13,7 @@ import { toast } from '../lib/notify'
 import { cn } from '../lib/utils'
 import { Skeleton } from '../components/ui/Skeleton'
 import { withCompanyQuery, resolvePath } from '../lib/navLinks'
+import { drsCategoryStyles } from '../lib/drsCategoryColors'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -625,7 +626,7 @@ export default function EngagementIntake() {
           </p>
 
           {/* ── SECTION 5: Revenue Contracts & Key Person ──────────── */}
-          <SectionCard icon={DollarSign} title="Revenue Contracts & Key Person Risk" accentColor="bg-blue-500/10"
+          <SectionCard icon={DollarSign} title="Revenue Contracts & Key Person Risk" accentColor={drsCategoryStyles.revenue_quality.bg}
             subtitle="Maps to DRS: Revenue Quality — captures contract formalization and owner-dependency"
             badge={<CompletionBadge complete={revComplete} />}>
 
@@ -688,7 +689,7 @@ export default function EngagementIntake() {
           </SectionCard>
 
           {/* ── SECTION 6: Operational Independence ─────────────────── */}
-          <SectionCard icon={Cog} title="Operational Independence" accentColor="bg-red-500/10"
+          <SectionCard icon={Cog} title="Operational Independence" accentColor={drsCategoryStyles.operational_independence.bg}
             subtitle="DRS weight: 20% — owner hours 35%, SOPs 30%, automation 15%, management depth 20%"
             badge={<CompletionBadge complete={opsComplete} />}>
 
@@ -804,7 +805,7 @@ export default function EngagementIntake() {
           </SectionCard>
 
           {/* ── SECTION 7: Growth Drivers ───────────────────────────── */}
-          <SectionCard icon={TrendingUp} title="Growth Drivers" accentColor="bg-emerald-500/10"
+          <SectionCard icon={TrendingUp} title="Growth Drivers" accentColor={drsCategoryStyles.growth_drivers.bg}
             subtitle="DRS weight: 10% — pipeline 30%, market positioning 20%, repeatability 15% (CAGR 35% from financial data)"
             badge={<CompletionBadge complete={growthComplete} />}>
 

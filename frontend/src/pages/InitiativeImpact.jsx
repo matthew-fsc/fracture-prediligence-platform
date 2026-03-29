@@ -4,6 +4,7 @@ import { Target, CheckCircle, Circle, Clock } from 'lucide-react'
 import { useCompanyId } from '../context/CompanyContext'
 import { apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
+import { drsCategoryBadgeClass } from '../lib/drsCategoryColors'
 
 // Static initiative library for gap categories (live API fallback)
 const INITIATIVES_BY_CAT = {
@@ -31,19 +32,6 @@ const INITIATIVES_BY_CAT = {
     { title: 'Build and document a 3-year growth plan', effort: 'Low', timeline: '30 days', ev_impact: 'Medium', description: 'A credible, data-backed growth plan increases strategic value to potential buyers.' },
     { title: 'Launch structured outbound sales motion', effort: 'Medium', timeline: '60–90 days', ev_impact: 'High', description: 'Adding a repeatable new-client acquisition channel improves growth score.' },
   ],
-}
-
-const catColors = {
-  operations:    'bg-red-500/10 text-red-400 border-red-500/20',
-  revenue:       'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  margin:        'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  documentation: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  revenue_quality: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  operational_independence: 'bg-red-500/10 text-red-400 border-red-500/20',
-  customer_risk: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  management_team: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  financial_integrity: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  growth_drivers: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
 }
 
 export default function InitiativeImpact() {
@@ -226,7 +214,7 @@ export default function InitiativeImpact() {
                     </div>
                     <p className="text-[11px] text-muted-foreground mb-2">{d.detail}</p>
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <span className={cn('text-[11px] font-semibold px-1.5 py-0.5 rounded border', catColors[d.category] || 'border-border text-muted-foreground')}>{d.category?.replace(/_/g, ' ')}</span>
+                      <span className={cn('text-[11px] font-semibold px-1.5 py-0.5 rounded border', drsCategoryBadgeClass(d.category))}>{d.category?.replace(/_/g, ' ')}</span>
                       <span className="text-[11px] px-1.5 py-0.5 rounded border border-border text-muted-foreground flex items-center gap-0.5">
                         <Clock className="w-2.5 h-2.5" />{d.timeline}
                       </span>

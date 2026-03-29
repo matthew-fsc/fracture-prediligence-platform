@@ -11,6 +11,7 @@ import {
   Zap, Filter, Edit2, Trash2, Check,
   MessageSquare, Sparkles, Shield,
 } from 'lucide-react'
+import { getDrsCategoryStyle } from '../lib/drsCategoryColors'
 
 const ITEM_TYPE_META = {
   buyer_question: { label: 'Buyer Question', icon: MessageSquare, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
@@ -25,15 +26,6 @@ const CATEGORY_LABELS = {
   customer_risk: 'Customer Risk',
   management_team: 'Management & Team',
   growth_drivers: 'Growth Drivers',
-}
-
-const CAT_COLORS = {
-  revenue_quality:          { bg: 'bg-blue-500/10',    text: 'text-blue-400',    border: 'border-blue-500/20' },
-  financial_integrity:      { bg: 'bg-purple-500/10',  text: 'text-purple-400',  border: 'border-purple-500/20' },
-  operational_independence: { bg: 'bg-red-500/10',     text: 'text-red-400',     border: 'border-red-500/20' },
-  customer_risk:            { bg: 'bg-amber-500/10',   text: 'text-amber-400',   border: 'border-amber-500/20' },
-  management_team:          { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
-  growth_drivers:           { bg: 'bg-sky-500/10',     text: 'text-sky-400',     border: 'border-sky-500/20' },
 }
 
 const SEV_COLORS = {
@@ -74,7 +66,7 @@ function ItemCard({ item, onEdit, onDelete }) {
   const [expanded, setExpanded] = useState(false)
   const meta = ITEM_TYPE_META[item.item_type] || ITEM_TYPE_META.buyer_question
   const Icon = meta.icon
-  const catC = CAT_COLORS[item.category] || { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-border' }
+  const catC = item.category ? getDrsCategoryStyle(item.category) : { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-border' }
 
   return (
     <div className={cn('rounded-xl border bg-card overflow-hidden transition-all', meta.border)}>

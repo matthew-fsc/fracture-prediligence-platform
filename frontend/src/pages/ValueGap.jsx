@@ -7,21 +7,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { useCompanyId } from '../context/CompanyContext'
 import { apiClient } from '../lib/apiClient'
 import { usePageTitle } from '../hooks/usePageTitle'
-
-const catColors = {
-  operations:             { bg: 'bg-red-500/10',     text: 'text-red-400',     border: 'border-red-500/20'     },
-  revenue:                { bg: 'bg-blue-500/10',    text: 'text-blue-400',    border: 'border-blue-500/20'    },
-  margin:                 { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
-  documentation:          { bg: 'bg-purple-500/10', text: 'text-purple-400',  border: 'border-purple-500/20'  },
-  customer:               { bg: 'bg-amber-500/10',  text: 'text-amber-400',   border: 'border-amber-500/20'   },
-  // API category keys
-  revenue_quality:        { bg: 'bg-blue-500/10',    text: 'text-blue-400',    border: 'border-blue-500/20'    },
-  financial_integrity:    { bg: 'bg-purple-500/10', text: 'text-purple-400',  border: 'border-purple-500/20'  },
-  operational_independence:{ bg: 'bg-red-500/10',   text: 'text-red-400',     border: 'border-red-500/20'     },
-  customer_risk:          { bg: 'bg-amber-500/10',  text: 'text-amber-400',   border: 'border-amber-500/20'   },
-  management_team:        { bg: 'bg-emerald-500/10',text: 'text-emerald-400', border: 'border-emerald-500/20' },
-  growth_drivers:         { bg: 'bg-blue-500/10',   text: 'text-blue-400',    border: 'border-blue-500/20'    },
-}
+import { getDrsCategoryStyle } from '../lib/drsCategoryColors'
 
 const MITIGATION_TARGETS = {
   revenue_quality: {
@@ -82,7 +68,7 @@ function ScoreBar({ current, target, label }) {
 // ── Detailed gap card ─────────────────────────────────────────────────────
 function GapCategoryCard({ d, rank, totalGap }) {
   const [open, setOpen] = useState(false)
-  const cat = catColors[d.category] || catColors.revenue
+  const cat = getDrsCategoryStyle(d.category)
   const weakSubs = d.weak_sub_scores ?? []
   const mitigationMap = MITIGATION_TARGETS[d.category] ?? {}
   const pctOfGap = totalGap > 0 ? (d.ev_uplift / totalGap * 100) : 0
@@ -397,15 +383,8 @@ export default function ValueGap() {
               </div>
               {drivers.map((d, i) => {
                 const pct = d.ev_uplift / (currentEV + totalDriverUplift) * 100
-                const cat = catColors[d.category] || catColors.revenue
-                const hues = {
-                  'text-red-400': 'bg-red-500/80',
-                  'text-blue-400': 'bg-blue-500/70',
-                  'text-emerald-400': 'bg-emerald-500/70',
-                  'text-purple-400': 'bg-purple-500/70',
-                  'text-amber-400': 'bg-amber-500/70',
-                }
-                const barBg = hues[cat.text] || 'bg-emerald-500/60'
+                const cat = getDrsCategoryStyle(d.category)
+                const barBg = cat.barSolid
                 return (
                   <div
                     key={d.category}
@@ -425,17 +404,10 @@ export default function ValueGap() {
                 <span className="text-muted-foreground">Current EV</span>
               </span>
               {drivers.map(d => {
-                const cat = catColors[d.category] || catColors.revenue
-                const hues = {
-                  'text-red-400': 'bg-red-500/80',
-                  'text-blue-400': 'bg-blue-500/70',
-                  'text-emerald-400': 'bg-emerald-500/70',
-                  'text-purple-400': 'bg-purple-500/70',
-                  'text-amber-400': 'bg-amber-500/70',
-                }
+                const cat = getDrsCategoryStyle(d.category)
                 return (
                   <span key={d.category} className="flex items-center gap-1">
-                    <span className={cn('w-2.5 h-2.5 rounded-sm inline-block', hues[cat.text] || 'bg-emerald-500/60')} />
+                    <span className={cn('w-2.5 h-2.5 rounded-sm inline-block', cat.barSolid)} />
                     <span className="text-muted-foreground">{d.label}</span>
                     <span className={cn('font-bold', cat.text)}>+{fmtM(d.ev_uplift)}</span>
                   </span>
@@ -537,7 +509,8 @@ export default function ValueGap() {
                         {item.content && (
                           <p className="text-[11px] text-muted-foreground leading-relaxed">{item.content}</p>
                         )}
-                        <p className="text-[10px] text-muted-foreground/50 capitalize">
+                        <p className="text-[10px] text-muted-foreground/50 capitalize flex items-center gap-1.5">
+                          <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', getDrsCategoryStyle(item.category).dot)} />
                           {(item.category ?? '').replace(/_/g, ' ')}
                           {item.score_gap != null && ` · ${item.score_gap.toFixed(0)}-pt gap`}
                         </p>

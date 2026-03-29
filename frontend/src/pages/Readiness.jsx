@@ -10,6 +10,7 @@ import {
 import { Skeleton } from '../components/ui/Skeleton'
 import { apiClient } from '../lib/apiClient'
 import { useCompanyId } from '../context/CompanyContext'
+import { getDrsCategoryStyle } from '../lib/drsCategoryColors'
 
 const DEFAULT_CATEGORY_META = {
   revenue_quality:          { label: 'Revenue Quality',          weight: 25, abbr: 'Revenue' },
@@ -245,9 +246,14 @@ function CategoryCard({ item, catData, override, onOverrideSaved }) {
     : {}
   const hasAdj = override && override.adjustment !== 0
   const qualComplete = catData?.qualitative_complete
+  const catPalette = getDrsCategoryStyle(item.key)
 
   return (
-    <div className={cn('rounded-xl border bg-card transition-all', hasAdj ? 'border-blue-500/30' : 'border-border')}>
+    <div className={cn(
+      'rounded-xl border bg-card transition-all border-l-2',
+      catPalette.accentLine,
+      hasAdj ? 'border-blue-500/30' : 'border-border',
+    )}>
       <button className="w-full text-left p-4" onClick={() => setOpen(!open)}>
         <div className="flex items-center gap-3">
           <div className="flex-1">
@@ -497,6 +503,7 @@ export default function Readiness() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {breakdown.map(b => (
                   <div key={b.key} className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/10 px-2.5 py-1.5">
+                    <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', getDrsCategoryStyle(b.key).dot)} />
                     <span className={cn('text-sm font-bold tabular-nums w-8', scoreColor(b.score))}>{b.weight}%</span>
                     <div className="min-w-0">
                       <p className="text-[11px] font-medium text-foreground truncate">{b.label}</p>
@@ -591,7 +598,10 @@ export default function Readiness() {
             <div className="w-full space-y-1.5 pt-3 border-t border-border">
               {breakdown.map(b => (
                 <div key={b.key} className="flex items-center justify-between text-[11px]">
-                  <span className="text-muted-foreground truncate">{b.abbr}</span>
+                  <span className="text-muted-foreground truncate flex items-center gap-1.5 min-w-0">
+                    <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', getDrsCategoryStyle(b.key).dot)} />
+                    {b.abbr}
+                  </span>
                   <div className="flex items-center gap-1">
                     {overrides[b.key] && overrides[b.key].adjustment !== 0 && (
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" title="Advisor adjustment active" />
@@ -610,9 +620,17 @@ export default function Readiness() {
                 <RadarChart data={radarData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
                   <PolarGrid stroke="hsl(220,18%,20%)" />
                   <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fill: 'hsl(220,10%,50%)' }} />
-                  <Radar name="Score" dataKey="score" stroke="hsl(160,84%,39%)" fill="hsl(160,84%,39%)" fillOpacity={0.2} strokeWidth={2} />
+                  <Radar name="Score" dataKey="score" stroke="hsl(217,91%,60%)" fill="hsl(217,91%,60%)" fillOpacity={0.18} strokeWidth={2} />
                 </RadarChart>
               </ResponsiveContainer>
+              <div className="flex flex-wrap justify-center gap-x-2.5 gap-y-1 mt-2 px-1">
+                {breakdown.map(b => (
+                  <span key={b.key} className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                    <span className={cn('w-1.5 h-1.5 rounded-full', getDrsCategoryStyle(b.key).dot)} />
+                    {b.abbr}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         </div>

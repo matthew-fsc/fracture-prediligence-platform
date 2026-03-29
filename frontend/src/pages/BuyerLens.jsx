@@ -8,6 +8,7 @@ import { useCompanyId } from '../context/CompanyContext'
 import { apiClient } from '../lib/apiClient'
 import { withCompanyQuery, resolvePath } from '../lib/navLinks'
 import { toast } from '../lib/notify'
+import { drsCategoryBadgeClass } from '../lib/drsCategoryColors'
 
 const CATEGORY_LABELS = {
   revenue_quality:          'Revenue Quality',
@@ -384,7 +385,9 @@ export default function BuyerLens() {
                           <span className={cn('text-[11px] font-bold px-1.5 py-0.5 rounded border', buyerBadge(q.buyer_type))}>
                             {q.buyer_type}
                           </span>
-                          <span className="text-[11px] text-muted-foreground">{CATEGORY_LABELS[q.category] ?? q.category}</span>
+                          <span className={cn('text-[11px] font-semibold px-1.5 py-0.5 rounded border', drsCategoryBadgeClass(q.category))}>
+                            {CATEGORY_LABELS[q.category] ?? q.category}
+                          </span>
                           <span
                             className={cn(
                               'text-[10px] font-semibold px-1.5 py-0.5 rounded border',
