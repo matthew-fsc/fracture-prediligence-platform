@@ -34,6 +34,8 @@ import DemoEBITDATimeline from './pages/EBITDATimeline'
 import DemoMarketComps from './pages/MarketComps'
 import DemoEngagementIntake from './pages/EngagementIntake'
 import DemoAdvisoryLibrary from './pages/AdvisoryLibrary'
+import DemoDataRoom from './pages/DataRoom'
+import DemoAICopilot from './pages/AICopilot'
 
 // Dashboard pages
 import Home from './pages/Home'
@@ -145,7 +147,7 @@ export default function App() {
           <Route path="initiative-impact"  element={<DemoInitiativeImpact />} />
           <Route path="risk-heatmap"       element={<DemoRiskHeatmap />} />
           <Route path="scenario-simulator" element={<DemoScenarioSimulator />} />
-          <Route path="data-room"          element={<Navigate to="home" replace />} />
+          <Route path="data-room"          element={<DemoDataRoom />} />
           <Route path="reports"            element={<DemoReports />} />
           <Route path="data-sources"       element={<DemoConnectors />} />
           <Route path="field-mapping"      element={<DemoDataMapping />} />
@@ -154,7 +156,7 @@ export default function App() {
           <Route path="market-comps"       element={<DemoMarketComps />} />
           <Route path="engagement-intake"  element={<DemoEngagementIntake />} />
           <Route path="advisory-library"  element={<DemoAdvisoryLibrary />} />
-          <Route path="ai-copilot"        element={<Navigate to="home" replace />} />
+          <Route path="ai-copilot"        element={<DemoAICopilot />} />
         </Route>
         <Route path="/demo/:slug" element={<DemoShellWithSlug />}>
           <Route index element={<DemoHome2 />} />
@@ -169,7 +171,7 @@ export default function App() {
           <Route path="initiative-impact"  element={<DemoInitiativeImpact />} />
           <Route path="risk-heatmap"       element={<DemoRiskHeatmap />} />
           <Route path="scenario-simulator" element={<DemoScenarioSimulator />} />
-          <Route path="data-room"          element={<Navigate to="home" replace />} />
+          <Route path="data-room"          element={<DemoDataRoom />} />
           <Route path="reports"            element={<DemoReports />} />
           <Route path="data-sources"       element={<DemoConnectors />} />
           <Route path="field-mapping"      element={<DemoDataMapping />} />
@@ -178,7 +180,7 @@ export default function App() {
           <Route path="market-comps"       element={<DemoMarketComps />} />
           <Route path="engagement-intake"  element={<DemoEngagementIntake />} />
           <Route path="advisory-library"  element={<DemoAdvisoryLibrary />} />
-          <Route path="ai-copilot"        element={<Navigate to="home" replace />} />
+          <Route path="ai-copilot"        element={<DemoAICopilot />} />
         </Route>
 
         {/* ---------------------------------------------------------------- */}

@@ -125,7 +125,7 @@ export default function RequestDemoPage() {
   usePageTitle('Request live demo')
   const navigate = useNavigate()
   const [statusLoading, setStatusLoading] = useState(true)
-  const [required, setRequired] = useState(false)
+  const [codeConfigured, setCodeConfigured] = useState(false)
   const [code, setCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -135,16 +135,17 @@ export default function RequestDemoPage() {
     fetchDemoAccessStatus()
       .then((s) => {
         if (cancelled || !s) return
-        setRequired(Boolean(s.required))
-        if (!s.required || s.granted) {
+        // If already granted (valid token), go straight to demo
+        if (s.granted) {
           navigate('/demo', { replace: true })
           return
         }
+        setCodeConfigured(Boolean(s.code_configured))
       })
       .catch(() => {
         if (cancelled) return
-        setRequired(true)
-        setError('Could not verify access settings. You can still try your code below, or email Matthew.')
+        setCodeConfigured(false)
+        setError('Could not reach the server. Email Matthew to request access.')
       })
       .finally(() => {
         if (!cancelled) setStatusLoading(false)
@@ -265,7 +266,7 @@ export default function RequestDemoPage() {
                 Email {CONTACT_EMAIL}
               </a>
 
-              {required && (
+              {codeConfigured && (
                 <>
                   <div
                     style={{

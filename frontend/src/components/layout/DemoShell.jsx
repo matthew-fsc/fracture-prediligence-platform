@@ -4,10 +4,9 @@ import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { fmtM, cn } from '../../lib/utils'
 import DemoSidebar from './DemoSidebar'
 import ConversionModal from '../demo/ConversionModal'
-import { DemoDashboardExitLink } from '../demo/DemoDashboardExit'
 import { DemoContext } from '../../context/DemoContext'
 import { useCompany } from '../../context/CompanyContext'
-import { Bell, Search, Share2, Check, ArrowLeft } from 'lucide-react'
+import { Bell, Search, Share2, Check } from 'lucide-react'
 import { usePageTitle } from '../../hooks/usePageTitle'
 import { apiClient } from '../../lib/apiClient'
 import { fetchDemoAccessStatus } from '../../lib/demoAccess'
@@ -57,13 +56,9 @@ function DemoHeader({ demoData, slug, personalized }) {
 
   return (
     <header className="h-14 border-b border-border bg-card/60 backdrop-blur-sm flex items-center justify-between px-4 flex-shrink-0">
-      {/* Left */}
-      <div className="flex items-center gap-3">
-        <DemoDashboardExitLink className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border hover:bg-muted/50 transition-colors text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-60 disabled:pointer-events-none">
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Dashboard
-        </DemoDashboardExitLink>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-card-foreground">
+      {/* Left — company badge + scores */}
+      <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-card-foreground flex-shrink-0">
           <span
             style={{
               background: 'hsl(var(--warning))',
@@ -80,38 +75,45 @@ function DemoHeader({ demoData, slug, personalized }) {
           </span>
           <span className="text-muted-foreground max-w-[160px] truncate">{companyName}</span>
         </div>
-        {drs != null && (
-          <span className={cn('text-xs font-semibold', drsColor)}>
-            {Math.round(drs)}/100
-            <span className="text-muted-foreground font-normal ml-1">
-              Readiness{tier ? ` · ${tier}` : ''}
+        <div className="flex items-center gap-1 sm:gap-2 flex-wrap min-w-0">
+          {drs != null && (
+            <span className={cn('text-xs font-semibold', drsColor)}>
+              {Math.round(drs)}/100
+              <span className="text-muted-foreground font-normal ml-1">
+                Readiness{tier ? ` · ${tier}` : ''}
+              </span>
             </span>
-          </span>
-        )}
-        {ev != null && ev > 0 && (
-          <span className="text-xs font-semibold text-primary">{fmtM(ev)} EV</span>
-        )}
+          )}
+          {ev != null && ev > 0 && (
+            <span className="text-xs font-semibold text-primary">{fmtM(ev)} EV</span>
+          )}
+        </div>
       </div>
 
       {/* Right */}
-      <div className="flex items-center gap-2">
-        {/* Share button */}
+      <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
         <button
           onClick={handleShare}
           title="Copy demo link"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border hover:bg-muted/50 transition-colors text-xs font-medium"
+          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border hover:bg-muted/50 transition-colors text-xs font-medium"
           style={{ color: copied ? 'hsl(var(--primary))' : 'hsl(var(--warning))' }}
         >
           {copied ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
           {copied ? 'Copied!' : 'Share'}
         </button>
-
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground w-48">
-          <Search className="w-3.5 h-3.5" />
-          <span>Search metrics, reports...</span>
-        </div>
-        <button className="relative p-1.5 rounded-md hover:bg-muted/50">
-          <Bell className="w-4 h-4 text-muted-foreground" />
+        <button
+          type="button"
+          className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground w-48 min-h-[44px] hover:bg-muted/70"
+        >
+          <Search className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="truncate text-left">Search pages…</span>
+        </button>
+        <button
+          type="button"
+          className="p-2.5 rounded-md hover:bg-muted/50 text-muted-foreground min-h-[44px] min-w-[44px] flex items-center justify-center"
+          disabled
+        >
+          <Bell className="w-4 h-4 opacity-60" />
         </button>
         <div className="flex items-center gap-2 pl-2">
           <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[11px] font-bold">
@@ -150,7 +152,7 @@ export default function DemoShell({ slug = null }) {
     fetchDemoAccessStatus()
       .then((s) => {
         if (cancelled || !s) return
-        if (!s.required || s.granted) setAccessGate('ready')
+        if (s.granted) setAccessGate('ready')
         else setAccessGate('blocked')
       })
       .catch(() => {

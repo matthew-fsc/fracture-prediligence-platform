@@ -1,8 +1,8 @@
-import { NavLink, Link } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import {
   Zap, House, Building, Workflow, Grid3x3, BarChart2,
   Eye, TrendingUp, Target, Activity, Plug, ArrowRightLeft,
-  Folder, FileText, Bot, Settings, ChevronLeft, MonitorPlay,
+  Folder, FileText, Bot, Settings, ChevronLeft,
   LineChart, GitCompare, NotebookPen, BookOpen,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
@@ -124,23 +124,12 @@ export default function Sidebar({ mobileOpen = false, onNavigate }) {
         ))}
       </nav>
 
-      {/* Demo link */}
-      <div className="px-3 pb-2 border-t border-sidebar-border pt-2">
-        <Link
-          to="/request-demo"
-          className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium text-amber-400/80 hover:text-amber-400 hover:bg-amber-400/10 transition-colors duration-100 w-full"
-        >
-          <MonitorPlay className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
-          <span>Request live demo</span>
-        </Link>
-      </div>
-
       {/* Collapse / close (mobile drawer) */}
-      <div className="h-10 flex items-center px-4 border-t border-sidebar-border">
+      <div className="px-3 pb-2 border-t border-sidebar-border pt-2 flex-shrink-0">
         <button
           type="button"
           onClick={() => onNavigate?.()}
-          className="text-[11px] text-sidebar-foreground/40 flex items-center gap-1 min-h-[44px] py-2 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring rounded"
+          className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] text-sidebar-foreground/40 min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring rounded w-full"
         >
           <ChevronLeft className="w-3 h-3" />
           <span className="md:hidden">Close menu</span>

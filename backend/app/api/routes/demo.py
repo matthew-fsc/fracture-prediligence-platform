@@ -373,13 +373,20 @@ def get_demo_data():
 def demo_access_status(
     x_demo_access_token: Optional[str] = Header(default=None, alias="X-Demo-Access-Token"),
 ):
-    """Whether generic demo access is gated and whether the caller's token is valid."""
-    required = bool(settings.DEMO_ACCESS_CODE)
-    if not required:
-        return {"required": False, "granted": True}
-    if not x_demo_access_token:
-        return {"required": True, "granted": False}
-    return {"required": True, "granted": _demo_token_valid(x_demo_access_token)}
+    """Whether generic demo access is gated and whether the caller's token is valid.
+
+    The demo is ALWAYS gated — access requires either:
+      1. A valid JWT token obtained via /demo/verify-access-code (when DEMO_ACCESS_CODE is set), or
+      2. A personalized slug link (/demo/:slug), which bypasses this check in the frontend.
+
+    When DEMO_ACCESS_CODE is not configured, no code-based entry is possible;
+    visitors must request access via email. The 'code_configured' field tells the
+    frontend whether to show the code input form.
+    """
+    code_configured = bool(settings.DEMO_ACCESS_CODE)
+    if x_demo_access_token and _demo_token_valid(x_demo_access_token):
+        return {"required": True, "granted": True, "code_configured": code_configured}
+    return {"required": True, "granted": False, "code_configured": code_configured}
 
 
 @router.post("/demo/verify-access-code")

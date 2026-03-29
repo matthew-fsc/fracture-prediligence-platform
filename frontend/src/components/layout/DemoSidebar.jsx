@@ -3,53 +3,57 @@ import { DemoDashboardExitLink } from '../demo/DemoDashboardExit'
 import {
   Zap, House, Building, Workflow, Grid3x3, BarChart2,
   Eye, TrendingUp, Target, Activity, LineChart, GitCompare,
-  FileText, BookOpen,
-  Plug, ArrowRightLeft, NotebookPen, MonitorPlay,
+  FileText, BookOpen, Bot, MonitorPlay,
+  Plug, ArrowRightLeft, Folder, NotebookPen,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useDemoData } from '../../context/DemoContext'
 
+// Mirror the auth sidebar groups exactly — same labels, same order, same icons.
+// Omissions vs auth: Data Quality (requires ingestion pipeline), Admin (internal only).
 const groups = [
   {
     label: 'Workspace',
     items: [
-      { label: 'Home',                href: '',                  icon: House },
-      { label: 'Company Workspace',   href: 'company',           icon: Building },
-      { label: 'Client Profile',      href: 'engagement-intake', icon: NotebookPen },
-      { label: 'Advisory Workflow',   href: 'workflow',          icon: Workflow },
+      { label: 'Home',                 href: '',                  icon: House },
+      { label: 'Company Workspace',    href: 'company',           icon: Building },
+      { label: 'Client Profile',       href: 'engagement-intake', icon: NotebookPen },
+      { label: 'Advisory Workflow',    href: 'workflow',          icon: Workflow },
     ],
   },
   {
     label: 'Intelligence',
     items: [
-      { label: 'Readiness Score',     href: 'readiness',         icon: Grid3x3 },
-      { label: 'Business Quality',    href: 'business-quality',  icon: BarChart2 },
-      { label: 'Buyer Risk Profile',  href: 'buyer-lens',        icon: Eye },
-      { label: 'Valuation',           href: 'valuation',         icon: TrendingUp },
-      { label: 'Market Comps',        href: 'market-comps',      icon: GitCompare },
+      { label: 'Readiness Score',      href: 'readiness',         icon: Grid3x3 },
+      { label: 'Business Quality',     href: 'business-quality',  icon: BarChart2 },
+      { label: 'Buyer Risk Profile',   href: 'buyer-lens',        icon: Eye },
+      { label: 'Valuation',            href: 'valuation',         icon: TrendingUp },
+      { label: 'Market Comps',         href: 'market-comps',      icon: GitCompare },
     ],
   },
   {
     label: 'Value Creation',
     items: [
-      { label: 'Value Gap',           href: 'value-gap',          icon: Target },
-      { label: 'EBITDA & EV Timeline',href: 'ebitda-timeline',    icon: LineChart },
-      { label: 'Initiative Impact',   href: 'initiative-impact',  icon: Zap },
-      { label: 'Scenario Simulator',  href: 'scenario-simulator', icon: Activity },
+      { label: 'Value Gap',            href: 'value-gap',          icon: Target },
+      { label: 'EBITDA & EV Timeline', href: 'ebitda-timeline',    icon: LineChart },
+      { label: 'Initiative Impact',    href: 'initiative-impact',  icon: Zap },
+      { label: 'Scenario Simulator',   href: 'scenario-simulator', icon: Activity },
     ],
   },
   {
     label: 'Data Pipeline',
     items: [
-      { label: 'Data Sources',        href: 'data-sources',  icon: Plug },
-      { label: 'Field Mapping',       href: 'field-mapping', icon: ArrowRightLeft },
+      { label: 'Data Sources',         href: 'data-sources',  icon: Plug },
+      { label: 'Field Mapping',        href: 'field-mapping', icon: ArrowRightLeft },
+      { label: 'Data Room (VDR)',      href: 'data-room',     icon: Folder },
     ],
   },
   {
     label: 'Output',
     items: [
-      { label: 'Reports',             href: 'reports',          icon: FileText },
-      { label: 'Advisory Library',    href: 'advisory-library', icon: BookOpen },
+      { label: 'Reports',              href: 'reports',          icon: FileText },
+      { label: 'Advisory Library',     href: 'advisory-library', icon: BookOpen },
+      { label: 'AI Copilot',           href: 'ai-copilot',       icon: Bot },
     ],
   },
 ]
@@ -117,8 +121,8 @@ export default function DemoSidebar({ basePrefix = '/demo' }) {
         ))}
       </nav>
 
-      {/* Demo CTA */}
-      <div className="px-3 pb-2 border-t border-sidebar-border pt-2 space-y-1">
+      {/* Demo CTA + back link */}
+      <div className="px-3 pb-2 border-t border-sidebar-border pt-2 space-y-1 flex-shrink-0">
         <button
           type="button"
           onClick={openConversionModal}
