@@ -1,5 +1,5 @@
 """
-Sandbox data generator for ABC Company Inc (company_id=1).
+Sandbox data generator for Meridian Consulting Group (company_id=1).
 
 Produces four CSV files matching the exact export formats of:
   - QuickBooks Online: Transaction List by Date (GL-style)
@@ -29,7 +29,7 @@ random.seed(42)  # reproducible
 
 
 # ─── Company profile ──────────────────────────────────────────────────────────
-# ABC Company Inc — B2B strategy/ops consulting firm
+# Meridian Consulting Group — B2B strategy/ops consulting firm
 # 3-year period: Jan 2022 – Dec 2024 (36 months)
 # Revenue grows ~12% YoY; mostly recurring retainers
 # EBITDA ~$820K on $2.7M revenue (TTM 2024)
@@ -50,7 +50,7 @@ CLIENTS = [
     ("Harbor Financial Services",     12_500,  8_000, date(2022, 2, 1),  True),
     ("BlueSky Retail Partners",       11_000, 12_000, date(2022, 9, 1),  True),
     ("Irongate Construction",          9_500,  6_000, date(2023, 1, 1),  True),
-    ("ABC Data Solutions",             9_000, 18_000, date(2023, 3, 1),  True),
+    ("Meridian Data Solutions",        9_000, 18_000, date(2023, 3, 1),  True),
     ("Northfield Pharma",              8_500,  5_000, date(2023, 6, 1),  True),
     ("Pacific Ventures LLC",           7_500,  0,     date(2022, 1, 1),  True),
     ("Clearwater Energy",              7_000,  8_000, date(2022, 4, 1),  True),
@@ -254,7 +254,7 @@ def generate_qb_transactions() -> Path:
     fieldnames = ["Date", "Transaction Type", "Num", "Name", "Memo/Description", "Account", "Split", "Amount"]
     with open(out, "w", newline="", encoding="utf-8") as f:
         # QB-style header block
-        f.write("ABC Company Inc\n")
+        f.write("Meridian Consulting Group\n")
         f.write("Transaction List by Date\n")
         f.write(f"January 2022 through December 2024\n")
         f.write("\n")
@@ -422,7 +422,7 @@ def generate_hubspot_deals() -> Path:
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print(f"\nGenerating ABC Company Inc sandbox data → {OUTPUT_DIR}\n")
+    print(f"\nGenerating Meridian Consulting Group sandbox data → {OUTPUT_DIR}\n")
     f1 = generate_qb_transactions()
     f2 = generate_qb_customers()
     f3 = generate_gusto_payroll()

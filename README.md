@@ -98,8 +98,6 @@ prediligence-platform/
 ├── railway.toml                # Railway Docker hints
 ├── PLATFORMIZATION.md          # Phased roadmap: hosting → platform maturity
 ├── ROADMAP.md
-├── start.bat                   # Windows: one-click local UI + API (http://localhost:8000)
-├── rebuild-frontend.bat        # Rebuild SPA after frontend edits (then restart start.bat)
 └── README.md
 ```
 
@@ -120,25 +118,7 @@ prediligence-platform/
 
 ## Quick Start (Development)
 
-### Windows — single command
-
-**Prerequisites:** Python 3.11+ on `PATH`, and [Node.js](https://nodejs.org/) on `PATH` for the first run (installs frontend deps and builds the SPA).
-
-From the repo root, double-click or run:
-
-```bat
-start.bat
-```
-
-This creates `backend\.venv` and installs Python deps if needed, creates `backend\.env` with SQLite when missing, runs `npm install` / `npm run build` in `frontend/` when needed, then starts FastAPI on **port 8000** with `--reload`. Open **http://localhost:8000** — the API serves the built React app from `frontend/dist` (same-origin `/api`).
-
-After you change frontend source, run `rebuild-frontend.bat` (or `npm run build` in `frontend/`) and restart the server.
-
-**If venv creation seems stuck or never finishes:** On Windows, `python` in `PATH` is often the Microsoft Store stub (`…\WindowsApps\python.exe`), which can hang. The launcher prefers `py -3` when available. You can also disable **Settings → Apps → Advanced app settings → App execution aliases** for `python.exe` / `python3.exe`, then install Python from [python.org](https://www.python.org/downloads/) with **Add to PATH** checked. Delete a half-created `backend\.venv` folder and run `start.bat` again.
-
-### Frontend (Vite dev server — optional)
-
-For hot reload while editing React, use the Vite dev server in a separate terminal; it proxies `/api` to the backend.
+### Frontend
 
 ```bash
 cd frontend
@@ -147,20 +127,20 @@ npm run dev
 # → http://localhost:5173
 ```
 
-Point `uvicorn` at **port 8000** to match `vite.config.js` (`/api` → `http://127.0.0.1:8000`), or change the proxy target in `vite.config.js` to match your API port.
-
-### Backend (manual — macOS / Linux / CI)
+### Backend
 
 ```bash
 cd backend
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env        # fill in DB credentials (use sqlite:///./prediligence.db for a local file DB)
+cp .env.example .env        # fill in DB credentials
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 # → http://localhost:8000
 ```
+
+The Vite dev server (`npm run dev` on port 5173) proxies `/api` to `http://127.0.0.1:8004` — set `uvicorn` to port **8004** in dev if you use that proxy, or change `vite.config.js` to match your API port.
 
 ---
 

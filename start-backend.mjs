@@ -12,7 +12,7 @@ const cwd = join(__dirname, 'backend');
 
 const proc = spawn(
   venvPython,
-  ['-m', 'uvicorn', 'app.main:app', '--reload', '--port', '8000'],
+  ['-m', 'uvicorn', 'app.main:app', '--reload', '--port', '8002'],
   { cwd, stdio: 'inherit' }
 );
 

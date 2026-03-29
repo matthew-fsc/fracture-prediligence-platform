@@ -6,7 +6,7 @@
 ## Strategic Arc
 
 ```
-Phase 0 (now)     → Repo scaffolded. UI demo proven. Blueprints documented. Local run: `start.bat` → http://localhost:8000.
+Phase 0 (now)     → Repo scaffolded. UI demo proven. Blueprints documented.
 Phase 1 (Client-0) → Get it working end-to-end for one real client.
 Phase 2 (Platform) → Multi-client, production-grade, self-serve.
 Phase 3 (Scale)    → Advisor network, integrations, AI-native workflows.

@@ -93,21 +93,14 @@ async def authenticate_credentials(credentials: HTTPAuthorizationCredentials) ->
         keys = await _get_jwks_keys()
 
         if keys:
-            # Clerk session JWTs are signed with RS256 or ES256 (see token header `alg`).
+            # Clerk RS256 path
             header = jwt.get_unverified_header(token)
-            alg = header.get("alg") or "RS256"
-            allowed_algs = frozenset({"RS256", "ES256", "RS384", "PS256"})
-            if alg not in allowed_algs:
-                raise HTTPException(
-                    status_code=401,
-                    detail=f"Unsupported JWT algorithm: {alg}",
-                )
             kid = header.get("kid")
             key = next((k for k in keys if k.get("kid") == kid), keys[0])
             payload = jwt.decode(
                 token,
                 key,
-                algorithms=[alg],
+                algorithms=["RS256"],
                 options={"verify_aud": False},
             )
         else:
