@@ -51,6 +51,15 @@ def _bootstrap_db():
         _ensure_spots_setting(db)
         seed_curated_benchmarks_if_empty(db)
         try:
+            from app.services.demo_company_seed import ensure_demo_company_seeded
+
+            ensure_demo_company_seeded(db)
+        except Exception:
+            logger.exception(
+                "Demo company seed failed — analytics may be empty until "
+                "you run: python scripts/seed_abc_company.py"
+            )
+        try:
             from app.api.routes.library import seed_library_if_empty
             seeded = seed_library_if_empty(db)
             if seeded:
