@@ -15,27 +15,33 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "advisory_library_items",
-        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("item_type", sa.String(32), nullable=False, index=True),
-        sa.Column("title", sa.String(1024), nullable=False),
-        sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("category", sa.String(64), nullable=True, index=True),
-        sa.Column("severity", sa.String(16), nullable=True),
-        sa.Column("buyer_type", sa.String(32), nullable=True),
-        sa.Column("tags_json", sa.Text(), nullable=True),
-        sa.Column("data_needed", sa.Text(), nullable=True),
-        sa.Column("score_trigger", sa.Numeric(6, 2), nullable=True),
-        sa.Column("effort", sa.String(32), nullable=True),
-        sa.Column("timeline", sa.String(128), nullable=True),
-        sa.Column("ev_impact", sa.String(32), nullable=True),
-        sa.Column("source", sa.String(32), nullable=False, server_default="system"),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
-    )
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    if "advisory_library_items" not in insp.get_table_names():
+        op.create_table(
+            "advisory_library_items",
+            sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
+            sa.Column("item_type", sa.String(32), nullable=False, index=True),
+            sa.Column("title", sa.String(1024), nullable=False),
+            sa.Column("description", sa.Text(), nullable=True),
+            sa.Column("category", sa.String(64), nullable=True, index=True),
+            sa.Column("severity", sa.String(16), nullable=True),
+            sa.Column("buyer_type", sa.String(32), nullable=True),
+            sa.Column("tags_json", sa.Text(), nullable=True),
+            sa.Column("data_needed", sa.Text(), nullable=True),
+            sa.Column("score_trigger", sa.Numeric(6, 2), nullable=True),
+            sa.Column("effort", sa.String(32), nullable=True),
+            sa.Column("timeline", sa.String(128), nullable=True),
+            sa.Column("ev_impact", sa.String(32), nullable=True),
+            sa.Column("source", sa.String(32), nullable=False, server_default="system"),
+            sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+            sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
+            sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
+        )
 
 
 def downgrade() -> None:
-    op.drop_table("advisory_library_items")
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    if "advisory_library_items" in insp.get_table_names():
+        op.drop_table("advisory_library_items")

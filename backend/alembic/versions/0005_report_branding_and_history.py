@@ -15,22 +15,33 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("companies", sa.Column("report_firm_name", sa.String(256), nullable=True))
-    op.add_column("companies", sa.Column("report_cover_blurb", sa.Text(), nullable=True))
-    op.add_column("companies", sa.Column("report_logo_url", sa.String(512), nullable=True))
+    conn = op.get_bind()
+    cols = {c["name"] for c in sa.inspect(conn).get_columns("companies")}
+    if "report_firm_name" not in cols:
+        op.add_column("companies", sa.Column("report_firm_name", sa.String(256), nullable=True))
+    if "report_cover_blurb" not in cols:
+        op.add_column("companies", sa.Column("report_cover_blurb", sa.Text(), nullable=True))
+    if "report_logo_url" not in cols:
+        op.add_column("companies", sa.Column("report_logo_url", sa.String(512), nullable=True))
 
-    op.create_table(
-        "generated_reports",
-        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("company_id", sa.Integer(), sa.ForeignKey("companies.id"), nullable=False, index=True),
-        sa.Column("template_id", sa.String(64), nullable=False),
-        sa.Column("drs_score", sa.Numeric(6, 2), nullable=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
-    )
+    insp = sa.inspect(conn)
+    if "generated_reports" not in insp.get_table_names():
+        op.create_table(
+            "generated_reports",
+            sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
+            sa.Column("company_id", sa.Integer(), sa.ForeignKey("companies.id"), nullable=False, index=True),
+            sa.Column("template_id", sa.String(64), nullable=False),
+            sa.Column("drs_score", sa.Numeric(6, 2), nullable=True),
+            sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
+        )
 
 
 def downgrade() -> None:
-    op.drop_table("generated_reports")
-    op.drop_column("companies", "report_logo_url")
-    op.drop_column("companies", "report_cover_blurb")
-    op.drop_column("companies", "report_firm_name")
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    if "generated_reports" in insp.get_table_names():
+        op.drop_table("generated_reports")
+    cols = {c["name"] for c in insp.get_columns("companies")}
+    for name in ("report_logo_url", "report_cover_blurb", "report_firm_name"):
+        if name in cols:
+            op.drop_column("companies", name)

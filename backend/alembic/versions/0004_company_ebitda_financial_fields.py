@@ -15,14 +15,27 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("companies", sa.Column("market_rate_replacement_annual", sa.Numeric(14, 2), nullable=True))
-    op.add_column("companies", sa.Column("depreciation_amortization_ttm", sa.Numeric(14, 2), nullable=True))
-    op.add_column("companies", sa.Column("interest_expense_ttm", sa.Numeric(14, 2), nullable=True))
-    op.add_column("companies", sa.Column("income_tax_expense_ttm", sa.Numeric(14, 2), nullable=True))
+    conn = op.get_bind()
+    cols = {c["name"] for c in sa.inspect(conn).get_columns("companies")}
+    adds = [
+        ("market_rate_replacement_annual", sa.Numeric(14, 2)),
+        ("depreciation_amortization_ttm", sa.Numeric(14, 2)),
+        ("interest_expense_ttm", sa.Numeric(14, 2)),
+        ("income_tax_expense_ttm", sa.Numeric(14, 2)),
+    ]
+    for name, typ in adds:
+        if name not in cols:
+            op.add_column("companies", sa.Column(name, typ, nullable=True))
 
 
 def downgrade() -> None:
-    op.drop_column("companies", "income_tax_expense_ttm")
-    op.drop_column("companies", "interest_expense_ttm")
-    op.drop_column("companies", "depreciation_amortization_ttm")
-    op.drop_column("companies", "market_rate_replacement_annual")
+    conn = op.get_bind()
+    cols = {c["name"] for c in sa.inspect(conn).get_columns("companies")}
+    for name in (
+        "income_tax_expense_ttm",
+        "interest_expense_ttm",
+        "depreciation_amortization_ttm",
+        "market_rate_replacement_annual",
+    ):
+        if name in cols:
+            op.drop_column("companies", name)
