@@ -65,6 +65,22 @@ def upgrade() -> None:
             ["created_at"],
             if_not_exists=True,
         )
+    else:
+        ss_idx = {i["name"] for i in insp.get_indexes("score_snapshots")}
+        if "ix_score_snapshots_company_id" not in ss_idx:
+            op.create_index(
+                "ix_score_snapshots_company_id",
+                "score_snapshots",
+                ["company_id"],
+                if_not_exists=True,
+            )
+        if "ix_score_snapshots_created_at" not in ss_idx:
+            op.create_index(
+                "ix_score_snapshots_created_at",
+                "score_snapshots",
+                ["created_at"],
+                if_not_exists=True,
+            )
 
     insp = sa.inspect(conn)
     _qi_columns = (
@@ -90,10 +106,16 @@ def upgrade() -> None:
                 sa.Integer(),
                 sa.ForeignKey("companies.id"),
                 nullable=False,
-                unique=True,
             ),
             *[sa.Column(name, typ, nullable=True) for name, typ in _qi_columns],
             sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now()),
+            if_not_exists=True,
+        )
+        op.create_index(
+            "ix_qualitative_inputs_company_id",
+            "qualitative_inputs",
+            ["company_id"],
+            unique=True,
             if_not_exists=True,
         )
     else:
@@ -106,6 +128,15 @@ def upgrade() -> None:
                 "qualitative_inputs",
                 sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now()),
             )
+        qi_idx = {i["name"] for i in insp.get_indexes("qualitative_inputs")}
+        if "ix_qualitative_inputs_company_id" not in qi_idx:
+            op.create_index(
+                "ix_qualitative_inputs_company_id",
+                "qualitative_inputs",
+                ["company_id"],
+                unique=True,
+                if_not_exists=True,
+            )
 
 
 def downgrade() -> None:
@@ -113,6 +144,7 @@ def downgrade() -> None:
     insp = sa.inspect(conn)
 
     if "qualitative_inputs" in insp.get_table_names():
+        op.drop_index("ix_qualitative_inputs_company_id", table_name="qualitative_inputs", if_exists=True)
         op.drop_table("qualitative_inputs")
 
     if "score_snapshots" in insp.get_table_names():

@@ -160,13 +160,16 @@ def upgrade() -> None:
     )
 
     # ── ingestion_jobs indexes ─────────────────────────────────────────────
-    op.create_index(
-        "ix_ingestion_jobs_ingestion_id",
-        "ingestion_jobs",
-        ["ingestion_id"],
-        unique=True,
-        if_not_exists=True,
-    )
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    if "ingestion_jobs" in insp.get_table_names():
+        op.create_index(
+            "ix_ingestion_jobs_ingestion_id",
+            "ingestion_jobs",
+            ["ingestion_id"],
+            unique=True,
+            if_not_exists=True,
+        )
 
     # ── seed a default company (idempotent — DB may already have id=1 from bootstrap or a retry)
     op.execute(
@@ -179,7 +182,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("ingestion_jobs")
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    if "ingestion_jobs" in insp.get_table_names():
+        op.drop_index("ix_ingestion_jobs_ingestion_id", table_name="ingestion_jobs", if_exists=True)
+        op.drop_table("ingestion_jobs")
     op.drop_table("contracts")
     op.drop_table("expenses")
     op.drop_table("revenue_streams")

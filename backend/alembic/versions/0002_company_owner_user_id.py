@@ -26,7 +26,12 @@ def upgrade() -> None:
     insp = sa.inspect(conn)
     indexes = {i["name"] for i in insp.get_indexes("companies")}
     if "ix_companies_owner_user_id" not in indexes:
-        op.create_index("ix_companies_owner_user_id", "companies", ["owner_user_id"])
+        op.create_index(
+            "ix_companies_owner_user_id",
+            "companies",
+            ["owner_user_id"],
+            if_not_exists=True,
+        )
 
 
 def downgrade() -> None:
