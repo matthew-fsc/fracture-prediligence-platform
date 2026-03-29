@@ -2,9 +2,9 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
@@ -216,9 +216,14 @@ app.include_router(webhooks.router,   prefix="/api",            tags=["webhooks"
 app.include_router(copilot.router,    prefix="/api/copilot",    tags=["copilot"])
 
 
-@app.get("/health")
-def health():
-    """Liveness: process is up (use for load balancer probes that should not hit the DB)."""
+@app.api_route("/health", methods=["GET", "HEAD"])
+def health(request: Request):
+    """Liveness: process is up (use for load balancer probes that should not hit the DB).
+
+    HEAD is supported — some platforms probe with HEAD; GET-only routes return 405 and fail checks.
+    """
+    if request.method == "HEAD":
+        return Response(status_code=200)
     return {
         "status": "ok",
         "service": "prediligence-platform",
@@ -226,16 +231,18 @@ def health():
     }
 
 
-@app.get("/health/ready")
-def health_ready():
+@app.api_route("/health/ready", methods=["GET", "HEAD"])
+def health_ready(request: Request):
     """Readiness: DB accepts connections. Returns 503 if the database is unreachable."""
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        return {"status": "ok", "database": "connected", "env": settings.APP_ENV}
     except Exception:
         logger.exception("readiness check failed")
         raise HTTPException(status_code=503, detail="database_unavailable")
+    if request.method == "HEAD":
+        return Response(status_code=200)
+    return {"status": "ok", "database": "connected", "env": settings.APP_ENV}
 
 
 # ── Serve React SPA ──────────────────────────────────────────────────────────

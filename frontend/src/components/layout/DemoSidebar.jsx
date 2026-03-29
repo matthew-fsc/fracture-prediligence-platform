@@ -3,54 +3,55 @@ import { DemoDashboardExitLink } from '../demo/DemoDashboardExit'
 import {
   Zap, House, Building, Workflow, Grid3x3, BarChart2,
   Eye, TrendingUp, Target, Activity, LineChart, GitCompare,
-  FileText, ChevronLeft, ShieldAlert, BookOpen,
-  UploadCloud, GitMerge, LayoutDashboard, NotebookPen,
+  FileText, ChevronLeft, BookOpen, Bot,
+  Plug, ArrowRightLeft, Folder, NotebookPen, MonitorPlay,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useDemoData } from '../../context/DemoContext'
 
 const groups = [
   {
-    label: 'Engagement',
+    label: 'Workspace',
     items: [
-      { label: 'Dashboard',          path: '',                  icon: House },
-      { label: 'Company Workspace',  path: 'company',           icon: Building },
-      { label: 'Client Profile',     path: 'engagement-intake', icon: NotebookPen },
-      { label: 'Advisory Workflow',  path: 'workflow',          icon: Workflow },
+      { label: 'Home',                href: '',                  icon: House },
+      { label: 'Company Workspace',   href: 'company',           icon: Building },
+      { label: 'Client Profile',      href: 'engagement-intake', icon: NotebookPen },
+      { label: 'Advisory Workflow',   href: 'workflow',          icon: Workflow },
     ],
   },
   {
-    label: 'Data',
+    label: 'Intelligence',
     items: [
-      { label: 'Data Sources',   path: 'data-sources',  icon: UploadCloud },
-      { label: 'Field Mapping',  path: 'field-mapping', icon: GitMerge },
+      { label: 'Readiness Score',     href: 'readiness',         icon: Grid3x3 },
+      { label: 'Business Quality',    href: 'business-quality',  icon: BarChart2 },
+      { label: 'Buyer Risk Profile',  href: 'buyer-lens',        icon: Eye },
+      { label: 'Valuation',           href: 'valuation',         icon: TrendingUp },
+      { label: 'Market Comps',        href: 'market-comps',      icon: GitCompare },
     ],
   },
   {
-    label: 'Analysis',
+    label: 'Value Creation',
     items: [
-      { label: 'Readiness Score',    path: 'readiness',       icon: Grid3x3 },
-      { label: 'Business Quality',   path: 'business-quality', icon: BarChart2 },
-      { label: 'Buyer Risk Profile', path: 'buyer-lens',      icon: Eye },
-      { label: 'Risk Heatmap',       path: 'risk-heatmap',    icon: ShieldAlert },
+      { label: 'Value Gap',           href: 'value-gap',          icon: Target },
+      { label: 'EBITDA & EV Timeline',href: 'ebitda-timeline',    icon: LineChart },
+      { label: 'Initiative Impact',   href: 'initiative-impact',  icon: Zap },
+      { label: 'Scenario Simulator',  href: 'scenario-simulator', icon: Activity },
     ],
   },
   {
-    label: 'Valuation',
+    label: 'Data Pipeline',
     items: [
-      { label: 'Valuation',          path: 'valuation',         icon: TrendingUp },
-      { label: 'Market Comps',       path: 'market-comps',      icon: GitCompare },
-      { label: 'EBITDA & EV Timeline',path: 'ebitda-timeline',  icon: LineChart },
-      { label: 'Value Gap',          path: 'value-gap',         icon: Target },
-      { label: 'Scenario Simulator', path: 'scenario-simulator',icon: Activity },
+      { label: 'Data Sources',        href: 'data-sources',  icon: Plug },
+      { label: 'Field Mapping',       href: 'field-mapping', icon: ArrowRightLeft },
+      { label: 'Data Room (VDR)',     href: 'data-room',     icon: Folder },
     ],
   },
   {
-    label: 'Delivery',
+    label: 'Output',
     items: [
-      { label: 'Initiative Impact',  path: 'initiative-impact', icon: Zap },
-      { label: 'Advisory Library',   path: 'advisory-library',  icon: BookOpen },
-      { label: 'Reports',            path: 'reports',           icon: FileText },
+      { label: 'Reports',             href: 'reports',          icon: FileText },
+      { label: 'Advisory Library',    href: 'advisory-library', icon: BookOpen },
+      { label: 'AI Copilot',          href: 'ai-copilot',       icon: Bot },
     ],
   },
 ]
@@ -85,13 +86,13 @@ export default function DemoSidebar({ basePrefix = '/demo' }) {
               {group.label}
             </p>
             <div className="px-2 space-y-0.5">
-              {group.items.map(({ label, path, icon: Icon }) => {
-                const href = path === '' ? basePrefix : `${basePrefix}/${path}`
+              {group.items.map(({ label, href, icon: Icon }) => {
+                const to = href === '' ? basePrefix : `${basePrefix}/${href}`
                 return (
                   <NavLink
-                    key={path}
-                    to={href}
-                    end={path === ''}
+                    key={href}
+                    to={to}
+                    end={href === ''}
                     className={({ isActive }) =>
                       cn(
                         'flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium transition-colors duration-100',
@@ -118,8 +119,8 @@ export default function DemoSidebar({ basePrefix = '/demo' }) {
         ))}
       </nav>
 
-      {/* Founding CTA + back to dashboard */}
-      <div className="border-t border-sidebar-border px-3 py-3 space-y-2 flex-shrink-0">
+      {/* Demo CTA */}
+      <div className="px-3 pb-2 border-t border-sidebar-border pt-2 space-y-1">
         <button
           type="button"
           onClick={openConversionModal}
@@ -127,8 +128,8 @@ export default function DemoSidebar({ basePrefix = '/demo' }) {
         >
           Request Founding license
         </button>
-        <DemoDashboardExitLink className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] font-medium text-sidebar-foreground/60 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/40 transition-colors duration-100 disabled:opacity-60 disabled:pointer-events-none text-left">
-          <LayoutDashboard className="w-3.5 h-3.5 flex-shrink-0" />
+        <DemoDashboardExitLink className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] font-medium text-sidebar-foreground/60 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/40 transition-colors duration-100 text-left">
+          <MonitorPlay className="w-3.5 h-3.5 flex-shrink-0" />
           Back to Dashboard
         </DemoDashboardExitLink>
       </div>
