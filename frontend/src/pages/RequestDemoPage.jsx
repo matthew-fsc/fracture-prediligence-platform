@@ -125,7 +125,6 @@ export default function RequestDemoPage() {
   usePageTitle('Request live demo')
   const navigate = useNavigate()
   const [statusLoading, setStatusLoading] = useState(true)
-  const [codeConfigured, setCodeConfigured] = useState(false)
   const [code, setCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -136,23 +135,13 @@ export default function RequestDemoPage() {
       .then((s) => {
         if (cancelled || !s) return
         // If already granted (valid token), go straight to demo
-        if (s.granted) {
-          navigate('/demo', { replace: true })
-          return
-        }
-        setCodeConfigured(Boolean(s.code_configured))
+        if (s.granted) navigate('/demo', { replace: true })
       })
-      .catch(() => {
-        if (cancelled) return
-        setCodeConfigured(false)
-        setError('Could not reach the server. Email Matthew to request access.')
-      })
+      .catch(() => { /* show page normally */ })
       .finally(() => {
         if (!cancelled) setStatusLoading(false)
       })
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [navigate])
 
   const handleSubmit = async (e) => {
@@ -266,59 +255,55 @@ export default function RequestDemoPage() {
                 Email {CONTACT_EMAIL}
               </a>
 
-              {codeConfigured && (
-                <>
-                  <div
+              <div
+                style={{
+                  borderTop: `1px solid ${COLORS.border}`,
+                  paddingTop: 32,
+                  marginTop: 8,
+                }}
+              >
+                <p
+                  style={{
+                    color: COLORS.muted,
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: 13,
+                    marginBottom: 16,
+                  }}
+                >
+                  Already have a code?
+                </p>
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    placeholder="Access code"
+                    value={code}
+                    onChange={(e) => {
+                      setCode(e.target.value)
+                      setError('')
+                    }}
+                    style={INPUT_STYLE}
+                  />
+                  <button
+                    type="submit"
+                    disabled={submitting || !code.trim()}
                     style={{
-                      borderTop: `1px solid ${COLORS.border}`,
-                      paddingTop: 32,
-                      marginTop: 8,
+                      background: COLORS.gold,
+                      color: COLORS.bg,
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontWeight: 600,
+                      fontSize: 15,
+                      padding: '12px 28px',
+                      borderRadius: 8,
+                      border: 'none',
+                      cursor: submitting || !code.trim() ? 'not-allowed' : 'pointer',
+                      opacity: submitting || !code.trim() ? 0.65 : 1,
                     }}
                   >
-                    <p
-                      style={{
-                        color: COLORS.muted,
-                        fontFamily: "'DM Sans', sans-serif",
-                        fontSize: 13,
-                        marginBottom: 16,
-                      }}
-                    >
-                      Already have a code?
-                    </p>
-                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-                      <input
-                        type="password"
-                        autoComplete="off"
-                        placeholder="Access code"
-                        value={code}
-                        onChange={(e) => {
-                          setCode(e.target.value)
-                          setError('')
-                        }}
-                        style={INPUT_STYLE}
-                      />
-                      <button
-                        type="submit"
-                        disabled={submitting || !code.trim()}
-                        style={{
-                          background: COLORS.gold,
-                          color: COLORS.bg,
-                          fontFamily: "'DM Sans', sans-serif",
-                          fontWeight: 600,
-                          fontSize: 15,
-                          padding: '12px 28px',
-                          borderRadius: 8,
-                          border: 'none',
-                          cursor: submitting || !code.trim() ? 'not-allowed' : 'pointer',
-                          opacity: submitting || !code.trim() ? 0.65 : 1,
-                        }}
-                      >
-                        {submitting ? 'Checking…' : 'Open demo'}
-                      </button>
-                    </form>
-                  </div>
-                </>
-              )}
+                    {submitting ? 'Checking…' : 'Open demo'}
+                  </button>
+                </form>
+              </div>
             </>
           )}
         </div>
