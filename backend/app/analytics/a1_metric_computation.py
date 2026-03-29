@@ -7,6 +7,7 @@ This metric registry is the input to every subsequent analytical phase (A2–A14
 
 from __future__ import annotations
 from dataclasses import dataclass, field
+import calendar
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
@@ -16,6 +17,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.ontology.models import Company, RevenueStream, Customer, Employee, Expense, Contract, RevenueType, ExpenseCategory, EmployeeStatus
+
+
+def _add_months(d: date, months: int) -> date:
+    """Calendar month arithmetic; clamps day to last day of target month."""
+    m_idx = d.year * 12 + d.month - 1 + months
+    y = m_idx // 12
+    mo = m_idx % 12 + 1
+    last = calendar.monthrange(y, mo)[1]
+    return date(y, mo, min(d.day, last))
 
 
 @dataclass
@@ -137,11 +147,16 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
         .all()
     )
     monthly_vals = []
+    ref_month_first = ref_date.replace(day=1)
     for i in range(24):
-        mo_start = ref_date.replace(day=1) - timedelta(days=30 * i)
-        mo_end = (mo_start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-        mo_rev = sum(r.revenue_gross for r in revenue_24m_rows if mo_start <= r.revenue_period <= mo_end)
-        key = mo_start.strftime("%Y-%m")
+        month_anchor = _add_months(ref_month_first, -i)
+        y, mo = month_anchor.year, month_anchor.month
+        period_start = date(y, mo, 1)
+        period_end = date(y, mo, calendar.monthrange(y, mo)[1])
+        mo_rev = sum(
+            r.revenue_gross for r in revenue_24m_rows if period_start <= r.revenue_period <= period_end
+        )
+        key = f"{y:04d}-{mo:02d}"
         m.monthly_revenue_24m[key] = mo_rev
         monthly_vals.append(float(mo_rev))
     if monthly_vals and statistics.mean(monthly_vals):

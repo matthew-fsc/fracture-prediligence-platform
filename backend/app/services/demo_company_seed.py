@@ -276,23 +276,23 @@ MONTH_ENDS_2025 = [
 ]
 
 # Seasonal revenue weights for a field services / traffic management company.
-# Outdoor municipal work peaks in summer construction season; January–February
-# and late December are soft (weather, budget cycles); Q4 has a modest year-end
-# government spending uptick before the holiday lull.
-# Weights sum exactly to 1.000.
+# Outdoor municipal work peaks in summer construction season; winter months are
+# soft; Q4 has a modest year-end government uptick before the holiday lull.
+# Each month has a distinct weight (no duplicate months) while preserving the same
+# annual total; weights sum exactly to 1.000.
 MONTHLY_WEIGHTS_2025 = [
-    Decimal("0.055"),  # Jan  — winter slow
-    Decimal("0.055"),  # Feb  — winter slow
-    Decimal("0.075"),  # Mar  — spring ramp
-    Decimal("0.090"),  # Apr  — season opens
-    Decimal("0.100"),  # May  — active
-    Decimal("0.105"),  # Jun  — peak
-    Decimal("0.105"),  # Jul  — peak
-    Decimal("0.100"),  # Aug  — high
-    Decimal("0.095"),  # Sep  — winding down
-    Decimal("0.085"),  # Oct  — fall close-outs
-    Decimal("0.070"),  # Nov  — slowing
-    Decimal("0.065"),  # Dec  — year-end close, holiday lull
+    Decimal("0.054"),  # Jan — winter slow
+    Decimal("0.056"),  # Feb — winter slow (slightly up vs Jan)
+    Decimal("0.074"),  # Mar — spring ramp
+    Decimal("0.089"),  # Apr — season opens
+    Decimal("0.101"),  # May — active
+    Decimal("0.104"),  # Jun — peak
+    Decimal("0.106"),  # Jul — peak (slightly above Jun)
+    Decimal("0.099"),  # Aug — high
+    Decimal("0.094"),  # Sep — winding down
+    Decimal("0.086"),  # Oct — fall close-outs
+    Decimal("0.071"),  # Nov — slowing
+    Decimal("0.066"),  # Dec — year-end close, holiday lull
 ]
 
 
@@ -655,7 +655,31 @@ def _demo_2025_revenue_matches(db: Session) -> bool:
     if total_2025 is None:
         return False
     diff = abs(Decimal(str(total_2025)) - EXPECTED_2025_REVENUE)
-    return diff < Decimal("5000")
+    if diff >= Decimal("5000"):
+        return False
+    # Older seeds used duplicate monthly weights (e.g. Jan == Feb company totals). Re-seed so
+    # month-over-month variation matches current MONTHLY_WEIGHTS_2025.
+    jan = (
+        db.query(func.sum(RevenueStream.revenue_gross))
+        .filter(
+            RevenueStream.company_id == COMPANY_ID,
+            RevenueStream.revenue_period == date(2025, 1, 31),
+        )
+        .scalar()
+    )
+    feb = (
+        db.query(func.sum(RevenueStream.revenue_gross))
+        .filter(
+            RevenueStream.company_id == COMPANY_ID,
+            RevenueStream.revenue_period == date(2025, 2, 28),
+        )
+        .scalar()
+    )
+    jan_d = Decimal(str(jan or 0))
+    feb_d = Decimal(str(feb or 0))
+    if jan_d == 0 and feb_d == 0:
+        return False
+    return jan_d != feb_d
 
 
 def ensure_demo_company_seeded(db: Session) -> bool:

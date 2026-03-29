@@ -355,7 +355,7 @@ function EbitdaBasisPanel({ companyId, metrics, onSaved }) {
       </div>
       <div className="px-5 py-4 space-y-4">
         <p className="text-[11px] text-muted-foreground leading-relaxed">
-          {metrics?.ebitda_basis_note ?? 'Ontology proxy (revenue − COGS − OpEx) plus advisor-entered D&A. Interest and tax are for disclosure only.'}
+          {metrics?.ebitda_basis_note ?? 'Ontology proxy (Revenue − COGS − OpEx) plus advisor-entered D&A. Interest and tax are for disclosure only.'}
         </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
