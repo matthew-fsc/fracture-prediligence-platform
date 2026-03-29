@@ -79,6 +79,10 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
     ref_date = latest_rev_date if latest_rev_date and latest_rev_date < today else today
     ttm_start = ref_date - timedelta(days=365)
 
+    # TTM revenue sums every row with period >= ttm_start. If the DB mixes annual,
+    # monthly, and extra connector ingests for the same economics, this double-counts
+    # and inflates revenue, gross profit, and EBITDA vs. a single clean P&L path.
+
     # --- Revenue: TTM ---
     ttm_revenue_rows = (
         db.query(RevenueStream)

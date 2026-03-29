@@ -27,7 +27,7 @@ function Nav() {
           </span>
         </div>
 
-        {/* Right nav � Clerk prebuilt buttons when configured; plain links otherwise */}
+        {/* Right nav — Clerk prebuilt buttons when configured; plain links otherwise */}
         <div className="flex items-center gap-4 sm:gap-6">
           {HAS_CLERK ? (
             <>
@@ -164,7 +164,7 @@ function Hero() {
           }}
         >
           Fracture Systems gives CEPA advisors the structure, scoring, and reporting to prepare
-          SMB clients for diligence � before buyers find the gaps.
+          SMB clients for diligence—before buyers find the gaps.
         </p>
 
         {/* CTAs */}
@@ -191,7 +191,7 @@ function Hero() {
               display: 'inline-block',
             }}
           >
-            See Live Demo ?
+            See Live Demo
           </Link>
           <Link
             to="/sign-in"
@@ -293,7 +293,7 @@ function Features() {
       Icon: TrendingUp,
       title: 'Diligence Gap Scoring',
       description:
-        'Our DRS engine scores 6 dimensions of business quality. Know exactly what a buyer will find � and fix it first.',
+        'Our DRS engine scores 6 dimensions of business quality. Know exactly what a buyer will find—and fix it first.',
     },
     {
       Icon: FileText,
@@ -448,7 +448,7 @@ function SocialProof() {
                   margin: 0,
                 }}
               >
-                � CEPA Advisor, {t.location}
+                — CEPA Advisor, {t.location}
               </p>
             </div>
           ))}
@@ -466,10 +466,10 @@ function Pricing() {
     {
       name: 'Founding Advisor',
       price: '$179',
-      badge: 'Limited � 20 spots',
+      badge: 'Limited — 20 spots',
       highlight: true,
       features: ['All Pro features', 'Rate locked for life', 'White-glove onboarding', 'Founding member badge'],
-      cta: 'Claim Founding Access ?',
+      cta: 'Claim Founding Access',
       ctaLink: '/pricing',
     },
     {
@@ -603,7 +603,7 @@ function Pricing() {
                       color: COLORS.muted,
                     }}
                   >
-                    <span style={{ color: COLORS.gold }}>?</span>
+                    <span style={{ color: COLORS.gold }}>✓</span>
                     {feat}
                   </li>
                 ))}
@@ -672,7 +672,7 @@ function Footer() {
           Built for CEPA advisors. Trusted at exit.
         </p>
 
-        {/* Row 2 � links */}
+        {/* Row 2 — links */}
         <div style={{ display: 'flex', gap: 24, marginBottom: 20, flexWrap: 'wrap' }}>
           {[
             { label: 'Log in', to: '/sign-in' },
@@ -703,7 +703,7 @@ function Footer() {
             margin: 0,
           }}
         >
-          matthew@fracturesystems.com � � 2026 Fracture Systems. All rights reserved.
+          matthew@fracturesystems.com — © 2026 Fracture Systems. All rights reserved.
         </p>
       </div>
     </footer>

@@ -5,6 +5,10 @@ Used by app startup (`ensure_demo_company_seeded`) when the DB has no revenue
 streams for company 1, and by the CLI `scripts/seed_abc_company.py` for
 manual resets.
 
+If live analytics show TTM revenue/EBITDA far above the printed verify() targets,
+company 1 likely has additional `revenue_streams` from connector uploads on top of
+this seed; wipe and re-seed (or trim duplicate ingests) so metrics match one P&L path.
+
 Populates:
   - 3-year P&L (2023 / 2024 / 2025)
   - 68 customers with correct concentration

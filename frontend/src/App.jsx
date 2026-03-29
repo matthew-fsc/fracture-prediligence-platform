@@ -25,7 +25,6 @@ import DemoValuation from './pages/Valuation'
 import DemoValueGap from './pages/ValueGap'
 import DemoInitiativeImpact from './pages/InitiativeImpact'
 import DemoScenarioSimulator from './pages/ScenarioSimulator'
-import DemoDataRoom from './pages/DataRoom'
 import DemoReports from './pages/Reports'
 import DemoRiskHeatmap from './pages/RiskHeatmap'
 import DemoConnectors from './pages/Connectors'
@@ -34,7 +33,6 @@ import DemoEBITDATimeline from './pages/EBITDATimeline'
 import DemoMarketComps from './pages/MarketComps'
 import DemoEngagementIntake from './pages/EngagementIntake'
 import DemoAdvisoryLibrary from './pages/AdvisoryLibrary'
-import DemoAICopilot from './pages/AICopilot'
 
 // Dashboard pages
 import Home from './pages/Home'
@@ -145,7 +143,7 @@ export default function App() {
           <Route path="initiative-impact"  element={<DemoInitiativeImpact />} />
           <Route path="risk-heatmap"       element={<DemoRiskHeatmap />} />
           <Route path="scenario-simulator" element={<DemoScenarioSimulator />} />
-          <Route path="data-room"          element={<DemoDataRoom />} />
+          <Route path="data-room"          element={<Navigate to="home" replace />} />
           <Route path="reports"            element={<DemoReports />} />
           <Route path="data-sources"       element={<DemoConnectors />} />
           <Route path="field-mapping"      element={<DemoDataMapping />} />
@@ -154,7 +152,7 @@ export default function App() {
           <Route path="market-comps"       element={<DemoMarketComps />} />
           <Route path="engagement-intake"  element={<DemoEngagementIntake />} />
           <Route path="advisory-library"  element={<DemoAdvisoryLibrary />} />
-          <Route path="ai-copilot"        element={<DemoAICopilot />} />
+          <Route path="ai-copilot"        element={<Navigate to="home" replace />} />
         </Route>
         <Route path="/demo/:slug" element={<DemoShellWithSlug />}>
           <Route index element={<DemoHome2 />} />
@@ -169,7 +167,7 @@ export default function App() {
           <Route path="initiative-impact"  element={<DemoInitiativeImpact />} />
           <Route path="risk-heatmap"       element={<DemoRiskHeatmap />} />
           <Route path="scenario-simulator" element={<DemoScenarioSimulator />} />
-          <Route path="data-room"          element={<DemoDataRoom />} />
+          <Route path="data-room"          element={<Navigate to="home" replace />} />
           <Route path="reports"            element={<DemoReports />} />
           <Route path="data-sources"       element={<DemoConnectors />} />
           <Route path="field-mapping"      element={<DemoDataMapping />} />
@@ -178,7 +176,7 @@ export default function App() {
           <Route path="market-comps"       element={<DemoMarketComps />} />
           <Route path="engagement-intake"  element={<DemoEngagementIntake />} />
           <Route path="advisory-library"  element={<DemoAdvisoryLibrary />} />
-          <Route path="ai-copilot"        element={<DemoAICopilot />} />
+          <Route path="ai-copilot"        element={<Navigate to="home" replace />} />
         </Route>
 
         {/* ---------------------------------------------------------------- */}
@@ -194,7 +192,7 @@ export default function App() {
         />
 
         {/* ---------------------------------------------------------------- */}
-        {/* Dashboard routes (auth required, AppShell) � pathless layout */}
+        {/* Dashboard routes (auth required, AppShell) — pathless layout */}
         {/* avoids duplicate parent path="/" with the landing route.          */}
         {/* ---------------------------------------------------------------- */}
         <Route element={<ProtectedAppShell />}>
