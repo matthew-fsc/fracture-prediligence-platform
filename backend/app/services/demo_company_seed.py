@@ -275,6 +275,26 @@ MONTH_ENDS_2025 = [
     date(2025, m, calendar.monthrange(2025, m)[1]) for m in range(1, 13)
 ]
 
+# Seasonal revenue weights for a field services / traffic management company.
+# Outdoor municipal work peaks in summer construction season; January–February
+# and late December are soft (weather, budget cycles); Q4 has a modest year-end
+# government spending uptick before the holiday lull.
+# Weights sum exactly to 1.000.
+MONTHLY_WEIGHTS_2025 = [
+    Decimal("0.055"),  # Jan  — winter slow
+    Decimal("0.055"),  # Feb  — winter slow
+    Decimal("0.075"),  # Mar  — spring ramp
+    Decimal("0.090"),  # Apr  — season opens
+    Decimal("0.100"),  # May  — active
+    Decimal("0.105"),  # Jun  — peak
+    Decimal("0.105"),  # Jul  — peak
+    Decimal("0.100"),  # Aug  — high
+    Decimal("0.095"),  # Sep  — winding down
+    Decimal("0.085"),  # Oct  — fall close-outs
+    Decimal("0.070"),  # Nov  — slowing
+    Decimal("0.065"),  # Dec  — year-end close, holiday lull
+]
+
 
 def month_end(year: int, month: int) -> date:
     return date(year, month, calendar.monthrange(year, month)[1])
@@ -422,13 +442,20 @@ def seed_customers_and_revenue(db) -> list[int]:
             ))
             rs_count += 1
 
-        # 2025 — monthly records (only for active customers)
+        # 2025 — monthly records with seasonal distribution (only for active customers)
         if not churned:
-            monthly_2025 = revenues[i][2025] / 12
-            for mo_end in MONTH_ENDS_2025:
+            annual_2025 = revenues[i][2025]
+            running = Decimal(0)
+            for mi, mo_end in enumerate(MONTH_ENDS_2025):
+                if mi == 11:
+                    # Last month absorbs rounding residual so per-customer total is exact
+                    monthly_amt = (annual_2025 - running).quantize(Decimal("0.01"), ROUND_HALF_UP)
+                else:
+                    monthly_amt = (annual_2025 * MONTHLY_WEIGHTS_2025[mi]).quantize(Decimal("0.01"), ROUND_HALF_UP)
+                    running += monthly_amt
                 db.add(RevenueStream(
                     company_id=COMPANY_ID, customer_id=cid,
-                    revenue_gross=monthly_2025.quantize(Decimal("0.01"), ROUND_HALF_UP),
+                    revenue_gross=monthly_amt,
                     revenue_type=RevenueType.PROJECT,
                     recurring_flag=False, revenue_period=mo_end,
                     description=f"Monthly revenue {mo_end.strftime('%b %Y')}",

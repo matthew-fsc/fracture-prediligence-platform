@@ -291,19 +291,23 @@ DEMO_DATA = {
             "data_needed": "Client success playbook, QBR cadence documentation, NPS results",
         },
     ],
+    # Monthly revenue reflects seasonal field-services pattern:
+    # peak June–July (outdoor construction season), soft Jan–Feb and Dec.
+    # Values computed as ANNUAL_REVENUE[2025] * MONTHLY_WEIGHTS_2025; last month
+    # absorbs rounding so the sum equals exactly $4,196,172.
     "monthly_revenue": [
-        {"month": "Jan '25", "revenue": 349681},
-        {"month": "Feb '25", "revenue": 349681},
-        {"month": "Mar '25", "revenue": 349681},
-        {"month": "Apr '25", "revenue": 349681},
-        {"month": "May '25", "revenue": 349681},
-        {"month": "Jun '25", "revenue": 349681},
-        {"month": "Jul '25", "revenue": 349681},
-        {"month": "Aug '25", "revenue": 349681},
-        {"month": "Sep '25", "revenue": 349681},
-        {"month": "Oct '25", "revenue": 349681},
-        {"month": "Nov '25", "revenue": 349681},
-        {"month": "Dec '25", "revenue": 349681},
+        {"month": "Jan '25", "revenue": 230789},   # 5.5%
+        {"month": "Feb '25", "revenue": 230789},   # 5.5%
+        {"month": "Mar '25", "revenue": 314713},   # 7.5%
+        {"month": "Apr '25", "revenue": 377655},   # 9.0%
+        {"month": "May '25", "revenue": 419617},   # 10.0%
+        {"month": "Jun '25", "revenue": 440598},   # 10.5%
+        {"month": "Jul '25", "revenue": 440598},   # 10.5%
+        {"month": "Aug '25", "revenue": 419617},   # 10.0%
+        {"month": "Sep '25", "revenue": 398636},   # 9.5%
+        {"month": "Oct '25", "revenue": 356674},   # 8.5%
+        {"month": "Nov '25", "revenue": 293732},   # 7.0%
+        {"month": "Dec '25", "revenue": 272754},   # remainder → 6.5% approx
     ],
 }
 
