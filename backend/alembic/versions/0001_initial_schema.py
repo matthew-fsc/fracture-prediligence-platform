@@ -168,10 +168,13 @@ def upgrade() -> None:
         if_not_exists=True,
     )
 
-    # ── seed a default company ─────────────────────────────────────────────
+    # ── seed a default company (idempotent — DB may already have id=1 from bootstrap or a retry)
     op.execute(
-        "INSERT INTO companies (id, name, industry, entity_type) "
-        "VALUES (1, 'Demo Company', 'Technology', 'LLC')"
+        """
+        INSERT INTO companies (id, name, industry, entity_type)
+        VALUES (1, 'Demo Company', 'Technology', 'LLC')
+        ON CONFLICT (id) DO NOTHING
+        """
     )
 
 
