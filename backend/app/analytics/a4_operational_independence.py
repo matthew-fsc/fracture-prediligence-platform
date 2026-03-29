@@ -14,13 +14,50 @@ DRS weight: Operational Independence = 20% of composite score.
 """
 
 from __future__ import annotations
+import re
 from dataclasses import dataclass
+from datetime import date, timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from app.analytics.a1_metric_computation import effective_total_headcount
-from app.ontology.models import Company, Employee, EmployeeStatus
+from app.ontology.models import Company, Employee, EmployeeStatus, Expense, ExpenseCategory, RevenueStream
+
+# OPEX lines that represent staff wages (P&L) — roster may only have the owner row from Gusto.
+_PAYROLL_OPEX = re.compile(
+    r"\b(salary|salaries|wage|wages|payroll|compensation|gusto|adp|paychex|pay\s*roll|"
+    r"payroll\s+tax|employee\s+benefit|workers?\s+comp|wc\s+insurance)\b",
+    re.I,
+)
+
+
+def _expense_text(e: Expense) -> str:
+    parts = [e.description or "", e.vendor or ""]
+    return " ".join(parts)
+
+
+def _looks_like_payroll_opex(e: Expense) -> bool:
+    if e.category != ExpenseCategory.OPEX:
+        return False
+    return bool(_PAYROLL_OPEX.search(_expense_text(e)))
+
+
+def _ttm_expenses_and_ref_date(company_id: int, db: Session) -> tuple[list[Expense], date]:
+    exp_all = db.query(Expense).filter(Expense.company_id == company_id).all()
+    rev_dates = [
+        r.revenue_period
+        for r in db.query(RevenueStream).filter(RevenueStream.company_id == company_id).all()
+        if r.revenue_period
+    ]
+    exp_dates = [e.period for e in exp_all if e.period]
+    candidates = rev_dates + exp_dates
+    ref = max(candidates) if candidates else date.today()
+    if ref > date.today():
+        ref = date.today()
+    ttm_start = ref - timedelta(days=365)
+    exp_ttm = [e for e in exp_all if e.period and e.period >= ttm_start]
+    return exp_ttm, ref
 
 
 @dataclass
@@ -81,23 +118,51 @@ def compute_operational_independence(company_id: int, db: Session) -> Operationa
     owners = [e for e in employees if e.is_owner]
     key_persons = [e for e in employees if e.is_key_person or e.is_owner]
 
-    # 1. Owner comp concentration — use active employees only (terminated rows distort %)
+    # 1. Owner comp concentration — blend roster comp with P&L wage lines.
+    # Many books map staff salaries to OPEX ("Salaries", "Payroll") while the Employee table
+    # only has the owner from Gusto — without P&L, owner looks like 100% of payroll.
     owners_active = [e for e in active if e.is_owner]
     total_comp = sum(float(e.comp_annual or 0) for e in active)
     owner_comp = sum(float(e.comp_annual or 0) for e in owners_active)
-    owner_comp_pct = (owner_comp / total_comp * 100) if total_comp > 0 else 0.0
+
+    exp_ttm, _ref = _ttm_expenses_and_ref_date(company_id, db)
+    pl_payroll_opex = sum(float(e.amount or 0) for e in exp_ttm if _looks_like_payroll_opex(e))
+    pl_owner_draws = sum(
+        float(e.amount or 0)
+        for e in exp_ttm
+        if e.category in (ExpenseCategory.OWNER, ExpenseCategory.PERSONAL)
+    )
+    pl_wages_total = pl_payroll_opex + pl_owner_draws
+
+    # Denominator: full wage pool (use the larger of roster TTM comp or P&L wage signals).
+    total_wages = max(total_comp, pl_wages_total)
+    # Owner $: roster owner comp vs explicit owner/personal lines (do not double-count — take max of parallel measures).
+    owner_wages = max(owner_comp, pl_owner_draws)
+    if total_wages > 0:
+        owner_comp_pct = min(100.0, (owner_wages / total_wages) * 100.0)
+    else:
+        owner_comp_pct = 0.0
+
     eff_headcount = effective_total_headcount(company_row, len(active))
     payroll_incomplete = len(active) < eff_headcount and eff_headcount > 1
+    used_pl = pl_wages_total > total_comp + 1e-6
 
-    if total_comp <= 0:
-        owner_comp_label = "No compensation on active payroll records"
+    if total_wages <= 0:
+        owner_comp_label = "No compensation on active payroll records or P&L wage lines"
+    elif used_pl and payroll_incomplete:
+        owner_comp_label = (
+            f"Owner {owner_comp_pct:.0f}% of wages (TTM P&L + roster; "
+            f"{len(active)} of {eff_headcount} employees on roster vs profile)"
+        )
+    elif used_pl:
+        owner_comp_label = f"Owner {owner_comp_pct:.0f}% of wages (TTM P&L payroll + owner lines vs roster)"
     elif payroll_incomplete:
         owner_comp_label = (
             f"Owner {owner_comp_pct:.0f}% of wages on file "
             f"({len(active)} of {eff_headcount} employees on payroll vs client profile)"
         )
     else:
-        owner_comp_label = f"Owner {owner_comp_pct:.0f}% of active payroll"
+        owner_comp_label = f"Owner {owner_comp_pct:.0f}% of active payroll (roster)"
 
     if owner_comp_pct >= 70:
         s_owner = 10
