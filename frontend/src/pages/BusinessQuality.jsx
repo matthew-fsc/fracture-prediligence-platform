@@ -174,7 +174,7 @@ export default function BusinessQuality() {
         <MetricPanel
           label="Revenue Growth (YoY)"
           displayValue={yoyGrowth != null ? `${yoyGrowth.toFixed(1)}%` : '—'}
-          benchmark="8% industry median · 18% top quartile"
+          benchmark="Directional benchmark — strong = above 15%, adequate = 5–15%"
           percentile={yoyGrowth != null ? (yoyGrowth >= 18 ? 82 : yoyGrowth >= 8 ? 62 : 40) : null}
           status={yoyStatus}
           trendDir={yoyGrowth != null ? (yoyGrowth >= 0 ? 'up' : 'down') : 'flat'}
@@ -197,7 +197,7 @@ export default function BusinessQuality() {
         <MetricPanel
           label="Recurring Revenue %"
           displayValue={`${recurringRate.toFixed(0)}%`}
-          benchmark="20% median · 40% top quartile (field services)"
+          benchmark="Directional — strong = 40%+, adequate = 20–40%, project-only = low"
           percentile={recurringRate >= 40 ? 75 : recurringRate >= 20 ? 50 : 25}
           status={recurringStatus}
           trendDir={recurringRate >= 20 ? 'up' : 'flat'}
@@ -217,7 +217,7 @@ export default function BusinessQuality() {
         <MetricPanel
           label="EBITDA Margin"
           displayValue={ebitdaMargin > 0 ? `${ebitdaMargin.toFixed(1)}%` : '—'}
-          benchmark="13% median · 22% top quartile"
+          benchmark="Directional — strong = 22%+, adequate = 13–22%, watch = below 10%"
           percentile={ebitdaMargin >= 35 ? 92 : ebitdaMargin >= 22 ? 75 : ebitdaMargin >= 13 ? 50 : 30}
           status={ebitdaStatus}
           trendDir="up"
@@ -237,7 +237,7 @@ export default function BusinessQuality() {
         <MetricPanel
           label="Cost Ratio (COGS + OpEx)"
           displayValue={costRatio > 0 ? `${costRatio.toFixed(1)}%` : '—'}
-          benchmark="75% median · 65% top quartile (field services)"
+          benchmark="Directional — lower is better; strong = below 65%, watch = above 80%"
           percentile={costRatio <= 65 ? 80 : costRatio <= 75 ? 55 : 35}
           status={costStatus}
           trendDir={costRatio <= 75 ? 'up' : 'down'}
@@ -270,7 +270,7 @@ export default function BusinessQuality() {
         <MetricPanel
           label="Revenue per Employee"
           displayValue={revenuePerEmp > 0 ? fmtM(revenuePerEmp) : '—'}
-          benchmark="$130K median · $180K top quartile (field services)"
+          benchmark="Directional — strong = above $180K/employee, watch = below $100K"
           percentile={revenuePerEmp >= 180000 ? 78 : revenuePerEmp >= 130000 ? 55 : 35}
           status={empStatus}
           trendDir={revenuePerEmp >= 130000 ? 'up' : 'down'}
@@ -299,7 +299,7 @@ export default function BusinessQuality() {
         <MetricPanel
           label="Revenue CAGR (3-Year)"
           displayValue={cagr > 0 ? `${cagr.toFixed(1)}%` : '—'}
-          benchmark="6% industry median · 15% top quartile"
+          benchmark="Directional — strong = 15%+, adequate = 5–15%, flat/declining = watch"
           percentile={cagr >= 15 ? 80 : cagr >= 6 ? 60 : 35}
           status={cagr >= 15 ? 'strong' : cagr >= 6 ? 'adequate' : 'watch'}
           trendDir={cagr >= 6 ? 'up' : 'down'}

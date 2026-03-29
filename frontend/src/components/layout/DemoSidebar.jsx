@@ -11,46 +11,46 @@ import { useDemoData } from '../../context/DemoContext'
 
 const groups = [
   {
-    label: 'Ingestion',
+    label: 'Engagement',
     items: [
-      { label: 'Data Upload',    path: 'data-sources',  icon: UploadCloud },
-      { label: 'Field Mapping',  path: 'field-mapping', icon: GitMerge },
-    ],
-  },
-  {
-    label: 'Workspace',
-    items: [
-      { label: 'Home',               path: '',                  icon: House },
+      { label: 'Dashboard',          path: '',                  icon: House },
       { label: 'Company Workspace',  path: 'company',           icon: Building },
-      { label: 'Engagement Intake',  path: 'engagement-intake', icon: NotebookPen },
+      { label: 'Client Profile',     path: 'engagement-intake', icon: NotebookPen },
       { label: 'Advisory Workflow',  path: 'workflow',          icon: Workflow },
     ],
   },
   {
-    label: 'Intelligence',
+    label: 'Data',
     items: [
-      { label: 'Readiness Score',    path: 'readiness',           icon: Grid3x3 },
-      { label: 'Business Quality',   path: 'business-quality',   icon: BarChart2 },
-      { label: 'Buyer Risk Profile', path: 'buyer-lens',        icon: Eye },
+      { label: 'Data Sources',   path: 'data-sources',  icon: UploadCloud },
+      { label: 'Field Mapping',  path: 'field-mapping', icon: GitMerge },
+    ],
+  },
+  {
+    label: 'Analysis',
+    items: [
+      { label: 'Readiness Score',    path: 'readiness',       icon: Grid3x3 },
+      { label: 'Business Quality',   path: 'business-quality', icon: BarChart2 },
+      { label: 'Buyer Risk Profile', path: 'buyer-lens',      icon: Eye },
+      { label: 'Risk Heatmap',       path: 'risk-heatmap',    icon: ShieldAlert },
+    ],
+  },
+  {
+    label: 'Valuation',
+    items: [
       { label: 'Valuation',          path: 'valuation',         icon: TrendingUp },
       { label: 'Market Comps',       path: 'market-comps',      icon: GitCompare },
-      { label: 'Risk Heatmap',       path: 'risk-heatmap',      icon: ShieldAlert },
+      { label: 'EBITDA & EV Timeline',path: 'ebitda-timeline',  icon: LineChart },
+      { label: 'Value Gap',          path: 'value-gap',         icon: Target },
+      { label: 'Scenario Simulator', path: 'scenario-simulator',icon: Activity },
     ],
   },
   {
-    label: 'Value Creation',
+    label: 'Delivery',
     items: [
-      { label: 'Value Gap',            path: 'value-gap',         icon: Target },
-      { label: 'EBITDA & EV Timeline', path: 'ebitda-timeline',   icon: LineChart },
-      { label: 'Initiative Impact',    path: 'initiative-impact', icon: Zap },
-      { label: 'Scenario Simulator',   path: 'scenario-simulator',icon: Activity },
-    ],
-  },
-  {
-    label: 'Output',
-    items: [
-      { label: 'Reports',            path: 'reports',           icon: FileText },
+      { label: 'Initiative Impact',  path: 'initiative-impact', icon: Zap },
       { label: 'Advisory Library',   path: 'advisory-library',  icon: BookOpen },
+      { label: 'Reports',            path: 'reports',           icon: FileText },
     ],
   },
 ]

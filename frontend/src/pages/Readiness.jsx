@@ -3,7 +3,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { ChevronDown, ChevronRight, Edit2, Check, X, Info } from 'lucide-react'
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
+import {
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine,
+} from 'recharts'
 import { Skeleton } from '../components/ui/Skeleton'
 import { apiClient } from '../lib/apiClient'
 import { useCompanyId } from '../context/CompanyContext'
@@ -80,11 +83,11 @@ function barColor(s) {
   return 'bg-red-500'
 }
 function tierLabel(s) {
-  if (s >= 85) return { label: 'Institutional Grade', color: 'emerald' }
-  if (s >= 70) return { label: 'Investment Grade',    color: 'emerald' }
-  if (s >= 55) return { label: 'Needs Work',          color: 'amber' }
-  if (s >= 40) return { label: 'High Risk',           color: 'red' }
-  return       { label: 'Not Saleable',               color: 'red' }
+  if (s >= 85) return { label: 'Investment-Ready',    color: 'emerald' }
+  if (s >= 70) return { label: 'Exit-Trackable',      color: 'emerald' }
+  if (s >= 55) return { label: '12–18 Month Runway',  color: 'amber' }
+  if (s >= 40) return { label: '24+ Month Runway',    color: 'amber' }
+  return       { label: 'Fundamental Gaps',           color: 'red' }
 }
 
 // ── Sub-score breakdown card ─────────────────────────────────────────────────
@@ -327,6 +330,7 @@ export default function Readiness() {
   const [overrides, setOverrides] = useState({})
   const [refresh, setRefresh] = useState(0)
   const [methodologyOpen, setMethodologyOpen] = useState(false)
+  const [snapshots, setSnapshots] = useState([])
 
   const reload = () => {
     setRefresh(r => r + 1)
@@ -349,6 +353,9 @@ export default function Readiness() {
         d.overrides.forEach(o => { map[o.category] = o })
         setOverrides(map)
       })
+      .catch(() => {})
+    apiClient.get(`/api/analytics/scores/${companyId}/history`)
+      .then(d => setSnapshots(d.snapshots ?? []))
       .catch(() => {})
   }, [refresh, companyId])
 
@@ -640,11 +647,11 @@ export default function Readiness() {
         <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-4">DRS Tier Classification</p>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {[
-            { range: '85–100', tier: 'Institutional Grade', color: 'emerald', note: 'Competitive process, minimal friction' },
-            { range: '70–84',  tier: 'Investment Grade',    color: 'emerald', note: 'Standard diligence, closes on schedule' },
-            { range: '55–69',  tier: 'Needs Work',          color: 'amber',   note: 'Material weaknesses, possible earnout' },
-            { range: '40–54',  tier: 'High Risk',           color: 'red',     note: 'Significant structural problems' },
-            { range: 'Below 40', tier: 'Not Saleable',      color: 'red',     note: 'No institutional bid viable' },
+            { range: '85–100',   tier: 'Investment-Ready',    color: 'emerald', note: 'Competitive process, minimal friction' },
+            { range: '70–84',    tier: 'Exit-Trackable',      color: 'emerald', note: 'Standard diligence, closes on schedule' },
+            { range: '55–69',    tier: '12–18 Month Runway',  color: 'amber',   note: 'Material weaknesses, focused value work needed' },
+            { range: '40–54',    tier: '24+ Month Runway',    color: 'amber',   note: 'Structural gaps — 2-year value creation plan' },
+            { range: 'Below 40', tier: 'Fundamental Gaps',    color: 'red',     note: 'No institutional bid viable without major changes' },
           ].map(t => {
             const isActive = (t.range === '70–84' && drs >= 70 && drs < 85) || (t.range === '85–100' && drs >= 85) ||
               (t.range === '55–69' && drs >= 55 && drs < 70) || (t.range === '40–54' && drs >= 40 && drs < 55) || (t.range === 'Below 40' && drs < 40)
@@ -661,6 +668,38 @@ export default function Readiness() {
           })}
         </div>
       </div>
+
+      {/* DRS Score History sparkline */}
+      {snapshots.length >= 2 && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">DRS Score History</p>
+            <span className="text-[11px] text-muted-foreground">{snapshots.length} captures</span>
+          </div>
+          <ResponsiveContainer width="100%" height={100}>
+            <LineChart data={snapshots} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+              <XAxis dataKey="created_at" hide />
+              <YAxis domain={[0, 100]} hide />
+              <Tooltip
+                contentStyle={{ background: 'hsl(220,20%,10%)', border: '1px solid hsl(220,18%,20%)', borderRadius: 8, fontSize: 11 }}
+                formatter={(v) => [v.toFixed(1), 'DRS']}
+                labelFormatter={(l) => new Date(l).toLocaleDateString()}
+              />
+              <ReferenceLine y={85} stroke="hsl(160,84%,39%)" strokeDasharray="3 3" strokeOpacity={0.4} />
+              <ReferenceLine y={70} stroke="hsl(43,96%,56%)" strokeDasharray="3 3" strokeOpacity={0.4} />
+              <Line
+                type="monotone" dataKey="drs_score"
+                stroke="hsl(217,91%,60%)" strokeWidth={2} dot={false}
+                activeDot={{ r: 4, fill: 'hsl(217,91%,60%)' }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="flex items-center gap-4 mt-1.5 text-[11px] text-muted-foreground/60">
+            <span className="flex items-center gap-1"><span className="inline-block w-4 h-px bg-emerald-500/60" /> 85 (Investment-Ready)</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-4 h-px bg-amber-500/60" /> 70 (Exit-Trackable)</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

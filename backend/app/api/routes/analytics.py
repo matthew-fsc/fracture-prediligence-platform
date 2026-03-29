@@ -38,6 +38,7 @@ from app.ontology.models import (
     CompanyInitiative,
     EngagementProfile,
     EngagementSnapshot,
+    ScoreSnapshot,
 )
 from app.services.advisory_workflow import build_advisory_workflow
 from app.services.analytics_service import compute_category_modules
@@ -155,6 +156,7 @@ class QualitativeRequest(BaseModel):
     automation_pct: Optional[float] = None
     mgmt_qualified: Optional[int] = None
     mgmt_total_functions: Optional[int] = None
+    mgmt_covered_functions: Optional[str] = None
     pipeline_value: Optional[float] = None
     market_positioning: Optional[str] = None
     repeatability_pct: Optional[float] = None
@@ -523,6 +525,52 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/scores/{company_id}/history")
+def get_score_history(company: CompanyScoped, db: Session = Depends(get_db)):
+    """Return the last 90 DRS snapshots for sparkline/timeline rendering."""
+    from sqlalchemy import desc as _desc
+    rows = (
+        db.query(ScoreSnapshot)
+        .filter(ScoreSnapshot.company_id == company.id)
+        .order_by(_desc(ScoreSnapshot.created_at))
+        .limit(90)
+        .all()
+    )
+    return {
+        "company_id": company.id,
+        "snapshots": [
+            {
+                "id": r.id,
+                "drs_score": float(r.drs_score),
+                "ev_estimate": float(r.ev_estimate) if r.ev_estimate is not None else None,
+                "trigger": r.trigger,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in reversed(rows)  # oldest first for chart rendering
+        ],
+    }
+
+
+@router.post("/scores/{company_id}/snapshot")
+def capture_score_snapshot(company: CompanyScoped, db: Session = Depends(get_db)):
+    """Manually trigger a DRS + EV snapshot."""
+    from app.analytics.ebitda_basis import ebitda_basis_for_company
+    from app.services.analytics_service import compute_category_scores
+    from app.analytics.a9_drs_composite import CategoryScores as _CS, compute_drs as _drs
+    try:
+        cat = compute_category_scores(company.id, db)
+        cs = _CS(**{k: cat[k] for k in cat})
+        drs_val = round(float(_drs(cs).base_drs), 2)
+        basis = ebitda_basis_for_company(company.id, db)
+        ebitda = float(basis.get("ebitda_normalized_ttm") or basis.get("ebitda_proxy_ttm") or 0)
+        ev_val = round(ebitda * 4.5, 2) if ebitda > 0 else None
+        db.add(ScoreSnapshot(company_id=company.id, drs_score=drs_val, ev_estimate=ev_val, trigger="manual"))
+        db.commit()
+        return {"company_id": company.id, "drs_score": drs_val, "ev_estimate": ev_val}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/revenue-quality/{company_id}")
 def get_revenue_quality(company: CompanyScoped, db: Session = Depends(get_db)):
     """A3: Revenue quality sub-scores and composite."""
@@ -696,6 +744,50 @@ def get_advisory_workflow(company: CompanyScoped, db: Session = Depends(get_db))
     """CEPA-style engagement stages with progress derived from live company + analytics signals."""
     try:
         return build_advisory_workflow(company, db)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/library-triggered/{company_id}")
+def get_library_triggered_items(company: CompanyScoped, db: Session = Depends(get_db)):
+    """Return advisory library items whose score_trigger is above the current category score.
+    These represent issues the advisor should prioritize based on DRS weakness."""
+    from app.ontology.models import AdvisoryLibraryItem
+    from app.services.analytics_service import compute_category_scores as _cat_scores
+    try:
+        cat = _cat_scores(company.id, db)
+        # Find library items where the category score is below their trigger threshold
+        library_items = (
+            db.query(AdvisoryLibraryItem)
+            .filter(
+                AdvisoryLibraryItem.score_trigger.isnot(None),
+                AdvisoryLibraryItem.is_active == True,
+            )
+            .all()
+        )
+        triggered = []
+        for item in library_items:
+            cat_score = cat.get(item.category)
+            if cat_score is not None and item.score_trigger is not None:
+                if float(cat_score) < float(item.score_trigger):
+                    triggered.append({
+                        "id": item.id,
+                        "item_type": item.item_type,
+                        "title": item.title,
+                        "description": item.description,
+                        "category": item.category,
+                        "severity": item.severity,
+                        "buyer_type": item.buyer_type,
+                        "score_trigger": float(item.score_trigger),
+                        "current_score": round(float(cat_score), 1),
+                        "effort": item.effort,
+                        "timeline": item.timeline,
+                        "ev_impact": item.ev_impact,
+                    })
+        # Sort by severity then by gap (biggest gap first)
+        sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2}
+        triggered.sort(key=lambda x: (sev_order.get(x.get("severity", "MEDIUM"), 2), x.get("current_score", 100)))
+        return {"company_id": company.id, "triggered_items": triggered}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1172,6 +1264,21 @@ def upsert_override(
             advisor_id=body.advisor_id,
         ))
     db.commit()
+    # Capture a score snapshot after each override change
+    try:
+        from app.services.analytics_service import compute_category_scores as _cat_scores
+        from app.analytics.a9_drs_composite import CategoryScores as _CS, compute_drs as _drs
+        from app.analytics.ebitda_basis import ebitda_basis_for_company as _ev_basis
+        cat_s = _cat_scores(company.id, db)
+        cs_s = _CS(**{k: cat_s[k] for k in cat_s})
+        drs_s = round(float(_drs(cs_s).base_drs), 2)
+        basis_s = _ev_basis(company.id, db)
+        ebitda_s = float(basis_s.get("ebitda_normalized_ttm") or basis_s.get("ebitda_proxy_ttm") or 0)
+        ev_s = round(ebitda_s * 4.5, 2) if ebitda_s > 0 else None
+        db.add(ScoreSnapshot(company_id=company.id, drs_score=drs_s, ev_estimate=ev_s, trigger="override"))
+        db.commit()
+    except Exception:
+        pass  # snapshot failure must not break the override save
     return {"status": "saved", "category": category, "adjustment": adj}
 
 
@@ -1272,6 +1379,7 @@ def get_qualitative(company: CompanyScoped, db: Session = Depends(get_db)):
             "automation_pct":        float(row.automation_pct)        if row.automation_pct        is not None else None,
             "mgmt_qualified":        row.mgmt_qualified,
             "mgmt_total_functions":  row.mgmt_total_functions,
+            "mgmt_covered_functions": row.mgmt_covered_functions,
             "pipeline_value":        float(row.pipeline_value)        if row.pipeline_value        is not None else None,
             "market_positioning":    row.market_positioning,
             "repeatability_pct":      float(row.repeatability_pct)      if row.repeatability_pct      is not None else None,
@@ -1290,6 +1398,7 @@ def _qualitative_snapshot(row: QualitativeInputs) -> dict:
         "automation_pct": float(row.automation_pct) if row.automation_pct is not None else None,
         "mgmt_qualified": row.mgmt_qualified,
         "mgmt_total_functions": row.mgmt_total_functions,
+        "mgmt_covered_functions": row.mgmt_covered_functions,
         "pipeline_value": float(row.pipeline_value) if row.pipeline_value is not None else None,
         "market_positioning": row.market_positioning,
         "repeatability_pct": float(row.repeatability_pct) if row.repeatability_pct is not None else None,
@@ -1434,6 +1543,10 @@ def delete_snapshot(company: CompanyScoped, snapshot_id: int, db: Session = Depe
 
 class EngagementProfilePayload(BaseModel):
     owner_goals_narrative: Optional[str] = None
+    owner_motivations: Optional[list[str]] = None
+    post_exit_plans: Optional[str] = None
+    non_negotiables: Optional[str] = None
+    engagement_start_date: Optional[str] = None
     exit_timeline: Optional[str] = None
     target_valuation: Optional[float] = None
     personal_financial_gap: Optional[float] = None
@@ -1451,9 +1564,21 @@ def _engagement_profile_dict(row: EngagementProfile) -> dict:
                 buyers = []
         except Exception:
             buyers = []
+    motivations: list[str] = []
+    if row.owner_motivations_json:
+        try:
+            motivations = json.loads(row.owner_motivations_json)
+            if not isinstance(motivations, list):
+                motivations = []
+        except Exception:
+            motivations = []
     return {
         "company_id": row.company_id,
         "owner_goals_narrative": row.owner_goals_narrative,
+        "owner_motivations": motivations,
+        "post_exit_plans": row.post_exit_plans,
+        "non_negotiables": row.non_negotiables,
+        "engagement_start_date": row.engagement_start_date,
         "exit_timeline": row.exit_timeline,
         "target_valuation": float(row.target_valuation) if row.target_valuation is not None else None,
         "personal_financial_gap": float(row.personal_financial_gap) if row.personal_financial_gap is not None else None,
@@ -1471,6 +1596,10 @@ def get_engagement_profile(company: CompanyScoped, db: Session = Depends(get_db)
         return {
             "company_id": company.id,
             "owner_goals_narrative": None,
+            "owner_motivations": [],
+            "post_exit_plans": None,
+            "non_negotiables": None,
+            "engagement_start_date": None,
             "exit_timeline": None,
             "target_valuation": None,
             "personal_financial_gap": None,
@@ -1490,6 +1619,7 @@ def patch_engagement_profile(
 ):
     data = body.model_dump(exclude_unset=True)
     buyers = data.pop("preferred_buyer_types", None)
+    motivations = data.pop("owner_motivations", None)
 
     row = db.query(EngagementProfile).filter(EngagementProfile.company_id == company.id).first()
     if not row:
@@ -1498,6 +1628,8 @@ def patch_engagement_profile(
 
     if buyers is not None:
         row.preferred_buyer_types_json = json.dumps(buyers)
+    if motivations is not None:
+        row.owner_motivations_json = json.dumps(motivations)
     for k, v in data.items():
         setattr(row, k, v)
 

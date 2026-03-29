@@ -39,6 +39,33 @@ const TIMELINE_PRESETS = [
   '36+ months (long horizon)',
 ]
 
+const OWNER_MOTIVATIONS = [
+  { id: 'maximize_proceeds', label: 'Maximize after-tax proceeds' },
+  { id: 'preserve_culture', label: 'Preserve company culture' },
+  { id: 'protect_employees', label: 'Protect employee jobs' },
+  { id: 'family_successor', label: 'Keep in family / select successor' },
+  { id: 'speed_of_close', label: 'Speed of transaction' },
+  { id: 'earn_out_upside', label: 'Participate in post-close upside' },
+  { id: 'retain_management', label: 'Retain existing management team' },
+  { id: 'geographic_presence', label: 'Maintain local / geographic presence' },
+]
+
+const POST_EXIT_OPTIONS = [
+  { value: 'retire', label: 'Retire' },
+  { value: 'new_venture', label: 'Start a new venture' },
+  { value: 'stay_advisor', label: 'Stay on as advisor / board member' },
+  { value: 'consulting', label: 'Independent consulting' },
+  { value: 'undecided', label: 'Undecided' },
+]
+
+const TIER_OPTIONS = [
+  { value: 0,   label: 'None',          desc: '0%' },
+  { value: 25,  label: 'Some',          desc: '~25%' },
+  { value: 50,  label: 'Moderate',      desc: '~50%' },
+  { value: 75,  label: 'Strong',        desc: '~75%' },
+  { value: 100, label: 'Comprehensive', desc: '100%' },
+]
+
 const MARKET_OPTIONS = [
   { value: 'defined', label: 'Defined ICP + clear differentiation + repeatable sales motion', score: 80 },
   { value: 'moderate', label: 'Moderate positioning — some differentiation, inconsistent execution', score: 45 },
@@ -50,6 +77,15 @@ const CONTRACT_TYPES = [
   { value: 'retainer', label: 'Retainer / Subscription', sub: 'Recurring — strong signal' },
   { value: 'project', label: 'Project-Based', sub: 'Lower predictability' },
   { value: 'mix', label: 'Mix of Above', sub: 'Document each relationship' },
+]
+
+const MGMT_FUNCTIONS = [
+  { id: 'sales', label: 'Sales / BD', desc: 'Revenue generation, pipeline, client acquisition' },
+  { id: 'delivery', label: 'Service Delivery', desc: 'Core product/service execution' },
+  { id: 'finance', label: 'Finance / Accounting', desc: 'Books, reporting, cash flow, compliance' },
+  { id: 'operations', label: 'Operations', desc: 'Day-to-day processes, scheduling, logistics' },
+  { id: 'hr', label: 'HR / Admin', desc: 'Hiring, payroll, employee management' },
+  { id: 'technology', label: 'Technology / IT', desc: 'Systems, tools, infrastructure' },
 ]
 
 // ─── Shared UI ───────────────────────────────────────────────────────────────
@@ -115,6 +151,34 @@ function SliderField({ label, sublabel, hint, min = 0, max = 100, step = 5, valu
   )
 }
 
+function TierSelector({ label, sublabel, value, onChange, formatter }) {
+  return (
+    <div>
+      {label && <label className="block text-xs font-semibold text-foreground mb-1">{label}</label>}
+      {sublabel && <p className="text-[11px] text-muted-foreground mb-2">{sublabel}</p>}
+      <div className="flex gap-2 flex-wrap">
+        {TIER_OPTIONS.map(opt => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              'flex-1 min-w-[80px] rounded-lg border px-2 py-2 text-center transition-all',
+              Number(value) === opt.value
+                ? 'border-primary/40 bg-primary/10 ring-1 ring-primary/20'
+                : 'border-border bg-muted/20 hover:bg-muted/40',
+            )}
+          >
+            <p className={cn('text-xs font-semibold', Number(value) === opt.value ? 'text-primary' : 'text-foreground')}>{opt.label}</p>
+            <p className="text-[10px] text-muted-foreground">{opt.desc}</p>
+          </button>
+        ))}
+      </div>
+      {formatter && formatter(Number(value))}
+    </div>
+  )
+}
+
 const inputCls = 'mt-1.5 w-full bg-muted/60 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 transition-colors'
 const textareaCls = cn(inputCls, 'resize-none')
 const numInputCls = 'text-sm bg-muted/60 border border-border rounded-lg px-3 py-1.5 text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/40 transition-colors'
@@ -134,6 +198,10 @@ export default function EngagementIntake() {
 
   // Engagement profile fields
   const [goals, setGoals] = useState('')
+  const [motivations, setMotivations] = useState([])
+  const [postExit, setPostExit] = useState('')
+  const [nonNegotiables, setNonNegotiables] = useState('')
+  const [engagementStartDate, setEngagementStartDate] = useState('')
   const [exitTimeline, setExitTimeline] = useState('')
   const [targetVal, setTargetVal] = useState('')
   const [gap, setGap] = useState('')
@@ -151,8 +219,7 @@ export default function EngagementIntake() {
     owner_hours_per_week: '',
     sop_pct: 50,
     automation_pct: 30,
-    mgmt_qualified: 0,
-    mgmt_total_functions: 4,
+    mgmt_covered: [],
     pipeline_value: '',
     market_positioning: '',
     repeatability_pct: 50,
@@ -180,6 +247,10 @@ export default function EngagementIntake() {
     ]).then(([ep, qd, company]) => {
       if (ep) {
         setGoals(ep.owner_goals_narrative ?? '')
+        setMotivations(Array.isArray(ep.owner_motivations) ? ep.owner_motivations : [])
+        setPostExit(ep.post_exit_plans ?? '')
+        setNonNegotiables(ep.non_negotiables ?? '')
+        setEngagementStartDate(ep.engagement_start_date ?? '')
         setExitTimeline(ep.exit_timeline ?? '')
         setTargetVal(ep.target_valuation != null ? String(ep.target_valuation) : '')
         setGap(ep.personal_financial_gap != null ? String(ep.personal_financial_gap) : '')
@@ -194,8 +265,7 @@ export default function EngagementIntake() {
           owner_hours_per_week: i.owner_hours_per_week ?? '',
           sop_pct: i.sop_pct ?? 50,
           automation_pct: i.automation_pct ?? 30,
-          mgmt_qualified: i.mgmt_qualified ?? 0,
-          mgmt_total_functions: i.mgmt_total_functions ?? 4,
+          mgmt_covered: i.mgmt_covered_functions ? i.mgmt_covered_functions.split(',').filter(Boolean) : [],
           pipeline_value: i.pipeline_value ?? '',
           market_positioning: i.market_positioning ?? '',
           repeatability_pct: i.repeatability_pct ?? 50,
@@ -223,7 +293,7 @@ export default function EngagementIntake() {
   const toggleBuyer = useCallback((id) => { setBuyers(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); setSaved(false) }, [])
 
   // Section completion checks
-  const engagementComplete = !!(goals.trim() && exitTimeline.trim() && targetVal.trim() && txType && buyers.length > 0)
+  const engagementComplete = !!(motivations.length > 0 && exitTimeline.trim() && targetVal.trim() && txType && buyers.length > 0)
   const opsComplete = qual.owner_hours_per_week !== ''
   const revComplete = qual.customer_contract_type !== ''
   const growthComplete = qual.pipeline_value !== '' && qual.market_positioning !== ''
@@ -240,6 +310,10 @@ export default function EngagementIntake() {
       await Promise.all([
         apiClient.patch(`/api/analytics/engagement-profile/${companyId}`, {
           owner_goals_narrative: goals.trim() || null,
+          owner_motivations: motivations,
+          post_exit_plans: postExit || null,
+          non_negotiables: nonNegotiables.trim() || null,
+          engagement_start_date: engagementStartDate || null,
           exit_timeline: exitTimeline.trim() || null,
           target_valuation: targetVal.trim() === '' ? null : parseFloat(targetVal),
           personal_financial_gap: gap.trim() === '' ? null : parseFloat(gap),
@@ -251,8 +325,9 @@ export default function EngagementIntake() {
           owner_hours_per_week: qual.owner_hours_per_week !== '' ? Number(qual.owner_hours_per_week) : null,
           sop_pct: Number(qual.sop_pct),
           automation_pct: Number(qual.automation_pct),
-          mgmt_qualified: qual.mgmt_qualified !== '' ? Number(qual.mgmt_qualified) : null,
-          mgmt_total_functions: qual.mgmt_total_functions !== '' ? Number(qual.mgmt_total_functions) : null,
+          mgmt_qualified: qual.mgmt_covered.length,
+          mgmt_total_functions: MGMT_FUNCTIONS.length,
+          mgmt_covered_functions: qual.mgmt_covered.length > 0 ? qual.mgmt_covered.join(',') : null,
           pipeline_value: qual.pipeline_value !== '' ? Number(qual.pipeline_value) : null,
           market_positioning: qual.market_positioning || null,
           repeatability_pct: Number(qual.repeatability_pct),
@@ -367,21 +442,75 @@ export default function EngagementIntake() {
             icon={Target}
             title="Owner Goals & Success Criteria"
             accentColor="bg-blue-500/10"
-            badge={goals.trim() ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> : null}
+            badge={motivations.length > 0 ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> : null}
           >
+            {/* Primary motivations multi-select */}
             <div>
-              <FieldLabel>What does a successful outcome look like?</FieldLabel>
-              <textarea value={goals} onChange={e => { setGoals(e.target.value); markDirty() }}
-                rows={4}
-                placeholder="Describe the owner's primary objectives — e.g. maximize after-tax proceeds, preserve employee culture, ensure successor has operational expertise…"
+              <FieldLabel>Primary motivations <span className="normal-case font-normal text-muted-foreground/60">(select all that apply)</span></FieldLabel>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {OWNER_MOTIVATIONS.map(m => {
+                  const active = motivations.includes(m.id)
+                  return (
+                    <button key={m.id} type="button"
+                      onClick={() => { setMotivations(prev => active ? prev.filter(x => x !== m.id) : [...prev, m.id]); markDirty() }}
+                      className={cn('text-left rounded-lg border px-3 py-2 transition-all',
+                        active ? 'border-primary/40 bg-primary/10 ring-1 ring-primary/20' : 'border-border bg-muted/20 hover:bg-muted/40')}>
+                      <div className="flex items-center gap-2">
+                        <div className={cn('w-3.5 h-3.5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors',
+                          active ? 'border-primary bg-primary' : 'border-muted-foreground/30')}>
+                          {active && <CheckCircle className="w-2 h-2 text-primary-foreground" />}
+                        </div>
+                        <span className={cn('text-xs', active ? 'text-primary font-semibold' : 'text-foreground')}>{m.label}</span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Post-exit plans */}
+            <div>
+              <FieldLabel optional>Post-exit plans</FieldLabel>
+              <div className="grid grid-cols-3 md:grid-cols-5 gap-2 mt-2">
+                {POST_EXIT_OPTIONS.map(opt => (
+                  <button key={opt.value} type="button"
+                    onClick={() => { setPostExit(opt.value); markDirty() }}
+                    className={cn('rounded-lg border px-2 py-2 text-center transition-all',
+                      postExit === opt.value ? 'border-primary/40 bg-primary/10 ring-1 ring-primary/20' : 'border-border bg-muted/20 hover:bg-muted/40')}>
+                    <span className={cn('text-xs', postExit === opt.value ? 'text-primary font-semibold' : 'text-foreground')}>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Non-negotiables */}
+            <div>
+              <FieldLabel optional>Non-negotiables</FieldLabel>
+              <textarea value={nonNegotiables} onChange={e => { setNonNegotiables(e.target.value); markDirty() }}
+                rows={3}
+                placeholder="Deal structure requirements that cannot be compromised — e.g. no earnouts, no PE rollup, employees must be retained for 24 months, keep HQ in current city…"
                 className={textareaCls} />
-              <p className="text-[10px] text-muted-foreground/60 mt-1">This narrative drives buyer targeting and negotiation strategy.</p>
+            </div>
+
+            {/* Narrative (optional freeform) */}
+            <div>
+              <FieldLabel optional>Additional context / narrative</FieldLabel>
+              <textarea value={goals} onChange={e => { setGoals(e.target.value); markDirty() }}
+                rows={3}
+                placeholder="Any additional background on the owner's situation, personal circumstances, or qualitative expectations not captured above…"
+                className={textareaCls} />
             </div>
           </SectionCard>
 
           {/* ── SECTION 2: Transaction & Valuation ─────────────────── */}
           <SectionCard icon={DollarSign} title="Transaction & Valuation" accentColor="bg-emerald-500/10">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <FieldLabel optional>Engagement start date</FieldLabel>
+                <input type="date" value={engagementStartDate} onChange={e => { setEngagementStartDate(e.target.value); markDirty() }}
+                  className={inputCls} />
+                <p className="text-[10px] text-muted-foreground/60 mt-1">Used as the timeline anchor for projected close markers.</p>
+              </div>
               <div>
                 <FieldLabel>Exit timeline</FieldLabel>
                 <select value={exitTimeline} onChange={e => { setExitTimeline(e.target.value); markDirty() }} className={inputCls}>
@@ -500,16 +629,16 @@ export default function EngagementIntake() {
             subtitle="Maps to DRS: Revenue Quality — captures contract formalization and owner-dependency"
             badge={<CompletionBadge complete={revComplete} />}>
 
-            {/* Contract Coverage slider */}
-            <SliderField
+            {/* Contract Coverage tier selector */}
+            <TierSelector
               label="Contract / MSA Coverage"
               sublabel="What percentage of active customers have a signed contract, MSA, or retainer agreement in place?"
               value={qual.contract_pct}
               onChange={v => setQ('contract_pct', v)}
               formatter={v => (
-                <p className={cn('text-[11px] font-semibold mt-1',
-                  v >= 80 ? 'text-emerald-400' : v >= 50 ? 'text-amber-400' : 'text-red-400')}>
-                  {v >= 80 ? 'Strong — buyers will view revenue as secured'
+                <p className={cn('text-[11px] font-semibold mt-2',
+                  v >= 75 ? 'text-emerald-400' : v >= 50 ? 'text-amber-400' : 'text-red-400')}>
+                  {v >= 75 ? 'Strong — buyers will view revenue as secured'
                     : v >= 50 ? 'Moderate — formalize remaining relationships before sale'
                     : 'Weak — significant buyer risk; contract formalization is a high-priority initiative'}
                 </p>
@@ -591,49 +720,85 @@ export default function EngagementIntake() {
             </div>
 
             {/* SOP Documentation */}
-            <SliderField
+            <TierSelector
               label="SOP Documentation"
-              sublabel="What percentage of core operational processes have written SOPs? (onboarding, service delivery, account management, billing)"
+              sublabel="How well are core operational processes documented with written SOPs? (onboarding, service delivery, account management, billing)"
               value={qual.sop_pct}
               onChange={v => setQ('sop_pct', v)}
+              formatter={v => (
+                <p className={cn('text-[11px] font-semibold mt-2',
+                  v >= 75 ? 'text-emerald-400' : v >= 50 ? 'text-amber-400' : 'text-red-400')}>
+                  {v >= 75 ? 'Buyer-ready — processes survive ownership transition'
+                    : v >= 25 ? 'Partial — prioritize documenting delivery and billing processes'
+                    : 'Low — creates key-person risk; documentation is a critical pre-sale initiative'}
+                </p>
+              )}
             />
 
             {/* Process Automation */}
-            <SliderField
+            <TierSelector
               label="Process Automation Level"
-              sublabel="What percentage of repetitive operational tasks (invoicing, reporting, scheduling) are handled by a system rather than a person?"
+              sublabel="How much of the repetitive operational work (invoicing, reporting, scheduling) runs through systems rather than people?"
               value={qual.automation_pct}
               onChange={v => setQ('automation_pct', v)}
+              formatter={v => (
+                <p className={cn('text-[11px] font-semibold mt-2',
+                  v >= 75 ? 'text-emerald-400' : v >= 50 ? 'text-amber-400' : 'text-red-400')}>
+                  {v >= 75 ? 'Strong — scalable infrastructure buyers will value'
+                    : v >= 25 ? 'Developing — identify highest-ROI automation opportunities'
+                    : 'Manual — increases integration cost and risk for acquirer'}
+                </p>
+              )}
             />
 
-            {/* Management Depth */}
+            {/* Management Depth — function checklist */}
             <div>
-              <label className="block text-xs font-semibold text-foreground mb-1">Management Depth Ratio</label>
-              <p className="text-[11px] text-muted-foreground mb-2">
-                How many core business functions (sales, delivery, finance, operations) have a qualified manager who could run that function without the owner?
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-foreground">Management Depth</label>
+                {(() => {
+                  const n = qual.mgmt_covered.length
+                  const total = MGMT_FUNCTIONS.length
+                  const pct = Math.round(n / total * 100)
+                  return (
+                    <span className={cn('text-[11px] font-bold px-2 py-0.5 rounded border',
+                      pct >= 75 ? 'border-emerald-500/20 text-emerald-400 bg-emerald-500/10' :
+                      pct >= 50 ? 'border-amber-500/20 text-amber-400 bg-amber-500/10' :
+                      'border-red-500/20 text-red-400 bg-red-500/10')}>
+                      {n}/{total} covered — {pct}%
+                    </span>
+                  )
+                })()}
+              </div>
+              <p className="text-[11px] text-muted-foreground mb-3">
+                Which core business functions have a qualified non-owner manager who could run that function independently?
               </p>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <input type="number" min={0} max={10} value={qual.mgmt_qualified}
-                    onChange={e => setQ('mgmt_qualified', e.target.value)}
-                    placeholder="0"
-                    className={cn(numInputCls, 'w-16 text-center')} />
-                  <span className="text-xs text-muted-foreground">qualified</span>
-                  <span className="text-xs text-muted-foreground">/</span>
-                  <input type="number" min={1} max={10} value={qual.mgmt_total_functions}
-                    onChange={e => setQ('mgmt_total_functions', e.target.value)}
-                    placeholder="4"
-                    className={cn(numInputCls, 'w-16 text-center')} />
-                  <span className="text-xs text-muted-foreground">total functions</span>
-                </div>
-                {qual.mgmt_qualified !== '' && qual.mgmt_total_functions !== '' && Number(qual.mgmt_total_functions) > 0 && (
-                  <span className={cn('text-[11px] font-bold px-2 py-0.5 rounded border',
-                    Number(qual.mgmt_qualified) / Number(qual.mgmt_total_functions) >= 0.75 ? 'border-emerald-500/20 text-emerald-400 bg-emerald-500/10' :
-                    Number(qual.mgmt_qualified) / Number(qual.mgmt_total_functions) >= 0.50 ? 'border-amber-500/20 text-amber-400 bg-amber-500/10' :
-                    'border-red-500/20 text-red-400 bg-red-500/10')}>
-                    {Math.round(Number(qual.mgmt_qualified) / Number(qual.mgmt_total_functions) * 100)}% coverage
-                  </span>
-                )}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {MGMT_FUNCTIONS.map(fn => {
+                  const active = qual.mgmt_covered.includes(fn.id)
+                  return (
+                    <button key={fn.id} type="button"
+                      onClick={() => {
+                        setQual(prev => ({
+                          ...prev,
+                          mgmt_covered: active
+                            ? prev.mgmt_covered.filter(x => x !== fn.id)
+                            : [...prev.mgmt_covered, fn.id],
+                        }))
+                        setSaved(false)
+                      }}
+                      className={cn('text-left rounded-lg border p-2.5 transition-all',
+                        active ? 'border-primary/40 bg-primary/10 ring-1 ring-primary/20' : 'border-border bg-muted/20 hover:bg-muted/40')}>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <div className={cn('w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors',
+                          active ? 'border-primary bg-primary' : 'border-muted-foreground/30')}>
+                          {active && <CheckCircle className="w-2 h-2 text-primary-foreground" />}
+                        </div>
+                        <span className={cn('text-xs font-semibold', active ? 'text-primary' : 'text-foreground')}>{fn.label}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground pl-5 leading-tight">{fn.desc}</p>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </SectionCard>
@@ -710,21 +875,74 @@ export default function EngagementIntake() {
               </span>
               {auditOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
             </button>
-            {auditOpen && (
-              <div className="px-4 pb-4 border-t border-border pt-3 space-y-2 text-[11px] text-muted-foreground max-h-72 overflow-y-auto">
-                {auditEntries.length === 0 && <p>No saved versions yet — history is recorded each time you save.</p>}
-                {auditEntries.map(e => (
-                  <div key={e.id} className="rounded-lg border border-border/80 bg-muted/10 p-2">
-                    <p className="text-[10px] font-semibold text-foreground mb-1">
-                      {e.created_at ? new Date(e.created_at).toLocaleString() : '—'}
-                    </p>
-                    <pre className="text-[10px] font-mono whitespace-pre-wrap break-all max-h-32 overflow-y-auto text-muted-foreground">
-                      {JSON.stringify(e.snapshot ?? {}, null, 2)}
-                    </pre>
-                  </div>
-                ))}
-              </div>
-            )}
+            {auditOpen && (() => {
+              const FIELD_LABELS = {
+                owner_hours_per_week: 'Owner Hours',
+                sop_pct: 'SOP Documentation',
+                automation_pct: 'Process Automation',
+                mgmt_qualified: 'Mgmt Functions Covered',
+                mgmt_total_functions: 'Mgmt Total Functions',
+                mgmt_covered_functions: 'Covered Functions',
+                pipeline_value: 'Pipeline Value',
+                market_positioning: 'Market Positioning',
+                repeatability_pct: 'Repeatability',
+                contract_pct: 'Contract Coverage',
+                customer_contract_type: 'Contract Type',
+                key_person_revenue_pct: 'Owner Revenue Dep.',
+              }
+              const fmtVal = (k, v) => {
+                if (v == null) return '—'
+                if (k === 'pipeline_value') return `$${Number(v).toLocaleString()}`
+                if (k.endsWith('_pct') || k === 'sop_pct' || k === 'automation_pct' || k === 'repeatability_pct' || k === 'contract_pct' || k === 'key_person_revenue_pct') return `${v}%`
+                if (k === 'owner_hours_per_week') return `${v} hrs/wk`
+                if (k === 'market_positioning') return String(v).replace(/_/g, ' ')
+                if (k === 'mgmt_covered_functions') return String(v).replace(/,/g, ', ')
+                return String(v)
+              }
+              const diffEntries = auditEntries.map((e, idx) => {
+                const snap = e.snapshot ?? {}
+                const prev = idx < auditEntries.length - 1 ? (auditEntries[idx + 1]?.snapshot ?? {}) : null
+                const changes = []
+                for (const [k, label] of Object.entries(FIELD_LABELS)) {
+                  const cur = snap[k]
+                  if (cur == null) continue
+                  if (prev && prev[k] != null && String(prev[k]) !== String(cur)) {
+                    changes.push({ label, from: fmtVal(k, prev[k]), to: fmtVal(k, cur) })
+                  } else if (!prev) {
+                    changes.push({ label, from: null, to: fmtVal(k, cur) })
+                  }
+                }
+                return { ...e, changes }
+              })
+              return (
+                <div className="px-4 pb-4 border-t border-border pt-3 space-y-2 text-[11px] text-muted-foreground max-h-72 overflow-y-auto">
+                  {auditEntries.length === 0 && <p>No saved versions yet — history is recorded each time you save.</p>}
+                  {diffEntries.map(e => (
+                    <div key={e.id} className="rounded-lg border border-border/80 bg-muted/10 p-2.5">
+                      <p className="text-[10px] font-semibold text-foreground mb-1.5">
+                        {e.created_at ? new Date(e.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}
+                      </p>
+                      {e.changes.length > 0 ? (
+                        <div className="space-y-0.5">
+                          {e.changes.map((c, i) => (
+                            <p key={i} className="text-[10px]">
+                              <span className="text-muted-foreground/70">{c.label}:</span>{' '}
+                              {c.from != null ? (
+                                <><span className="text-red-400/70 line-through">{c.from}</span> <span className="text-muted-foreground/40">&rarr;</span> <span className="text-emerald-400">{c.to}</span></>
+                              ) : (
+                                <span className="text-foreground">{c.to}</span>
+                              )}
+                            </p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground/50 italic">No field changes vs. prior version</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
           </div>
 
           {/* ── Save + navigate CTA ──────────────────────────────────── */}

@@ -407,9 +407,19 @@ export default function Reports() {
           <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Recent exports</p>
           <div className="divide-y divide-border">
             {history.slice(0, 12).map((r) => (
-              <div key={r.id} className="flex items-center justify-between py-2 text-xs">
-                <span className="text-muted-foreground">{r.template_id}</span>
-                <span className="text-muted-foreground font-mono text-[11px]">
+              <div key={r.id} className="flex items-center gap-4 py-2 text-xs">
+                <span className="text-card-foreground font-medium flex-1 truncate">{r.template_id.replace(/_/g, ' ')}</span>
+                {r.drs_at_generation != null && (
+                  <span className="text-[11px] font-bold px-1.5 py-0.5 rounded border border-primary/20 bg-primary/10 text-primary flex-shrink-0">
+                    DRS {r.drs_at_generation.toFixed(1)}
+                  </span>
+                )}
+                {r.ev_at_generation != null && (
+                  <span className="text-[11px] font-bold px-1.5 py-0.5 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 flex-shrink-0">
+                    EV ~{r.ev_at_generation >= 1_000_000 ? `$${(r.ev_at_generation / 1_000_000).toFixed(1)}M` : `$${(r.ev_at_generation / 1_000).toFixed(0)}K`}
+                  </span>
+                )}
+                <span className="text-muted-foreground font-mono text-[11px] flex-shrink-0">
                   {r.created_at ? new Date(r.created_at).toLocaleString() : '—'}
                 </span>
               </div>

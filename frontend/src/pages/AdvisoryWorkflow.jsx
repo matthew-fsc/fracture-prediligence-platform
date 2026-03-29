@@ -39,7 +39,7 @@ export default function AdvisoryWorkflow() {
     return (
       <div className="space-y-5 max-w-[1400px]">
         <SectionHeader
-          title="CEPA Advisory Workflow"
+          title="Advisory Workflow"
           subtitle="BEI Value Acceleration Methodology™ — 9-stage certified exit planning engagement framework"
         />
         <p className="text-sm text-muted-foreground">Select a client in the header to load workflow progress.</p>
@@ -62,7 +62,7 @@ export default function AdvisoryWorkflow() {
   if (error) {
     return (
       <div className="space-y-5 max-w-[1400px]">
-        <SectionHeader title="CEPA Advisory Workflow" subtitle="Could not load workflow state" />
+        <SectionHeader title="Advisory Workflow" subtitle="Could not load workflow state" />
         <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-6 text-sm text-red-400">
           {error?.message || 'Failed to load advisory workflow'}
         </div>
@@ -80,8 +80,8 @@ export default function AdvisoryWorkflow() {
   return (
     <div className="space-y-5 max-w-[1400px]">
       <SectionHeader
-        title="CEPA Advisory Workflow"
-        subtitle="BEI Value Acceleration Methodology™ — 9-stage certified exit planning engagement framework · progress from live data"
+        title="Advisory Workflow"
+        subtitle="9-stage exit planning engagement framework · stage progress derived from live data"
         action={
           <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-primary/20 bg-primary/10 text-primary">
             {completed}/{total} stages complete · {overall}% overall

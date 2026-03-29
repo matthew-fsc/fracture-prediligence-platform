@@ -238,8 +238,7 @@ export default function CompanyWorkspace() {
                 Engagement intake
               </button>
             </div>
-            <div className="text-sm text-muted-foreground flex items-center gap-1 flex-wrap">
-              {editingHeadcount ? (
+            <div className="text-sm text-muted-foreground flex items-center gap-1 flex-wrap">{editingHeadcount ? (
                 <span className="inline-flex items-center gap-1">
                   <input
                     type="number"
@@ -289,17 +288,16 @@ export default function CompanyWorkspace() {
                 <button
                   type="button"
                   onClick={() => {
-                    setHeadcountInput(String(metrics?.total_headcount || companyData?.total_headcount || ''))
+                    setHeadcountInput(String(companyData?.total_headcount ?? metrics?.total_headcount ?? ''))
                     setEditingHeadcount(true)
                   }}
                   className="inline-flex items-center gap-0.5 hover:text-foreground transition-colors group"
                   title="Click to edit employee count"
                 >
-                  {metrics?.total_headcount || companyData?.total_headcount || '—'} employees
+                  {companyData?.total_headcount ?? metrics?.total_headcount ?? '—'} employees
                   <Edit2 className="w-2.5 h-2.5 opacity-0 group-hover:opacity-60 transition-opacity" />
                 </button>
-              )}
-              <span>· Founded {companyData?.founded ?? '—'} · {companyData?.industry ?? '—'}</span>
+              )}<span>· Founded {companyData?.founded ?? '—'} · {companyData?.industry ?? '—'}</span>
             </div>
             <div className="flex items-center gap-6 mt-2">
               <span className="text-xs text-muted-foreground">Readiness <span className="text-foreground font-semibold">{kpis.drs}/100</span></span>
@@ -512,6 +510,18 @@ export default function CompanyWorkspace() {
             { label: contractLabel, value: contractValue, unit: '%', dir: 'higher_better', peer: findPeer('Recurring Rev.') },
             { label: 'Rev / Employee', value: revenuePerEmp, unit: '$auto', dir: 'higher_better', peer: findPeer('Rev / Employee') },
           ].filter(m => m.value != null)
+
+          if (marketBench === undefined) {
+            return (
+              <div className="col-span-12 md:col-span-4 rounded-xl border border-border bg-card p-4 space-y-3">
+                <Skeleton className="h-3 w-24" />
+                <div className="grid grid-cols-2 gap-2">
+                  {[0,1,2,3].map(i => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
+                </div>
+                <Skeleton className="h-3 w-40" />
+              </div>
+            )
+          }
 
           return (
             <div className="col-span-12 md:col-span-4 rounded-xl border border-border bg-card p-4 space-y-3">

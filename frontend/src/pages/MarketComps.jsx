@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
-import { TrendingUp, Filter, ArrowUpRight, Info, BarChart2, ChevronDown, ChevronRight } from 'lucide-react'
+import { TrendingUp, Filter, ArrowUpRight, Info, BarChart2, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react'
 import { useCompanyId } from '../context/CompanyContext'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../lib/apiClient'
@@ -348,16 +348,25 @@ function LeverCard({ lever, comps }) {
           {refComps.length > 0 && (
             <div>
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Referenced Transactions</p>
-              <div className="space-y-1.5">
-                {refComps.map(comp => (
-                  <div key={comp.id} className="flex items-center gap-3 text-[11px]">
-                    <span className={cn('text-[11px] font-bold px-1 py-0.5 rounded border', SOURCE_COLORS[comp.source])}>
-                      {comp.source}
-                    </span>
-                    <span className="text-muted-foreground flex-1 truncate">{comp.description} · {comp.date}</span>
-                    <span className={cn('font-bold', QUALITY_COLORS[comp.quality])}>{comp.multiple.toFixed(1)}×</span>
-                  </div>
-                ))}
+              <div className="space-y-2">
+                {refComps.map(comp => {
+                  const qualVerb = comp.quality === 'premium' || comp.quality === 'high'
+                    ? 'commanded' : comp.quality === 'low' ? 'achieved only' : 'sold at'
+                  const highlight = comp.highlights?.[0] ?? comp.description
+                  const sentence = `${qualVerb} ${comp.multiple.toFixed(1)}× EBITDA — ${highlight}.`
+                  return (
+                    <div key={comp.id} className="rounded-lg bg-muted/20 border border-border/50 px-3 py-2">
+                      <div className="flex items-center gap-3 text-[11px] mb-1">
+                        <span className={cn('text-[11px] font-bold px-1 py-0.5 rounded border flex-shrink-0', SOURCE_COLORS[comp.source])}>
+                          {comp.source}
+                        </span>
+                        <span className="text-muted-foreground flex-1 truncate">{comp.description} · {comp.date}</span>
+                        <span className={cn('font-bold flex-shrink-0', QUALITY_COLORS[comp.quality])}>{comp.multiple.toFixed(1)}×</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground/80 italic capitalize-first">{sentence}</p>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -466,6 +475,15 @@ export default function MarketComps() {
             <p className="text-[11px] text-muted-foreground">{stat.sub}</p>
           </div>
         ))}
+      </div>
+
+      {/* Illustrative data disclosure */}
+      <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+        <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+        <div className="text-[11px] leading-relaxed">
+          <span className="font-bold text-amber-400">Illustrative comp set</span>
+          <span className="text-muted-foreground"> — these transactions are representative examples for advisory planning purposes. Production version is backed by live IBBA / DealStats licensing with verified, anonymized deal data.</span>
+        </div>
       </div>
 
       {/* Client positioning + comp table side by side */}

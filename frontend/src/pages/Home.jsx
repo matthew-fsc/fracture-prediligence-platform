@@ -3,8 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import {
   Network, Building2, Shield, Target, BarChart2,
   ArrowRight, Activity, ListChecks, ChevronRight,
-  Zap, Clock, Loader2, NotebookPen,
+  Zap, Clock, Loader2, NotebookPen, TrendingUp,
 } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts'
 import { apiClient } from '../lib/apiClient'
 import { cn, fmtM } from '../lib/utils'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -137,6 +138,20 @@ export default function Home() {
     staleTime: 60_000,
   })
 
+  const { data: engProfile = null } = useQuery({
+    queryKey: ['engagement-profile', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/engagement-profile/${companyId}`).catch(() => null),
+    enabled: companyReady,
+    staleTime: ANALYTICS_STALE_MS,
+  })
+
+  const { data: snapshotData = null } = useQuery({
+    queryKey: ['score-history', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/scores/${companyId}/history`),
+    enabled: companyReady,
+    staleTime: ANALYTICS_STALE_MS,
+  })
+
   if (companyId == null) {
     if (companiesLoading) {
       return workspaceLoadingUi()
@@ -203,6 +218,87 @@ export default function Home() {
           ))
         )}
       </div>
+
+      {/* Owner financial gap */}
+      {(() => {
+        const ownerTarget = engProfile?.target_valuation != null ? Number(engProfile.target_valuation) : null
+        const financialGap = engProfile?.personal_financial_gap != null ? Number(engProfile.personal_financial_gap) : null
+        const evShortfall = ownerTarget && currentEV ? Math.max(0, ownerTarget - currentEV) : null
+        if (!ownerTarget && !financialGap) return null
+        return (
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <Target className="w-3.5 h-3.5 text-amber-400" />
+              Owner Financial Target
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+              {ownerTarget != null && (
+                <div>
+                  <p className="text-[10px] text-muted-foreground mb-0.5">Owner Target</p>
+                  <p className="text-lg font-bold text-amber-400">{fmtM(ownerTarget)}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-[10px] text-muted-foreground mb-0.5">Current EV</p>
+                <p className="text-lg font-bold text-blue-400">{currentEV ? fmtM(currentEV) : '—'}</p>
+              </div>
+              {evShortfall != null && evShortfall > 0 && (
+                <div>
+                  <p className="text-[10px] text-muted-foreground mb-0.5">EV Shortfall</p>
+                  <p className="text-lg font-bold text-red-400">{fmtM(evShortfall)}</p>
+                </div>
+              )}
+              {financialGap != null && (
+                <div>
+                  <p className="text-[10px] text-muted-foreground mb-0.5">Personal Fin. Gap</p>
+                  <p className="text-lg font-bold text-red-400">{fmtM(financialGap)}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* DRS Score Trend */}
+      {(() => {
+        const snaps = snapshotData?.snapshots ?? []
+        if (snaps.length < 2) return null
+        const chartData = snaps.map(s => ({
+          date: s.created_at ? new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
+          drs: typeof s.drs_score === 'number' ? parseFloat(s.drs_score.toFixed(1)) : null,
+        }))
+        const first = snaps[snaps.length - 1]?.drs_score ?? 0
+        const last  = snaps[0]?.drs_score ?? 0
+        const delta = last - first
+        const deltaColor = delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-muted-foreground'
+        return (
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-3.5 h-3.5 text-primary" />
+              <p className="text-xs font-semibold text-foreground">DRS Score Trend</p>
+              <span className={cn('text-[11px] font-bold ml-1', deltaColor)}>
+                {delta >= 0 ? '+' : ''}{delta.toFixed(1)} pts
+              </span>
+              <span className="text-[10px] text-muted-foreground ml-auto">
+                {snaps.length} snapshots · last {snaps.length >= 30 ? '90' : snaps.length} captures
+              </span>
+            </div>
+            <ResponsiveContainer width="100%" height={80}>
+              <LineChart data={chartData} margin={{ top: 4, right: 8, left: -28, bottom: 0 }}>
+                <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
+                <Tooltip
+                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 6, fontSize: 11 }}
+                  labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+                  formatter={(v) => [v, 'DRS']}
+                />
+                <ReferenceLine y={70} stroke="hsl(var(--emerald-400, 52 211 153))" strokeDasharray="3 3" strokeOpacity={0.4} />
+                <Line type="monotone" dataKey="drs" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )
+      })()}
 
       {/* Module grid */}
       <div>

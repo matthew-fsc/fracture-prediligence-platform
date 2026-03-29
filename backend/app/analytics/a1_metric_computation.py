@@ -194,10 +194,10 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
     # --- Employees ---
     active_emps = db.query(Employee).filter(Employee.company_id == company_id, Employee.status == EmployeeStatus.ACTIVE).all()
     ingested_headcount = len(active_emps)
-    # Prefer the advisor-entered override when ingested employee records are missing
     company_row = db.query(Company).filter(Company.id == company_id).first()
     manual_headcount = company_row.total_headcount if company_row and company_row.total_headcount else 0
-    m.total_headcount = ingested_headcount if ingested_headcount > 0 else manual_headcount
+    # Advisor-entered headcount is the authoritative override; fall back to ingested records
+    m.total_headcount = manual_headcount if manual_headcount > 0 else ingested_headcount
     if m.total_headcount and m.total_revenue_ttm:
         m.revenue_per_employee = m.total_revenue_ttm / m.total_headcount
     emp_tenures = [(today - e.hire_date).days / 365 for e in active_emps if e.hire_date]

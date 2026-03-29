@@ -61,11 +61,17 @@ export default function InitiativeImpact() {
       .catch(() => {})
   }, [companyId])
 
+  const [libraryInits, setLibraryInits] = useState([])
+
   useEffect(() => {
     if (companyId == null || companyId < 1) return
-    apiClient.get(`/api/analytics/initiatives/${companyId}`)
-      .then(d => setCustomInits(d.initiatives ?? []))
-      .catch(() => setCustomInits([]))
+    Promise.all([
+      apiClient.get(`/api/analytics/initiatives/${companyId}`).catch(() => ({ initiatives: [] })),
+      apiClient.get(`/api/library/?item_type=initiative&is_active=true`).catch(() => ({ items: [] })),
+    ]).then(([d, lib]) => {
+      setCustomInits(d.initiatives ?? [])
+      setLibraryInits(lib.items ?? [])
+    })
   }, [companyId])
 
   const toggle = (id) => {
@@ -79,10 +85,18 @@ export default function InitiativeImpact() {
   const gapTotal     = gapData?.total_value_gap ?? rawUpliftSum
   const upliftScale  = rawUpliftSum > 0 ? gapTotal / rawUpliftSum : 1
 
+  // Build per-category initiative lookup — prefer library items, fall back to static map
+  const initsByCat = Object.fromEntries(
+    Object.keys(INITIATIVES_BY_CAT).map(cat => {
+      const libItems = libraryInits.filter(i => i.category === cat)
+      return [cat, libItems.length > 0 ? libItems : INITIATIVES_BY_CAT[cat]]
+    })
+  )
+
   const DRIVERS = gapData?.gaps?.length
     ? [
         ...gapData.gaps.flatMap((g) => {
-          const inits = INITIATIVES_BY_CAT[g.category] ?? []
+          const inits = initsByCat[g.category] ?? INITIATIVES_BY_CAT[g.category] ?? []
           const scaledUplift = g.ev_uplift * upliftScale
           const n = inits.length || 1
           return inits.map((init) => ({

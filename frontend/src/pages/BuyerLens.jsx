@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
-import { AlertCircle, AlertTriangle, Info, FileText, ChevronDown, ChevronRight } from 'lucide-react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { AlertCircle, AlertTriangle, Info, FileText, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useCompanyId } from '../context/CompanyContext'
 import { apiUrl, apiClient } from '../lib/apiClient'
+import { withCompanyQuery, resolvePath } from '../lib/navLinks'
 import { toast } from '../lib/notify'
 
 const CATEGORY_LABELS = {
@@ -109,6 +111,9 @@ function buyerBadge(t) {
 
 export default function BuyerLens() {
   const companyId = useCompanyId()
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const go = (appPath) => navigate(withCompanyQuery(resolvePath(appPath, pathname), companyId))
   const [data, setData]           = useState(null)
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(null)
@@ -140,7 +145,9 @@ export default function BuyerLens() {
     ])
       .then(([qData, profile, inits]) => {
         setData(qData)
-        setPreferredBuyers(Array.isArray(profile.preferred_buyer_types) ? profile.preferred_buyer_types : [])
+        const prefs = Array.isArray(profile.preferred_buyer_types) ? profile.preferred_buyer_types : []
+        setPreferredBuyers(prefs)
+        if (prefs.length > 0) setFilterBuyer('preferred')
         setInitiatives(inits.initiatives ?? [])
         setLoading(false)
       })
@@ -353,6 +360,12 @@ export default function BuyerLens() {
               No preferred buyer types saved yet — showing all questions. Set them under Engagement intake.
             </p>
           )}
+          {filterBuyer === 'preferred' && preferredBuyers.length > 0 && (
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+              <Info className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+              <span>Filtered to match engagement profile: <span className="font-semibold text-primary">{preferredBuyers.join(', ')}</span></span>
+            </div>
+          )}
 
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="divide-y divide-border">
@@ -408,7 +421,17 @@ export default function BuyerLens() {
                             </select>
                           </div>
                           <div className="md:col-span-2">
-                            <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Mitigating initiative</label>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Mitigating initiative</label>
+                              <button
+                                type="button"
+                                onClick={() => go('/ValueGap')}
+                                className="flex items-center gap-1 text-[10px] text-primary hover:underline"
+                              >
+                                <ExternalLink className="w-2.5 h-2.5" />
+                                View initiatives
+                              </button>
+                            </div>
                             <select
                               value={draft.mitigating_initiative_id}
                               onChange={e => setDraft(d => ({ ...d, mitigating_initiative_id: e.target.value }))}

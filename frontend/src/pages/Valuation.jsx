@@ -260,18 +260,14 @@ const CATEGORY_LABEL = {
 const CATEGORY_FLAG = { OWNER: true, PERSONAL: true, ONE_TIME: true, RELATED_PARTY: true }
 
 function LineItemRow({ line, onPropose }) {
-  const [hovered, setHovered] = useState(false)
   const catLabel = CATEGORY_LABEL[line.category]
   const flagged  = CATEGORY_FLAG[line.category] ?? false
   return (
     <div
       className={cn(
-        'flex items-center justify-between px-4 py-1.5 group transition-colors',
+        'flex items-center justify-between px-4 py-1.5 group transition-colors hover:bg-muted/30',
         flagged ? 'bg-amber-500/5' : '',
-        hovered && 'bg-muted/30',
       )}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       <div className="flex items-center gap-2 min-w-0">
         <span className="text-muted-foreground/60 pl-4">·</span>
@@ -290,15 +286,16 @@ function LineItemRow({ line, onPropose }) {
         )}
       </div>
       <div className="flex items-center gap-3 flex-shrink-0">
-        {hovered && (
-          <button
-            type="button"
-            onClick={onPropose}
-            className="flex items-center gap-1 text-[10px] font-medium text-primary hover:text-primary/80 border border-primary/30 rounded px-1.5 py-0.5 bg-primary/5 hover:bg-primary/10 transition-colors"
-          >
-            <Plus className="w-2.5 h-2.5" /> Propose Addback
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onPropose}
+          className={cn(
+            'flex items-center gap-1 text-[10px] font-medium text-primary hover:text-primary/80 border border-primary/30 rounded px-1.5 py-0.5 bg-primary/5 hover:bg-primary/10 transition-all',
+            flagged ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          )}
+        >
+          <Plus className="w-2.5 h-2.5" /> Propose Addback
+        </button>
         <span className="text-[11px] font-semibold text-red-400 tabular-nums">({fmtM(line.amount)})</span>
       </div>
     </div>
@@ -408,6 +405,11 @@ export default function Valuation() {
   const recastQuery = useQuery({
     queryKey: ['ebitda-recast', companyId],
     queryFn: () => apiClient.get(`/api/analytics/ebitda-recast/${companyId}`),
+    enabled: companyReady,
+  })
+  const profileQuery = useQuery({
+    queryKey: ['engagement-profile', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/engagement-profile/${companyId}`).catch(() => null),
     enabled: companyReady,
   })
 
@@ -911,12 +913,63 @@ export default function Valuation() {
           </div>
 
           {/* Source citation */}
-          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 group/cite relative">
             <ExternalLink className="w-3 h-3 flex-shrink-0" />
-            <span>{sourceCitation}</span>
+            {sourceCitation.length > 40 ? (
+              <span className="cursor-help border-b border-dotted border-muted-foreground/30">
+                {sourceCitation.slice(0, 40)}…
+                <span className="invisible group-hover/cite:visible absolute bottom-full left-0 mb-1.5 z-20 max-w-sm px-3 py-2 rounded-lg border border-border bg-card text-[11px] text-foreground shadow-lg whitespace-normal">
+                  {sourceCitation}
+                </span>
+              </span>
+            ) : (
+              <span>{sourceCitation}</span>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Owner Financial Target vs. Current EV */}
+      {(() => {
+        const ep = profileQuery.data
+        const ownerTarget = ep?.target_valuation != null ? Number(ep.target_valuation) : null
+        const financialGap = ep?.personal_financial_gap != null ? Number(ep.personal_financial_gap) : null
+        const evGap = ownerTarget && midpoint ? Math.max(0, ownerTarget - midpoint) : null
+        if (!ownerTarget && !financialGap) return null
+        return (
+          <div className="rounded-xl border border-amber-500/20 bg-card overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-3 border-b border-border bg-amber-500/5">
+              <AlertTriangle className="w-4 h-4 text-amber-400" />
+              <h3 className="text-sm font-semibold text-card-foreground">Owner Financial Gap</h3>
+            </div>
+            <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+              {ownerTarget != null && (
+                <div className="text-center">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Owner Target</p>
+                  <p className="text-lg font-bold text-amber-400">{fmtM(ownerTarget)}</p>
+                </div>
+              )}
+              <div className="text-center">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Current EV Midpoint</p>
+                <p className="text-lg font-bold text-blue-400">{fmtM(midpoint)}</p>
+              </div>
+              {evGap != null && evGap > 0 && (
+                <div className="text-center">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">EV Shortfall</p>
+                  <p className="text-lg font-bold text-red-400">{fmtM(evGap)}</p>
+                </div>
+              )}
+              {financialGap != null && (
+                <div className="text-center">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Personal Fin. Gap</p>
+                  <p className="text-lg font-bold text-red-400">{fmtM(financialGap)}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">from engagement intake</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Sensitivity Matrix */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">

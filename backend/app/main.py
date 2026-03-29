@@ -34,9 +34,10 @@ def _bootstrap_db():
     if 'qualitative_inputs' in inspector.get_table_names():
         existing = {c['name'] for c in inspector.get_columns('qualitative_inputs')}
         new_cols = {
-            'contract_pct':           'NUMERIC(5,1)',
-            'customer_contract_type': 'VARCHAR(32)',
-            'key_person_revenue_pct': 'NUMERIC(5,1)',
+            'contract_pct':            'NUMERIC(5,1)',
+            'customer_contract_type':  'VARCHAR(32)',
+            'key_person_revenue_pct':  'NUMERIC(5,1)',
+            'mgmt_covered_functions':  'VARCHAR(256)',
         }
         with engine.connect() as conn:
             for col, col_type in new_cols.items():
@@ -65,6 +66,44 @@ def _bootstrap_db():
             for col, col_type in fin_cols.items():
                 if col not in co_cols:
                     conn.execute(text(f'ALTER TABLE companies ADD COLUMN {col} {col_type}'))
+            conn.commit()
+
+    # score_snapshots table — auto-create if missing (create_all won't run in prod)
+    if 'score_snapshots' not in inspector.get_table_names():
+        with engine.connect() as conn:
+            conn.execute(text(
+                """CREATE TABLE IF NOT EXISTS score_snapshots (
+                    id SERIAL PRIMARY KEY,
+                    company_id INTEGER NOT NULL REFERENCES companies(id),
+                    drs_score NUMERIC(6,2) NOT NULL,
+                    ev_estimate NUMERIC(16,2),
+                    trigger VARCHAR(64),
+                    created_at TIMESTAMP DEFAULT NOW()
+                )"""
+            ))
+            conn.execute(text('CREATE INDEX IF NOT EXISTS ix_score_snapshots_company_id ON score_snapshots (company_id)'))
+            conn.execute(text('CREATE INDEX IF NOT EXISTS ix_score_snapshots_created_at ON score_snapshots (created_at)'))
+            conn.commit()
+
+    if 'generated_reports' in inspector.get_table_names():
+        gr_cols = {c['name'] for c in inspector.get_columns('generated_reports')}
+        if 'ev_at_generation' not in gr_cols:
+            with engine.connect() as conn:
+                conn.execute(text('ALTER TABLE generated_reports ADD COLUMN ev_at_generation NUMERIC(16,2)'))
+                conn.commit()
+
+    if 'engagement_profiles' in inspector.get_table_names():
+        ep_cols = {c['name'] for c in inspector.get_columns('engagement_profiles')}
+        ep_new = {
+            'owner_motivations_json': 'TEXT',
+            'post_exit_plans':        'VARCHAR(64)',
+            'non_negotiables':        'TEXT',
+            'engagement_start_date':  'VARCHAR(32)',
+        }
+        with engine.connect() as conn:
+            for col, col_type in ep_new.items():
+                if col not in ep_cols:
+                    conn.execute(text(f'ALTER TABLE engagement_profiles ADD COLUMN {col} {col_type}'))
             conn.commit()
 
     db = SessionLocal()
@@ -101,14 +140,19 @@ async def lifespan(app: FastAPI):
         logger.warning(
             "SECRET_KEY is still the default; set a strong random SECRET_KEY in production."
         )
-    # Do not fail process startup if DB is unreachable — Railway/load balancers need /health (liveness)
-    # while Postgres is provisioning or DATABASE_URL is wrong. Use /health/ready for DB readiness.
-    try:
-        _bootstrap_db()
-    except Exception:
-        logger.exception(
-            "Database bootstrap failed; API is up but /health/ready will report unavailable until DB works."
-        )
+    # Run DB bootstrap in a background thread so /health responds immediately.
+    # Railway's health check must pass before traffic is routed — bootstrap must not block yield.
+    import asyncio
+
+    async def _bg_bootstrap():
+        try:
+            await asyncio.to_thread(_bootstrap_db)
+        except Exception:
+            logger.exception(
+                "Database bootstrap failed; API is up but /health/ready will report unavailable until DB works."
+            )
+
+    asyncio.create_task(_bg_bootstrap())
     yield
 
 

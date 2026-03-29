@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
-import { Target, ChevronDown, ChevronRight, AlertTriangle, ArrowRight, TrendingUp, Info } from 'lucide-react'
+import { Target, ChevronDown, ChevronRight, AlertTriangle, ArrowRight, TrendingUp, Info, BookOpen } from 'lucide-react'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useCompanyId } from '../context/CompanyContext'
 import { apiClient } from '../lib/apiClient'
@@ -219,6 +219,12 @@ export default function ValueGap() {
     queryKey: ['analytics-value-gap', companyId],
     queryFn: () => apiClient.get(`/api/analytics/value-gap/${companyId}`),
     enabled: companyReady,
+  })
+  const triggeredQuery = useQuery({
+    queryKey: ['library-triggered', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/library-triggered/${companyId}`),
+    enabled: companyReady,
+    staleTime: 60_000,
   })
 
   const liveData = liveQuery.data ?? null
@@ -476,6 +482,74 @@ export default function ValueGap() {
           <p className="text-xs text-muted-foreground">No value-gap drivers identified — the business scores at investment grade across all DRS dimensions.</p>
         </div>
       )}
+
+      {/* ── Advisory Library Triggers ─────────────────────────────────── */}
+      {(() => {
+        const triggered = triggeredQuery.data?.triggered_items ?? []
+        if (triggered.length === 0) return null
+        const byType = {
+          risk_flag:      triggered.filter(i => i.item_type === 'risk_flag'),
+          buyer_question: triggered.filter(i => i.item_type === 'buyer_question'),
+          initiative:     triggered.filter(i => i.item_type === 'initiative'),
+        }
+        const typeLabels = { risk_flag: 'Risk Flags', buyer_question: 'Buyer Questions', initiative: 'Initiatives' }
+        const typeColors = {
+          risk_flag:      { bg: 'bg-red-500/5',    text: 'text-red-400',    border: 'border-red-500/20'    },
+          buyer_question: { bg: 'bg-amber-500/5',  text: 'text-amber-400',  border: 'border-amber-500/20'  },
+          initiative:     { bg: 'bg-blue-500/5',   text: 'text-blue-400',   border: 'border-blue-500/20'   },
+        }
+        const severityColor = { critical: 'text-red-400', high: 'text-amber-400', medium: 'text-blue-400', low: 'text-muted-foreground' }
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <BookOpen className="w-4 h-4 text-amber-400" />
+              <h3 className="text-sm font-semibold text-foreground">Advisory Library Alerts</h3>
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-400">
+                {triggered.length} triggered
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                Library items surfaced because category scores fall below their trigger threshold
+              </span>
+            </div>
+            {Object.entries(byType).map(([type, items]) => {
+              if (items.length === 0) return null
+              const tc = typeColors[type]
+              return (
+                <div key={type} className={cn('rounded-xl border p-4 space-y-3', tc.border, tc.bg)}>
+                  <p className={cn('text-[11px] font-bold uppercase tracking-wider', tc.text)}>
+                    {typeLabels[type]} ({items.length})
+                  </p>
+                  <div className="space-y-2">
+                    {items.map(item => (
+                      <div key={item.id} className="rounded-lg border border-border/50 bg-card/60 px-3 py-2.5 space-y-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-xs font-semibold text-foreground leading-snug">{item.title}</p>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <span className={cn('text-[10px] font-bold capitalize', severityColor[item.severity] ?? 'text-muted-foreground')}>
+                              {item.severity}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground/40">|</span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              {item.category_score?.toFixed(0)} / {item.score_trigger}
+                            </span>
+                          </div>
+                        </div>
+                        {item.content && (
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">{item.content}</p>
+                        )}
+                        <p className="text-[10px] text-muted-foreground/50 capitalize">
+                          {(item.category ?? '').replace(/_/g, ' ')}
+                          {item.score_gap != null && ` · ${item.score_gap.toFixed(0)}-pt gap`}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
 
       {/* ── Footnote ───────────────────────────────────────────────────── */}
       <div className="rounded-lg border border-border/40 bg-muted/10 px-4 py-3 text-[10px] text-muted-foreground/60 space-y-1">

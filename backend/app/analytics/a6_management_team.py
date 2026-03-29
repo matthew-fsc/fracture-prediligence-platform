@@ -92,7 +92,7 @@ def compute_management_team(company_id: int, db: Session) -> ManagementTeamScore
         )
 
     active = [e for e in employees if e.status == EmployeeStatus.ACTIVE]
-    total  = len(active) if len(active) > 0 else manual_headcount
+    total  = manual_headcount if manual_headcount > 0 else len(active)
     owners = [e for e in active if e.is_owner]
 
     # Classify roles

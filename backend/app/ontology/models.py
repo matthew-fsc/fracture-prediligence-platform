@@ -278,6 +278,7 @@ class QualitativeInputs(Base):
     contract_pct:           Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # % customers with formal MSA/contract
     customer_contract_type: Mapped[Optional[str]]   = mapped_column(String(32), nullable=True)       # project|retainer|msa|mix
     key_person_revenue_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # % revenue tied to owner relationships
+    mgmt_covered_functions: Mapped[Optional[str]]   = mapped_column(String(256), nullable=True)      # comma-separated function IDs with qualified manager
     updated_at:             Mapped[datetime]        = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
@@ -334,11 +335,12 @@ class EngagementSnapshot(Base):
 class GeneratedReport(Base):
     __tablename__ = "generated_reports"
 
-    id:          Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
-    company_id:  Mapped[int]            = mapped_column(ForeignKey("companies.id"), index=True)
-    template_id: Mapped[str]            = mapped_column(String(64))
-    drs_score:   Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
-    created_at:  Mapped[datetime]       = mapped_column(DateTime, server_default=func.now())
+    id:                 Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:         Mapped[int]            = mapped_column(ForeignKey("companies.id"), index=True)
+    template_id:        Mapped[str]            = mapped_column(String(64))
+    drs_score:          Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    ev_at_generation:   Mapped[Optional[float]] = mapped_column(Numeric(16, 2), nullable=True)
+    created_at:         Mapped[datetime]       = mapped_column(DateTime, server_default=func.now())
 
     company: Mapped[Company] = relationship("Company")
 
@@ -400,7 +402,29 @@ class EngagementProfile(Base):
     transaction_type:           Mapped[Optional[str]]   = mapped_column(String(64), nullable=True)
     buyer_universe_notes:       Mapped[Optional[str]]   = mapped_column(Text, nullable=True)
     preferred_buyer_types_json: Mapped[Optional[str]]   = mapped_column(Text, nullable=True)
+    owner_motivations_json:     Mapped[Optional[str]]   = mapped_column(Text, nullable=True)
+    post_exit_plans:            Mapped[Optional[str]]   = mapped_column(String(64), nullable=True)
+    non_negotiables:            Mapped[Optional[str]]   = mapped_column(Text, nullable=True)
+    engagement_start_date:      Mapped[Optional[str]]   = mapped_column(String(32), nullable=True)
     updated_at:                 Mapped[datetime]        = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    company: Mapped[Company] = relationship("Company")
+
+
+# ---------------------------------------------------------------------------
+# Score Snapshots — historical DRS captures for trend tracking
+# ---------------------------------------------------------------------------
+
+class ScoreSnapshot(Base):
+    """Point-in-time DRS and EV capture for a company. Written on DRS fetch and override changes."""
+    __tablename__ = "score_snapshots"
+
+    id:          Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:  Mapped[int]            = mapped_column(ForeignKey("companies.id"), index=True)
+    drs_score:   Mapped[float]          = mapped_column(Numeric(6, 2), nullable=False)
+    ev_estimate: Mapped[Optional[float]] = mapped_column(Numeric(16, 2), nullable=True)
+    trigger:     Mapped[Optional[str]]  = mapped_column(String(64), nullable=True)  # 'manual', 'override', 'report'
+    created_at:  Mapped[datetime]       = mapped_column(DateTime, server_default=func.now(), index=True)
 
     company: Mapped[Company] = relationship("Company")
 

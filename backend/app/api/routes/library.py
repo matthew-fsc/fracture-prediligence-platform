@@ -296,6 +296,10 @@ def seed_library_if_empty(db: Session) -> int:
          "description": "Revenue is entirely project-based or transactional with no contractual recurring component."},
         {"title": "Weak or undocumented growth pipeline", "category": "growth_drivers", "severity": "MEDIUM",
          "description": "No formal sales pipeline, CRM tracking, or documented growth strategy exists."},
+        {"title": "Informal or verbal customer agreements", "category": "customer_risk", "severity": "HIGH",
+         "description": "Customer relationships are governed by handshake deals or purchase orders rather than signed MSAs. This creates termination risk and reduces buyer confidence in revenue durability."},
+        {"title": "No business continuity or succession plan", "category": "operational_independence", "severity": "HIGH",
+         "description": "No documented plan exists for leadership continuity in the event of an owner departure, incapacitation, or acquisition. Buyers will require this before closing."},
     ]
     for rf in risk_flags:
         db.add(AdvisoryLibraryItem(

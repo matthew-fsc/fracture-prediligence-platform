@@ -28,7 +28,7 @@ const SOURCE_TYPES = [
 function jobNeedsPolling(jobs) {
   if (!Array.isArray(jobs) || jobs.length === 0) return false
   return jobs.some(j =>
-    j.status === 'RUNNING' || j.status === 'PENDING',
+    j.status === 'RUNNING' || j.status === 'PENDING' || j.status === 'AWAITING_REVIEW',
   )
 }
 
