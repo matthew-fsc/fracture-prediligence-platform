@@ -465,7 +465,7 @@ function Pricing() {
   const tiers = [
     {
       name: 'Founding Advisor',
-      price: '$179',
+      price: 'TBD',
       badge: 'Limited — 20 spots',
       highlight: true,
       features: ['All Pro features', 'Rate locked for life', 'White-glove onboarding', 'Founding member badge'],
@@ -474,7 +474,7 @@ function Pricing() {
     },
     {
       name: 'Pro',
-      price: '$299',
+      price: 'TBD',
       badge: null,
       highlight: false,
       features: ['Unlimited clients', 'PDF report generation', 'Data room organization', 'Priority support'],
@@ -483,7 +483,7 @@ function Pricing() {
     },
     {
       name: 'Team',
-      price: '$799',
+      price: 'TBD',
       badge: null,
       highlight: false,
       features: ['Up to 5 advisors', 'Shared client workspace', 'Team reporting', 'API access'],
@@ -517,7 +517,7 @@ function Pricing() {
             marginBottom: 56,
           }}
         >
-          Lock in your advisor rate today.
+          Pricing details coming soon.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -577,15 +577,6 @@ function Pricing() {
                   }}
                 >
                   {tier.price}
-                </span>
-                <span
-                  style={{
-                    color: COLORS.muted,
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontSize: 14,
-                  }}
-                >
-                  /mo
                 </span>
               </div>
 
