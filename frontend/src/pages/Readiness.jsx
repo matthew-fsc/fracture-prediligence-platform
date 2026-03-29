@@ -83,12 +83,13 @@ function barColor(s) {
   if (s >= 55) return 'bg-amber-500'
   return 'bg-red-500'
 }
+/** Matches backend DRSTier + SCORING_RULES.drs_tier_thresholds (a9_drs_composite / scoring_rules). */
 function tierLabel(s) {
-  if (s >= 85) return { label: 'Investment-Ready',    color: 'emerald' }
-  if (s >= 70) return { label: 'Exit-Trackable',      color: 'emerald' }
-  if (s >= 55) return { label: '12–18 Month Runway',  color: 'amber' }
-  if (s >= 40) return { label: '24+ Month Runway',    color: 'amber' }
-  return       { label: 'Fundamental Gaps',           color: 'red' }
+  if (s >= 85) return { label: 'Institutional Grade',      color: 'emerald' }
+  if (s >= 70) return { label: 'Investment Grade',         color: 'emerald' }
+  if (s >= 55) return { label: 'Conditional',               color: 'amber' }
+  if (s >= 40) return { label: 'High Risk',                 color: 'amber' }
+  return       { label: 'Pre-Diligence Required',        color: 'red' }
 }
 
 // ── Sub-score breakdown card ─────────────────────────────────────────────────
@@ -537,29 +538,29 @@ export default function Readiness() {
               </div>
             </div>
 
-            {/* What the tiers mean */}
+            {/* What the tiers mean — names align with DRSTier enum in scoring */}
             <div>
               <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-2">What the tiers mean for a deal</p>
               <div className="space-y-1.5 text-[11px]">
                 <div className="flex items-start gap-2">
                   <span className="font-mono text-emerald-400 w-12 flex-shrink-0 text-right">85–100</span>
-                  <span><span className="font-semibold text-emerald-400">Institutional Grade</span> — Company can run a competitive auction process. Diligence is routine; buyers compete on terms. Expect premium multiples and clean close timelines.</span>
+                  <span><span className="font-semibold text-emerald-400">Institutional Grade</span> — Competitive process readiness. Diligence is routine; buyers compete on terms. Expect premium multiples and cleaner close timelines.</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="font-mono text-emerald-400 w-12 flex-shrink-0 text-right">70–84</span>
-                  <span><span className="font-semibold text-emerald-400">Investment Grade</span> — Standard process. Minor issues surface in diligence but are resolvable. Deals close on schedule with market-rate multiples.</span>
+                  <span><span className="font-semibold text-emerald-400">Investment Grade</span> — Standard sell-side bar. Typical issues are addressable in diligence. Market-rate multiples achievable with orderly preparation.</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="font-mono text-amber-400 w-12 flex-shrink-0 text-right">55–69</span>
-                  <span><span className="font-semibold text-amber-400">Needs Work</span> — Material weaknesses will surface. Expect buyer price adjustments, earnout structures, or extended diligence timelines. Value acceleration work recommended before going to market.</span>
+                  <span><span className="font-semibold text-amber-400">Conditional</span> — Material gaps will surface; expect heavier diligence, potential price adjustments or structure. Value acceleration before a broad process is usually warranted.</span>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="font-mono text-red-400 w-12 flex-shrink-0 text-right">40–54</span>
-                  <span><span className="font-semibold text-red-400">High Risk</span> — Significant structural problems. Most institutional buyers will pass or propose heavily discounted terms. Requires 12–24 months of preparation before a viable process.</span>
+                  <span className="font-mono text-amber-400 w-12 flex-shrink-0 text-right">40–54</span>
+                  <span><span className="font-semibold text-amber-400">High Risk</span> — Many institutional buyers will pass or seek steep discounts / heavy structure. A longer runway to remediate issues is typically required for a credible process.</span>
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="font-mono text-red-400 w-12 flex-shrink-0 text-right">&lt; 40</span>
-                  <span><span className="font-semibold text-red-400">Not Saleable</span> — No institutional bid is viable in current state. Focus on operational improvements, documentation, and financial normalization before considering a transaction.</span>
+                  <span><span className="font-semibold text-red-400">Pre-Diligence Required</span> — Not ready for institutional marketing. Prioritize data quality, documentation, and operating fixes before expecting credible bids.</span>
                 </div>
               </div>
             </div>
@@ -665,11 +666,11 @@ export default function Readiness() {
         <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-4">DRS Tier Classification</p>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {[
-            { range: '85–100',   tier: 'Investment-Ready',    color: 'emerald', note: 'Competitive process, minimal friction' },
-            { range: '70–84',    tier: 'Exit-Trackable',      color: 'emerald', note: 'Standard diligence, closes on schedule' },
-            { range: '55–69',    tier: '12–18 Month Runway',  color: 'amber',   note: 'Material weaknesses, focused value work needed' },
-            { range: '40–54',    tier: '24+ Month Runway',    color: 'amber',   note: 'Structural gaps — 2-year value creation plan' },
-            { range: 'Below 40', tier: 'Fundamental Gaps',    color: 'red',     note: 'No institutional bid viable without major changes' },
+            { range: '85–100',   tier: 'Institutional Grade',      color: 'emerald', note: 'Competitive process, minimal friction' },
+            { range: '70–84',    tier: 'Investment Grade',          color: 'emerald', note: 'Standard diligence, closes on schedule' },
+            { range: '55–69',    tier: 'Conditional',               color: 'amber',   note: 'Material weaknesses, focused value work needed' },
+            { range: '40–54',    tier: 'High Risk',                 color: 'amber',   note: 'Structural gaps — extended preparation typical' },
+            { range: 'Below 40', tier: 'Pre-Diligence Required',    color: 'red',     note: 'Not marketable to institutional buyers until fixed' },
           ].map(t => {
             const isActive = (t.range === '70–84' && drs >= 70 && drs < 85) || (t.range === '85–100' && drs >= 85) ||
               (t.range === '55–69' && drs >= 55 && drs < 70) || (t.range === '40–54' && drs >= 40 && drs < 55) || (t.range === 'Below 40' && drs < 40)
@@ -739,9 +740,9 @@ export default function Readiness() {
           {[
             { label: 'P90 — Top Performers',   score: 84, pct: '90th',  note: 'Institutional-grade, competitive process',      color: 'emerald' },
             { label: 'P75 — Investment Grade',  score: 73, pct: '75th',  note: 'Standard diligence, limited friction',           color: 'emerald' },
-            { label: 'P50 — Median Engagement', score: 58, pct: '50th',  note: 'Conditional — 12–18 month runway to optimize',   color: 'amber'   },
-            { label: 'P25 — High Risk',         score: 44, pct: '25th',  note: 'Material gaps — price adjustments likely',       color: 'amber'   },
-            { label: 'P10 — Pre-Diligence',     score: 31, pct: '10th',  note: 'Structural issues — value creation required',    color: 'red'     },
+            { label: 'P50 — Median Engagement', score: 58, pct: '50th',  note: 'Conditional tier — meaningful prep before process', color: 'amber'   },
+            { label: 'P25 — High Risk',         score: 44, pct: '25th',  note: 'High Risk tier — discounts or structure likely',    color: 'amber'   },
+            { label: 'P10 — Pre-Diligence',     score: 31, pct: '10th',  note: 'Pre-Diligence Required — heavy value creation first', color: 'red'     },
           ].map(b => {
             const isAbove = drs >= b.score
             const colorCls = b.color === 'emerald' ? 'text-emerald-400' : b.color === 'amber' ? 'text-amber-400' : 'text-red-400'
@@ -803,8 +804,8 @@ export default function Readiness() {
             </LineChart>
           </ResponsiveContainer>
           <div className="flex items-center gap-4 mt-1.5 text-[11px] text-muted-foreground/60">
-            <span className="flex items-center gap-1"><span className="inline-block w-4 h-px bg-emerald-500/60" /> 85 (Investment-Ready)</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-4 h-px bg-amber-500/60" /> 70 (Exit-Trackable)</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-4 h-px bg-emerald-500/60" /> 85 · Institutional Grade</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-4 h-px bg-amber-500/60" /> 70 · Investment Grade</span>
           </div>
         </div>
       )}
