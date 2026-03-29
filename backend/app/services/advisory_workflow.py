@@ -128,7 +128,8 @@ def build_advisory_workflow(company: Company, db: Session) -> dict:
     )
     drs_result = compute_drs(cs)
     drs_base = float(drs_result.base_drs)
-    tier = str(drs_result.tier)
+    tier_raw = drs_result.tier
+    tier = str(getattr(tier_raw, "value", tier_raw)).replace("_", " ").title()
 
     basis = ebitda_basis_for_company(cid, db)
     ebitda = float(basis.get("ebitda_normalized_ttm") or basis.get("ebitda_proxy_ttm") or 0)
