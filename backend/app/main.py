@@ -167,6 +167,10 @@ if FRONTEND_DIST.exists():
     def favicon():
         return FileResponse(FRONTEND_DIST / "favicon.svg")
 
+    @app.get("/logo.png")
+    def logo():
+        return FileResponse(FRONTEND_DIST / "logo.png")
+
     # SPA catch-all: serve index.html for every non-API route
     @app.get("/{full_path:path}")
     def spa_fallback(full_path: str):
