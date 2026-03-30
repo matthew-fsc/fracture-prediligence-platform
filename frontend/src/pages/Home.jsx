@@ -322,8 +322,8 @@ export default function Home() {
           date: s.created_at ? new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
           drs: typeof s.drs_score === 'number' ? parseFloat(s.drs_score.toFixed(1)) : null,
         }))
-        const first = snaps[snaps.length - 1]?.drs_score ?? 0
-        const last  = snaps[0]?.drs_score ?? 0
+        const first = snaps[0]?.drs_score ?? 0
+        const last  = snaps[snaps.length - 1]?.drs_score ?? 0
         const delta = last - first
         const deltaColor = delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-muted-foreground'
         return (
