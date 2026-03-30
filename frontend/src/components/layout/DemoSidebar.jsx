@@ -64,9 +64,7 @@ export default function DemoSidebar({ basePrefix = '/demo' }) {
       {/* Brand */}
       <div className="h-14 flex items-center px-3 border-b border-sidebar-border flex-shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
-            <Zap className="w-3.5 h-3.5 text-primary-foreground" />
-          </div>
+          <img src="/logo.png" alt="Fracture Systems" className="w-7 h-7 flex-shrink-0 object-contain" />
           <div className="min-w-0">
             <h1 className="text-[12px] font-semibold text-sidebar-accent-foreground truncate leading-tight">
               Pre-Diligence Platform
