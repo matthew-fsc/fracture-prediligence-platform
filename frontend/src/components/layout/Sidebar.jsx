@@ -72,7 +72,7 @@ export default function Sidebar({ mobileOpen = false, onNavigate }) {
       {/* Brand */}
       <div className="h-14 flex items-center px-3 border-b border-sidebar-border flex-shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
-          <img src="/logo.png" alt="Fracture Systems" className="w-7 h-7 flex-shrink-0 object-contain" />
+          <img src="/logo.png" alt="Fracture Systems" className="w-10 h-10 flex-shrink-0 object-contain rounded-md" />
           <div className="min-w-0">
             <h1 className="text-[12px] font-semibold text-sidebar-accent-foreground truncate leading-tight">
               Pre-Diligence Platform
