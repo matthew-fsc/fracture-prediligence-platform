@@ -1,11 +1,11 @@
-"""Persist per-company report logos as files (uploaded images for PDF branding)."""
+"""Persist per-company report logos via the file storage abstraction (local or S3)."""
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Optional
 
 from app.core.config import settings
+from app.core.file_storage import get_storage
 
 _EXT_BY_CT = {
     "image/png": ".png",
@@ -17,24 +17,30 @@ _EXT_BY_CT = {
 _ALL_EXT = (".png", ".jpg", ".jpeg", ".webp", ".gif")
 
 
-def _backend_root() -> Path:
-    return Path(__file__).resolve().parent.parent.parent
+def _logo_key(company_id: int, ext: str) -> str:
+    return f"logos/{company_id}{ext}"
 
 
-def company_logo_dir() -> Path:
-    p = Path(settings.COMPANY_LOGO_DIR)
-    if not p.is_absolute():
-        p = _backend_root() / p
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+def resolve_company_logo_path(company_id: int) -> Optional[str]:
+    """
+    Return the logo location for this company, or None if not uploaded.
 
+    - Local storage: returns absolute filesystem path string
+    - S3 storage: returns a pre-signed URL (valid 1 hour)
 
-def resolve_company_logo_path(company_id: int) -> Optional[Path]:
-    root = company_logo_dir()
+    Both strings are accepted by fpdf2's image() method and by FastAPI's
+    FileResponse / RedirectResponse in the analytics logo endpoint.
+    """
+    storage = get_storage()
     for ext in _ALL_EXT:
-        candidate = root / f"{company_id}{ext}"
-        if candidate.is_file():
-            return candidate
+        key = _logo_key(company_id, ext)
+        if storage.file_exists(key):
+            if settings.USE_S3_STORAGE:
+                return storage.get_signed_url(key, expires_in=3600)
+            else:
+                from app.core.file_storage import LocalFileStorage
+                assert isinstance(storage, LocalFileStorage)
+                return str((storage._base / key).resolve())
     return None
 
 
@@ -43,14 +49,13 @@ def has_uploaded_company_logo(company_id: int) -> bool:
 
 
 def delete_company_logo_files(company_id: int) -> None:
-    root = company_logo_dir()
+    storage = get_storage()
     for ext in _ALL_EXT:
-        p = root / f"{company_id}{ext}"
-        if p.is_file():
-            p.unlink()
+        storage.delete_file(_logo_key(company_id, ext))
 
 
-def save_company_logo_upload(company_id: int, raw: bytes, content_type: str) -> Path:
+def save_company_logo_upload(company_id: int, raw: bytes, content_type: str) -> str:
+    """Store logo bytes via the active storage backend. Returns the storage key."""
     ct = (content_type or "").split(";")[0].strip().lower()
     ext = _EXT_BY_CT.get(ct)
     if not ext:
@@ -59,6 +64,6 @@ def save_company_logo_upload(company_id: int, raw: bytes, content_type: str) -> 
     if len(raw) > max_b:
         raise ValueError(f"Logo must be under {max_b // (1024 * 1024)} MB.")
     delete_company_logo_files(company_id)
-    dest = company_logo_dir() / f"{company_id}{ext}"
-    dest.write_bytes(raw)
-    return dest
+    key = _logo_key(company_id, ext)
+    get_storage().store_file(key, raw)
+    return key

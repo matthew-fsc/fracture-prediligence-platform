@@ -2,16 +2,20 @@
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_company_scope
+from app.core.analytics_events import track
 from app.core.config import settings
 from app.core.database import get_db
-from app.ontology.models import Company, QualitativeInputs, EngagementProfile
+from app.middleware.auth import CurrentUser, get_current_user
+from app.ontology.models import AICopilotUsage, Company, QualitativeInputs, EngagementProfile, UserSubscription
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +36,50 @@ class ChatMessage(BaseModel):
 class CopilotRequest(BaseModel):
     message: str
     history: list[ChatMessage] = []
+
+
+# ---------------------------------------------------------------------------
+# Token budget helpers
+# ---------------------------------------------------------------------------
+
+_TIER_LIMIT_MAP = {
+    "founding": "COPILOT_MONTHLY_TOKEN_LIMIT_FOUNDING",
+    "pro":      "COPILOT_MONTHLY_TOKEN_LIMIT_PRO",
+    "team":     "COPILOT_MONTHLY_TOKEN_LIMIT_TEAM",
+}
+
+
+def _get_tier_limit(tier: Optional[str]) -> int:
+    """Return monthly token limit for the given subscription tier."""
+    key = _TIER_LIMIT_MAP.get(tier or "pro", "COPILOT_MONTHLY_TOKEN_LIMIT_PRO")
+    return int(getattr(settings, key, 500_000))
+
+
+def _current_month() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m")
+
+
+def _get_usage(db: Session, user_id: str, month: str) -> AICopilotUsage:
+    row = (
+        db.query(AICopilotUsage)
+        .filter(AICopilotUsage.user_id == user_id, AICopilotUsage.month == month)
+        .with_for_update()
+        .first()
+    )
+    if row is None:
+        row = AICopilotUsage(user_id=user_id, month=month)
+        db.add(row)
+        db.flush()
+    return row
+
+
+def _record_usage(db: Session, user_id: str, month: str, tokens_in: int, tokens_out: int) -> None:
+    row = _get_usage(db, user_id, month)
+    row.tokens_input += tokens_in
+    row.tokens_output += tokens_out
+    row.request_count += 1
+    row.last_request_at = datetime.now(timezone.utc)
+    db.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -188,6 +236,7 @@ CURRENT COMPANY DATA:
 async def copilot_chat(
     company: CompanyScoped,
     body: CopilotRequest,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Send a message to the AI Copilot with full company diligence context."""
@@ -202,6 +251,24 @@ async def copilot_chat(
     except ImportError:
         raise HTTPException(status_code=503, detail="Anthropic SDK not installed.")
 
+    # --- Token budget check ---
+    sub = db.query(UserSubscription).filter(UserSubscription.user_id == user.user_id).first()
+    tier = sub.tier if sub else None
+    limit = _get_tier_limit(tier)
+    month = _current_month()
+
+    if limit > 0:
+        usage = _get_usage(db, user.user_id, month)
+        tokens_used = usage.tokens_input + usage.tokens_output
+        if tokens_used >= limit:
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    f"Monthly AI Copilot limit reached ({tokens_used:,} of {limit:,} tokens used). "
+                    "Limit resets on the 1st of next month."
+                ),
+            )
+
     context = _build_context(company.id, db)
     system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(context=context)
 
@@ -212,6 +279,9 @@ async def copilot_chat(
             messages.append({"role": h.role, "content": h.content})
     messages.append({"role": "user", "content": body.message})
 
+    import time
+    start_ms = int(time.time() * 1000)
+
     try:
         client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
         response = client.messages.create(
@@ -221,8 +291,34 @@ async def copilot_chat(
             messages=messages,
         )
         reply = response.content[0].text if response.content else "No response generated."
-        return {"reply": reply, "has_context": bool(context)}
 
+        # Record usage
+        tokens_in = response.usage.input_tokens if response.usage else 0
+        tokens_out = response.usage.output_tokens if response.usage else 0
+        _record_usage(db, user.user_id, month, tokens_in, tokens_out)
+
+        latency_ms = int(time.time() * 1000) - start_ms
+        track("copilot_query", user_id=user.user_id, properties={
+            "company_id": company.id,
+            "tier": tier,
+            "tokens_input": tokens_in,
+            "tokens_output": tokens_out,
+            "latency_ms": latency_ms,
+        })
+
+        tokens_remaining = max(0, limit - (tokens_in + tokens_out + (usage.tokens_input + usage.tokens_output if limit > 0 else 0)))
+        return {
+            "reply": reply,
+            "has_context": bool(context),
+            "usage": {
+                "tokens_this_request": tokens_in + tokens_out,
+                "tokens_used_this_month": (usage.tokens_input + usage.tokens_output + tokens_in + tokens_out) if limit > 0 else None,
+                "monthly_limit": limit if limit > 0 else None,
+            },
+        }
+
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Copilot Claude API call failed")
         raise HTTPException(status_code=502, detail=f"AI service error: {exc}")

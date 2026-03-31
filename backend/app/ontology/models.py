@@ -225,6 +225,10 @@ class UserSubscription(Base):
     tier:                   Mapped[Optional[str]]  = mapped_column(String(64), nullable=True)    # founding | pro | team
     # status: active | cancelled | inactive | past_due | paused (Stripe webhooks)
     status:                 Mapped[str]            = mapped_column(String(64), default="inactive")
+    # billing_interval: monthly | annual
+    billing_interval:       Mapped[str]            = mapped_column(String(16), default="monthly")
+    # max active company engagements included in plan (overage billed separately)
+    max_companies:          Mapped[int]            = mapped_column(Integer, default=10)
     created_at:             Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
     updated_at:             Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -353,6 +357,10 @@ class BuyerQuestionState(Base):
     question_id:                Mapped[int]             = mapped_column(Integer, nullable=False)
     status:                     Mapped[str]             = mapped_column(String(32), default="open")
     response_text:              Mapped[Optional[str]]   = mapped_column(Text, nullable=True)
+    # Structured answer drafting (2E)
+    answer_draft:               Mapped[Optional[str]]   = mapped_column(Text, nullable=True)
+    ai_draft_generated_at:      Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    reviewed_by:                Mapped[Optional[str]]   = mapped_column(String(256), nullable=True)  # advisor user_id
     mitigating_initiative_id:   Mapped[Optional[int]]   = mapped_column(Integer, nullable=True)
     updated_at:                 Mapped[datetime]        = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -516,3 +524,131 @@ class MarketBenchmarkCache(Base):
     payload_json: Mapped[str]          = mapped_column(Text)
     expires_at: Mapped[datetime]       = mapped_column(DateTime, index=True)
     created_at: Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# AI Copilot usage tracking (1B — token budget enforcement)
+# ---------------------------------------------------------------------------
+
+class AICopilotUsage(Base):
+    """
+    Monthly token usage per user for the AI Copilot.
+    PK is (user_id, month) to allow UPSERT with ON CONFLICT DO UPDATE.
+    """
+    __tablename__ = "ai_copilot_usage"
+
+    user_id:        Mapped[str] = mapped_column(String(256), primary_key=True)
+    month:          Mapped[str] = mapped_column(String(7), primary_key=True)   # "YYYY-MM"
+    tokens_input:   Mapped[int] = mapped_column(Integer, default=0)
+    tokens_output:  Mapped[int] = mapped_column(Integer, default=0)
+    request_count:  Mapped[int] = mapped_column(Integer, default=0)
+    last_request_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+# ---------------------------------------------------------------------------
+# Per-engagement billing (1C — overage pricing)
+# ---------------------------------------------------------------------------
+
+class CompanyEngagementBilling(Base):
+    """Tracks billing status of each company engagement against a user's plan."""
+    __tablename__ = "company_engagement_billing"
+
+    id:                       Mapped[int]           = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:               Mapped[int]           = mapped_column(ForeignKey("companies.id"), unique=True, index=True)
+    user_id:                  Mapped[str]           = mapped_column(String(256), index=True)
+    # included = within plan limit, add_on = overage line item
+    billing_status:           Mapped[str]           = mapped_column(String(16), default="included")
+    stripe_subscription_item_id: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    created_at:               Mapped[datetime]      = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship("Company")
+
+
+# ---------------------------------------------------------------------------
+# Company access grants (2D — client portal + associate seats)
+# ---------------------------------------------------------------------------
+
+class CompanyAccessGrant(Base):
+    """
+    Grants a non-owner user read (or associate) access to a specific company.
+    role: "client" (SMB owner view-only) | "associate" (firm advisor)
+    """
+    __tablename__ = "company_access_grants"
+
+    id:           Mapped[int]     = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:   Mapped[int]     = mapped_column(ForeignKey("companies.id"), index=True)
+    user_id:      Mapped[str]     = mapped_column(String(256), index=True)   # Clerk sub of grantee
+    role:         Mapped[str]     = mapped_column(String(32))                # client | associate
+    granted_by:   Mapped[str]     = mapped_column(String(256))               # Clerk sub of granting advisor
+    is_active:    Mapped[bool]    = mapped_column(Boolean, default=True)
+    granted_at:   Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    company: Mapped[Company] = relationship("Company")
+
+
+# ---------------------------------------------------------------------------
+# Referral program (3B)
+# ---------------------------------------------------------------------------
+
+class ReferralCode(Base):
+    """One referral code per advisor. Earns Stripe credit balance on conversions."""
+    __tablename__ = "referral_codes"
+
+    id:                   Mapped[int]     = mapped_column(Integer, primary_key=True, autoincrement=True)
+    code:                 Mapped[str]     = mapped_column(String(64), unique=True, index=True)
+    owner_user_id:        Mapped[str]     = mapped_column(String(256), unique=True, index=True)
+    total_clicks:         Mapped[int]     = mapped_column(Integer, default=0)
+    total_conversions:    Mapped[int]     = mapped_column(Integer, default=0)
+    credit_balance_cents: Mapped[int]     = mapped_column(Integer, default=0)
+    created_at:           Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ReferralConversion(Base):
+    """Records each signup that used a referral code."""
+    __tablename__ = "referral_conversions"
+
+    id:                      Mapped[int]     = mapped_column(Integer, primary_key=True, autoincrement=True)
+    referral_code:           Mapped[str]     = mapped_column(String(64), index=True)
+    converted_user_id:       Mapped[str]     = mapped_column(String(256), index=True)
+    converted_at:            Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    credited_amount_cents:   Mapped[int]     = mapped_column(Integer, default=0)
+    stripe_credit_applied:   Mapped[bool]    = mapped_column(Boolean, default=False)
+
+
+# ---------------------------------------------------------------------------
+# Advisor firm (3C — multi-advisor Team tier)
+# ---------------------------------------------------------------------------
+
+class AdvisorFirm(Base):
+    """
+    A firm groups multiple advisors under a single Team subscription.
+    owner_user_id is the billing admin; associates are tracked via CompanyAccessGrant.
+    """
+    __tablename__ = "advisor_firms"
+
+    id:                    Mapped[int]           = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name:                  Mapped[str]           = mapped_column(String(256))
+    owner_user_id:         Mapped[str]           = mapped_column(String(256), unique=True, index=True)
+    subscription_user_id:  Mapped[str]           = mapped_column(String(256), index=True)   # FK to UserSubscription.user_id
+    max_seats:             Mapped[int]           = mapped_column(Integer, default=5)
+    created_at:            Mapped[datetime]      = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Channel partner (3D — association / whitelabel distribution)
+# ---------------------------------------------------------------------------
+
+class ChannelPartner(Base):
+    """
+    Distribution partners (e.g. EPI, IBBA) who co-brand pricing and apply member discounts.
+    """
+    __tablename__ = "channel_partners"
+
+    id:                Mapped[int]           = mapped_column(Integer, primary_key=True, autoincrement=True)
+    slug:              Mapped[str]           = mapped_column(String(64), unique=True, index=True)
+    name:              Mapped[str]           = mapped_column(String(256))
+    logo_url:          Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    discount_pct:      Mapped[int]           = mapped_column(Integer, default=0)        # e.g. 15 = 15% off
+    stripe_coupon_id:  Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    is_active:         Mapped[bool]          = mapped_column(Boolean, default=True)
+    created_at:        Mapped[datetime]      = mapped_column(DateTime, default=datetime.utcnow)

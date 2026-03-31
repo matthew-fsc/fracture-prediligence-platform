@@ -17,9 +17,16 @@ class Settings(BaseSettings):
     CLERK_JWKS_URL: str = ""
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
+    # Monthly price IDs
     STRIPE_FOUNDING_PRICE_ID: str = ""
     STRIPE_PRO_PRICE_ID: str = ""
     STRIPE_TEAM_PRICE_ID: str = ""
+    # Annual price IDs (10 months equivalent — two months free)
+    STRIPE_FOUNDING_ANNUAL_PRICE_ID: str = ""
+    STRIPE_PRO_ANNUAL_PRICE_ID: str = ""
+    STRIPE_TEAM_ANNUAL_PRICE_ID: str = ""
+    # Per-engagement overage price ID (charged as Stripe Subscription Item add-on)
+    STRIPE_ENGAGEMENT_OVERAGE_PRICE_ID: str = ""
     # Only when True AND APP_ENV=development: allow Stripe webhooks without STRIPE_WEBHOOK_SECRET (local CLI tests).
     # Never enable in staging/production — unsigned webhooks are a security risk.
     ALLOW_UNSIGNED_STRIPE_WEBHOOKS: bool = False
@@ -62,6 +69,32 @@ class Settings(BaseSettings):
     # Market data (optional — PitchBook-style APIs; keys never exposed to frontend)
     PITCHBOOK_API_KEY: str = ""
     PITCHBOOK_API_BASE_URL: str = "https://api.pitchbook.com"
+
+    # AI Copilot monthly token limits per tier (input + output combined).
+    # Set to 0 to disable the feature for a tier. Use a large number for effectively unlimited.
+    COPILOT_MONTHLY_TOKEN_LIMIT_FOUNDING: int = 500_000
+    COPILOT_MONTHLY_TOKEN_LIMIT_PRO: int = 500_000
+    COPILOT_MONTHLY_TOKEN_LIMIT_TEAM: int = 1_500_000   # shared across firm
+
+    # Usage analytics (PostHog). POSTHOG_HOST defaults to PostHog Cloud.
+    POSTHOG_API_KEY: str = ""
+    POSTHOG_HOST: str = "https://app.posthog.com"
+
+    # S3-compatible storage (leave USE_S3_STORAGE=False to keep local filesystem)
+    USE_S3_STORAGE: bool = False
+    S3_BUCKET: str = ""
+    S3_ENDPOINT_URL: str = ""   # empty = AWS default; set for Cloudflare R2 / MinIO
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_REGION: str = "us-east-1"
+
+    # Referral program — credit (in cents) applied to referrer on each conversion
+    REFERRAL_CREDIT_CENTS: int = 2990   # $29.90 ≈ one month Pro
+
+    # Max companies included per plan tier (can be overridden per subscription record)
+    PLAN_MAX_COMPANIES_FOUNDING: int = 10
+    PLAN_MAX_COMPANIES_PRO: int = 10
+    PLAN_MAX_COMPANIES_TEAM: int = 50
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

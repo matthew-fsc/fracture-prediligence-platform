@@ -11,6 +11,7 @@ from sqlalchemy import text
 from app.api.routes import ingestion, analytics, companies, reports, demo, library
 from app.api.routes import payments, webhooks
 from app.api.routes import copilot
+from app.api.routes import admin_metrics, client_portal, firms, partners, referrals
 from app.core.config import settings
 from app.core.database import engine, SessionLocal, Base
 
@@ -126,7 +127,12 @@ app.include_router(library.router,    prefix="/api/library",    tags=["library"]
 app.include_router(demo.router,       prefix="/api",            tags=["demo"])
 app.include_router(payments.router,   prefix="/api",            tags=["payments"])
 app.include_router(webhooks.router,   prefix="/api",            tags=["webhooks"])
-app.include_router(copilot.router,    prefix="/api/copilot",    tags=["copilot"])
+app.include_router(copilot.router,       prefix="/api/copilot",       tags=["copilot"])
+app.include_router(client_portal.router, prefix="/api/portal",        tags=["portal"])
+app.include_router(referrals.router,     prefix="/api/referrals",     tags=["referrals"])
+app.include_router(firms.router,         prefix="/api/firms",         tags=["firms"])
+app.include_router(partners.router,      prefix="/api/partners",      tags=["partners"])
+app.include_router(admin_metrics.router, prefix="/api/admin",         tags=["admin"])
 
 
 @app.api_route("/health", methods=["GET", "HEAD"])

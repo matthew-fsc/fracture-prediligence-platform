@@ -8,6 +8,9 @@ import { CompanyProvider } from './context/CompanyContext'
 import LandingPage from './pages/LandingPage'
 import RequestDemoPage from './pages/RequestDemoPage'
 import PricingPage from './pages/PricingPage'
+import ROICalculatorPage from './pages/ROICalculatorPage'
+import PartnerLandingPage from './pages/PartnerLandingPage'
+import ClientPortal from './pages/ClientPortal'
 import NotFoundPage from './pages/NotFoundPage'
 import OnboardingPage from './pages/OnboardingPage'
 
@@ -91,6 +94,9 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/request-demo" element={<RequestDemoPage />} />
         <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/roi-calculator" element={<ROICalculatorPage />} />
+        <Route path="/partners/:slug" element={<PartnerLandingPage />} />
+        <Route path="/portal" element={<ClientPortal />} />
         <Route path="/sign-in/*" element={<SignInPage />} />
         <Route path="/sign-up/*" element={<SignUpPage />} />
 
