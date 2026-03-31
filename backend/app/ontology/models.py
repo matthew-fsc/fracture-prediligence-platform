@@ -380,10 +380,11 @@ class CompanyInitiative(Base):
 class QualitativeInputAudit(Base):
     __tablename__ = "qualitative_input_audits"
 
-    id:            Mapped[int]      = mapped_column(Integer, primary_key=True, autoincrement=True)
-    company_id:    Mapped[int]      = mapped_column(ForeignKey("companies.id"), index=True)
-    snapshot_json: Mapped[str]      = mapped_column(Text)
-    created_at:    Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    id:            Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:    Mapped[int]            = mapped_column(ForeignKey("companies.id"), index=True)
+    advisor_id:    Mapped[Optional[str]]  = mapped_column(String(256), nullable=True)  # Clerk sub of advisor who saved
+    snapshot_json: Mapped[str]            = mapped_column(Text)
+    created_at:    Mapped[datetime]       = mapped_column(DateTime, server_default=func.now())
 
     company: Mapped[Company] = relationship("Company")
 
@@ -406,6 +407,7 @@ class EngagementProfile(Base):
     post_exit_plans:            Mapped[Optional[str]]   = mapped_column(String(64), nullable=True)
     non_negotiables:            Mapped[Optional[str]]   = mapped_column(Text, nullable=True)
     engagement_start_date:      Mapped[Optional[str]]   = mapped_column(String(32), nullable=True)
+    advisor_id:                 Mapped[Optional[str]]   = mapped_column(String(256), nullable=True)  # Clerk sub of advisor who set up the engagement
     updated_at:                 Mapped[datetime]        = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     company: Mapped[Company] = relationship("Company")
