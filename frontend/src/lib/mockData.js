@@ -29,12 +29,12 @@ export const kpis = {
 }
 
 export const drsCategories = [
-  { name: 'Revenue Quality',          score: 78, weight: 0.25, tier: 'Investment' },
-  { name: 'Financial Integrity',      score: 89, weight: 0.20, tier: 'Strong' },
-  { name: 'Operational Independence', score: 74, weight: 0.20, tier: 'Conditional' },
-  { name: 'Customer Risk',            score: 69, weight: 0.15, tier: 'Conditional' },
-  { name: 'Management & Team',        score: 72, weight: 0.10, tier: 'Conditional' },
-  { name: 'Growth Drivers',           score: 68, weight: 0.10, tier: 'Conditional' },
+  { name: 'Revenue Quality',          score: 70, weight: 0.25, tier: 'Investment' },
+  { name: 'Financial Integrity',      score: 74, weight: 0.20, tier: 'Investment' },
+  { name: 'Operational Independence', score: 71, weight: 0.20, tier: 'Investment' },
+  { name: 'Customer Risk',            score: 70, weight: 0.15, tier: 'Investment' },
+  { name: 'Management & Team',        score: 72, weight: 0.10, tier: 'Investment' },
+  { name: 'Growth Drivers',           score: 78, weight: 0.10, tier: 'Investment' },
 ]
 
 export const ebitdaRecast = {
