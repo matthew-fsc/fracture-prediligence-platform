@@ -53,8 +53,8 @@ if (PUBLISHABLE_KEY) {
     <React.StrictMode>
       <ClerkProvider
         publishableKey={PUBLISHABLE_KEY}
-        afterSignInUrl="/Home"
-        afterSignUpUrl="/dashboard/onboarding"
+        afterSignInUrl="/auth-redirect"
+        afterSignUpUrl="/role-select"
         afterSignOutUrl="/"
       >
         <ClerkAuthBridge>
