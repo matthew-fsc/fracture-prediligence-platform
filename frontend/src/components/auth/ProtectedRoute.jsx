@@ -1,5 +1,18 @@
+/**
+ * ProtectedRoute — enforces authentication AND role-based routing.
+ *
+ * After Clerk auth resolves:
+ *   - No role yet          → /role-select
+ *   - CLIENT accessing /   → /client/dashboard
+ *   - ADVISOR accessing /client/* → /Home
+ *   - Otherwise            → render children
+ *
+ * In dev without VITE_CLERK_PUBLISHABLE_KEY the route is always accessible.
+ */
+
 import { useAuth } from '@clerk/react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
+import { useUserRole } from '../../context/UserRoleContext'
 
 const COLORS = { bg: '#0A1628', gold: '#C9973A', muted: '#8A9BB0' }
 
@@ -100,14 +113,57 @@ function NoClerkNotice() {
   )
 }
 
-function ClerkGuard({ children }) {
-  const { isLoaded, isSignedIn } = useAuth()
-  if (!isLoaded) return <LoadingShell />
-  if (!isSignedIn) return <Navigate to="/sign-in" replace />
+/**
+ * Inner guard — Clerk is loaded. Apply role-based redirects.
+ * - `requireAdvisor`: the route is advisor-only (default for all /Home etc. routes)
+ * - `requireClient`: the route is client-only (all /client/* routes)
+ */
+function RoleGuard({ children, requireAdvisor = false, requireClient = false }) {
+  const { role, loading } = useUserRole()
+  const location = useLocation()
+
+  if (loading) return <LoadingShell />
+
+  // No role set → prompt role selection
+  if (role === null) {
+    return <Navigate to="/role-select" replace state={{ from: location }} />
+  }
+
+  // Advisor tried to access client portal → redirect to advisor home
+  if (requireClient && role === 'ADVISOR') {
+    return <Navigate to="/Home" replace />
+  }
+
+  // Client tried to access advisor portal → redirect to client dashboard
+  if (requireAdvisor && role === 'CLIENT') {
+    return <Navigate to="/client/dashboard" replace />
+  }
+
   return children
 }
 
-export default function ProtectedRoute({ children }) {
+function ClerkGuard({ children, requireAdvisor, requireClient }) {
+  const { isLoaded, isSignedIn } = useAuth()
+  if (!isLoaded) return <LoadingShell />
+  if (!isSignedIn) return <Navigate to="/sign-in" replace />
+  return (
+    <RoleGuard requireAdvisor={requireAdvisor} requireClient={requireClient}>
+      {children}
+    </RoleGuard>
+  )
+}
+
+/**
+ * @param {object} props
+ * @param {React.ReactNode} props.children
+ * @param {boolean} [props.requireAdvisor]  — enforce ADVISOR role (default true for advisor routes)
+ * @param {boolean} [props.requireClient]   — enforce CLIENT role (for /client/* routes)
+ */
+export default function ProtectedRoute({
+  children,
+  requireAdvisor = false,
+  requireClient = false,
+}) {
   const hasKey = Boolean((import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim())
   if (!hasKey && import.meta.env.PROD) return <NoClerkNotice />
 
@@ -118,8 +174,13 @@ export default function ProtectedRoute({ children }) {
           'Set the key for staging/production builds.',
       )
     }
+    // In dev without Clerk: skip role check, render directly
     return children
   }
 
-  return <ClerkGuard>{children}</ClerkGuard>
+  return (
+    <ClerkGuard requireAdvisor={requireAdvisor} requireClient={requireClient}>
+      {children}
+    </ClerkGuard>
+  )
 }

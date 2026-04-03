@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import ensure_company_access, ensure_company_write_access
 from app.core.database import get_db
 from app.middleware.auth import CurrentUser, get_current_user, get_current_user_optional
-from app.ontology.models import Company
+from app.ontology.models import ClientAccess, ClientAccessStatus, Company, UserProfile, UserRole
 
 router = APIRouter()
 
@@ -74,13 +74,35 @@ def list_companies(
     user: Optional[CurrentUser] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
-    q = db.query(Company)
-    if user:
-        q = q.filter(Company.owner_user_id == user.user_id)
-    else:
+    if not user:
         # No token: return only unowned (demo/shared) companies
-        q = q.filter(Company.owner_user_id.is_(None))
-    rows = q.order_by(Company.id).all()
+        rows = db.query(Company).filter(Company.owner_user_id.is_(None)).order_by(Company.id).all()
+        return [company_to_dict(r) for r in rows]
+
+    # Check if this user is a CLIENT — return their linked company instead
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user.user_id).first()
+    if profile and profile.role == UserRole.CLIENT:
+        access_rows = (
+            db.query(ClientAccess)
+            .filter(
+                ClientAccess.client_user_id == user.user_id,
+                ClientAccess.status == ClientAccessStatus.ACCEPTED,
+            )
+            .all()
+        )
+        company_ids = [a.company_id for a in access_rows]
+        if not company_ids:
+            return []
+        rows = db.query(Company).filter(Company.id.in_(company_ids)).order_by(Company.id).all()
+        return [company_to_dict(r) for r in rows]
+
+    # Advisor: return companies they own
+    rows = (
+        db.query(Company)
+        .filter(Company.owner_user_id == user.user_id)
+        .order_by(Company.id)
+        .all()
+    )
     return [company_to_dict(r) for r in rows]
 
 

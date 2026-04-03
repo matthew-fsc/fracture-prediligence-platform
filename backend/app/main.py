@@ -11,6 +11,7 @@ from sqlalchemy import text
 from app.api.routes import ingestion, analytics, companies, reports, demo, library
 from app.api.routes import payments, webhooks
 from app.api.routes import copilot
+from app.api.routes import user_profiles
 from app.core.config import settings
 from app.core.database import engine, SessionLocal, Base
 
@@ -21,7 +22,7 @@ FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
 def _bootstrap_db():
     """Seed data and dev-only create_all. Production/staging schema must come from Alembic only."""
-    # Import all models so Base knows about them
+    # Import all models so Base knows about them (UserProfile, ClientAccess included)
     import app.ontology.models           # noqa: F401
     import app.ontology.ingestion_models  # noqa: F401
 
@@ -126,7 +127,8 @@ app.include_router(library.router,    prefix="/api/library",    tags=["library"]
 app.include_router(demo.router,       prefix="/api",            tags=["demo"])
 app.include_router(payments.router,   prefix="/api",            tags=["payments"])
 app.include_router(webhooks.router,   prefix="/api",            tags=["webhooks"])
-app.include_router(copilot.router,    prefix="/api/copilot",    tags=["copilot"])
+app.include_router(copilot.router,       prefix="/api/copilot",    tags=["copilot"])
+app.include_router(user_profiles.router, prefix="/api",            tags=["user-profiles"])
 
 
 @app.api_route("/health", methods=["GET", "HEAD"])

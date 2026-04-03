@@ -518,3 +518,60 @@ class MarketBenchmarkCache(Base):
     payload_json: Mapped[str]          = mapped_column(Text)
     expires_at: Mapped[datetime]       = mapped_column(DateTime, index=True)
     created_at: Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# User profiles — role assignments (ADVISOR vs CLIENT)
+# ---------------------------------------------------------------------------
+
+class UserRole(str, Enum):
+    ADVISOR = "ADVISOR"
+    CLIENT  = "CLIENT"
+
+
+class UserProfile(Base):
+    """Links a Clerk user_id to an application role (ADVISOR or CLIENT)."""
+
+    __tablename__ = "user_profiles"
+
+    id:         Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id:    Mapped[str]            = mapped_column(String(256), unique=True, index=True)  # Clerk sub
+    role:       Mapped[str]            = mapped_column(String(32))  # ADVISOR | CLIENT
+    created_at: Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Client access — invite-based linking of CLIENT users to companies
+# ---------------------------------------------------------------------------
+
+class ClientAccessStatus(str, Enum):
+    PENDING  = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    REVOKED  = "REVOKED"
+
+
+class ClientAccess(Base):
+    """
+    An advisor-created invitation that links a business-owner (CLIENT) to a specific company.
+
+    Workflow:
+      1. Advisor posts to /api/me/invite-client → record created with status=PENDING + unique token
+      2. Advisor shares the invite URL to the client
+      3. Client signs in, visits /client-invite/:token → POST /api/me/accept-invite/:token
+      4. Server sets client_user_id, status=ACCEPTED; UserProfile.role is set to CLIENT
+    """
+
+    __tablename__ = "client_access"
+
+    id:                   Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:           Mapped[int]            = mapped_column(ForeignKey("companies.id"), index=True)
+    invited_by_user_id:   Mapped[str]            = mapped_column(String(256))              # Clerk sub of the advisor
+    invite_email:         Mapped[str]            = mapped_column(String(256), index=True)  # email the invite was sent to
+    invite_token:         Mapped[str]            = mapped_column(String(128), unique=True, index=True)
+    client_user_id:       Mapped[Optional[str]]  = mapped_column(String(256), nullable=True, index=True)  # set on accept
+    status:               Mapped[str]            = mapped_column(String(32), default=ClientAccessStatus.PENDING)
+    created_at:           Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
+    accepted_at:          Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    company: Mapped[Company] = relationship("Company")
