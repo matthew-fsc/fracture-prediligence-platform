@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import ensure_company_access
+from app.api.deps import ensure_company_access, ensure_company_write_access
 from app.core.database import get_db
-from app.middleware.auth import CurrentUser, get_current_user, get_current_user_optional  # get_current_user used by create_company
+from app.middleware.auth import CurrentUser, get_current_user, get_current_user_optional
 from app.ontology.models import Company
 
 router = APIRouter()
@@ -119,10 +119,10 @@ def get_company(
 def patch_company(
     company_id: int,
     body: CompanyPatch,
-    user: Optional[CurrentUser] = Depends(get_current_user_optional),
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    row = ensure_company_access(company_id, user, db)
+    row = ensure_company_write_access(company_id, user, db)
     data = body.model_dump(exclude_unset=True)
     for k, v in data.items():
         setattr(row, k, v)

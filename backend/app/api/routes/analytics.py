@@ -10,9 +10,10 @@ from pydantic import BaseModel
 from typing import Annotated, Optional
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_company_scope
+from app.api.deps import get_company_scope, get_company_write_scope
 from app.api.routes.companies import company_to_dict
 from app.core.database import get_db
+from app.middleware.auth import CurrentUser, get_current_user, get_current_user_optional
 from app.analytics.a1_metric_computation import compute_metrics
 from app.analytics.a2_ebitda_recast import compute_ebitda_recast, ChallengeLikelihood
 from app.analytics.a3_revenue_quality import compute_revenue_quality
@@ -54,6 +55,7 @@ from app.services.company_logo_storage import (
 router = APIRouter()
 
 CompanyScoped = Annotated[Company, Depends(get_company_scope)]
+CompanyWriteScoped = Annotated[Company, Depends(get_company_write_scope)]
 
 VALID_CATEGORIES = {
     "revenue_quality", "financial_integrity", "operational_independence",
@@ -150,7 +152,6 @@ def _qual_key_person_score(key_person_pct: float) -> float:
 class OverrideRequest(BaseModel):
     adjustment: float  # -20 to +20
     rationale: str
-    advisor_id: Optional[str] = None
 
 class QualitativeRequest(BaseModel):
     owner_hours_per_week: Optional[float] = None
@@ -213,7 +214,7 @@ def get_company_financial(company: CompanyScoped, db: Session = Depends(get_db))
 
 @router.patch("/company-financial/{company_id}")
 def patch_company_financial(
-    company: CompanyScoped,
+    company: CompanyWriteScoped,
     body: CompanyFinancialPatch,
     db: Session = Depends(get_db),
 ):
@@ -1295,9 +1296,10 @@ def get_overrides(company: CompanyScoped, db: Session = Depends(get_db)):
 
 @router.post("/overrides/{company_id}/{category}")
 def upsert_override(
-    company: CompanyScoped,
+    company: CompanyWriteScoped,
     category: str,
     body: OverrideRequest,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     if category not in VALID_CATEGORIES:
@@ -1314,13 +1316,13 @@ def upsert_override(
     if existing:
         existing.adjustment = adj
         existing.rationale  = body.rationale.strip()
-        existing.advisor_id = body.advisor_id
+        existing.advisor_id = user.user_id
         existing.updated_at = datetime.utcnow()
     else:
         db.add(AdvisorOverride(
             company_id=company.id, category=category,
             adjustment=adj, rationale=body.rationale.strip(),
-            advisor_id=body.advisor_id,
+            advisor_id=user.user_id,
         ))
     db.commit()
     # Capture a score snapshot after each override change
@@ -1342,7 +1344,7 @@ def upsert_override(
 
 
 @router.delete("/overrides/{company_id}/{category}")
-def delete_override(company: CompanyScoped, category: str, db: Session = Depends(get_db)):
+def delete_override(company: CompanyWriteScoped, category: str, db: Session = Depends(get_db)):
     deleted = db.query(AdvisorOverride).filter(
         AdvisorOverride.company_id == company.id,
         AdvisorOverride.category == category,
@@ -1363,16 +1365,16 @@ class AddbackOverrideRequest(BaseModel):
     documented:   bool   = False
     notes:        Optional[str] = None
     rationale:    Optional[str] = None
-    advisor_id:   Optional[str] = None
     is_custom:    bool          = False
 
 VALID_CHALLENGES = {"LOW", "MEDIUM", "HIGH", "NOT_DEFENSIBLE"}
 
 @router.post("/addbacks/{company_id}/{addback_key}")
 def upsert_addback_override(
-    company: CompanyScoped,
+    company: CompanyWriteScoped,
     addback_key: str,
     body: AddbackOverrideRequest,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Save or update an advisor override for a specific addback line (or add a custom line)."""
@@ -1392,7 +1394,7 @@ def upsert_addback_override(
         existing.documented  = body.documented
         existing.notes       = body.notes
         existing.rationale   = body.rationale
-        existing.advisor_id  = body.advisor_id
+        existing.advisor_id  = user.user_id
         existing.is_custom   = body.is_custom
         existing.updated_at  = datetime.utcnow()
     else:
@@ -1401,7 +1403,7 @@ def upsert_addback_override(
             description=body.description, amount=body.amount,
             challenge=body.challenge, category=body.category,
             documented=body.documented, notes=body.notes,
-            rationale=body.rationale, advisor_id=body.advisor_id,
+            rationale=body.rationale, advisor_id=user.user_id,
             is_custom=body.is_custom,
         ))
     db.commit()
@@ -1409,7 +1411,7 @@ def upsert_addback_override(
 
 
 @router.delete("/addbacks/{company_id}/{addback_key}")
-def delete_addback_override(company: CompanyScoped, addback_key: str, db: Session = Depends(get_db)):
+def delete_addback_override(company: CompanyWriteScoped, addback_key: str, db: Session = Depends(get_db)):
     """Remove an advisor override for an addback line (reverts to system default)."""
     deleted = db.query(AddbackOverride).filter(
         AddbackOverride.company_id == company.id,
@@ -1482,6 +1484,7 @@ def list_qualitative_audit(company: CompanyScoped, db: Session = Depends(get_db)
         "entries": [
             {
                 "id": r.id,
+                "advisor_id": r.advisor_id,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
                 "snapshot": json.loads(r.snapshot_json) if r.snapshot_json else {},
             }
@@ -1491,7 +1494,12 @@ def list_qualitative_audit(company: CompanyScoped, db: Session = Depends(get_db)
 
 
 @router.post("/qualitative/{company_id}")
-def save_qualitative(company: CompanyScoped, body: QualitativeRequest, db: Session = Depends(get_db)):
+def save_qualitative(
+    company: CompanyWriteScoped,
+    body: QualitativeRequest,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     row = db.query(QualitativeInputs).filter(
         QualitativeInputs.company_id == company.id
     ).first()
@@ -1508,6 +1516,7 @@ def save_qualitative(company: CompanyScoped, body: QualitativeRequest, db: Sessi
     db.add(
         QualitativeInputAudit(
             company_id=company.id,
+            advisor_id=user.user_id,
             snapshot_json=json.dumps(_qualitative_snapshot(row)),
         )
     )
@@ -1633,6 +1642,7 @@ def _engagement_profile_dict(row: EngagementProfile) -> dict:
             motivations = []
     return {
         "company_id": row.company_id,
+        "advisor_id": row.advisor_id,
         "owner_goals_narrative": row.owner_goals_narrative,
         "owner_motivations": motivations,
         "post_exit_plans": row.post_exit_plans,
@@ -1654,6 +1664,7 @@ def get_engagement_profile(company: CompanyScoped, db: Session = Depends(get_db)
     if not row:
         return {
             "company_id": company.id,
+            "advisor_id": None,
             "owner_goals_narrative": None,
             "owner_motivations": [],
             "post_exit_plans": None,
@@ -1672,8 +1683,9 @@ def get_engagement_profile(company: CompanyScoped, db: Session = Depends(get_db)
 
 @router.patch("/engagement-profile/{company_id}")
 def patch_engagement_profile(
-    company: CompanyScoped,
+    company: CompanyWriteScoped,
     body: EngagementProfilePayload,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     data = body.model_dump(exclude_unset=True)
@@ -1682,7 +1694,7 @@ def patch_engagement_profile(
 
     row = db.query(EngagementProfile).filter(EngagementProfile.company_id == company.id).first()
     if not row:
-        row = EngagementProfile(company_id=company.id)
+        row = EngagementProfile(company_id=company.id, advisor_id=user.user_id)
         db.add(row)
 
     if buyers is not None:
