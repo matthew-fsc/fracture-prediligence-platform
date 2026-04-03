@@ -21,10 +21,6 @@ from app.services import demo_service
 
 router = APIRouter()
 
-# ---------------------------------------------------------------------------
-# Spots remaining — module-level mutable state
-# ---------------------------------------------------------------------------
-_spots_remaining = 18
 TOTAL_SPOTS = settings.DEMO_TOTAL_SPOTS
 
 # ---------------------------------------------------------------------------
@@ -37,7 +33,7 @@ DEMO_DATA = {
         "industry": "Field Services — Traffic Management & Transportation",
         "founded": 2009,
         "state": "CA",
-        "employees": 13,
+        "employees": 25,
         "ttm_revenue": 4196172,
         "ebitda": 1743357,
         "ebitda_margin": 41.5,
@@ -61,63 +57,63 @@ DEMO_DATA = {
     },
     "category_scores": {
         "revenue_quality": {
-            "composite": 52,
+            "composite": 70,
             "data_confidence": "HIGH",
             "sub_scores": {
-                "recurring_rate": {"score": 38, "label": "Low recurring mix — mostly project-based municipal work"},
-                "concentration": {"score": 42, "label": "Top customer ~49% of TTM revenue"},
-                "durability": {"score": 55, "label": "Government contracts; renewal timing uneven"},
-                "consistency": {"score": 62, "label": "Revenue CV reflects project timing"},
-                "nrr": {"score": 45, "label": "Limited expansion within existing accounts"},
+                "recurring_rate": {"score": 58, "label": "Project-based municipal work; limited recurring revenue mix"},
+                "concentration": {"score": 62, "label": "Top customer ~49% of TTM revenue — primary concentration risk"},
+                "durability": {"score": 80, "label": "Government contracts provide multi-year durability"},
+                "consistency": {"score": 82, "label": "Revenue trend positive across 3-year P&L window"},
+                "nrr": {"score": 75, "label": "Stable account base; limited expansion within existing accounts"},
             },
         },
         "financial_integrity": {
-            "composite": 58,
+            "composite": 74,
             "data_confidence": "HIGH",
             "sub_scores": {
-                "addback_exposure": {"score": 55, "label": "Officer salary $202K vs ~$120K market replacement"},
-                "expense_completeness": {"score": 72, "label": "QB-style GL mapped to ontology categories"},
-                "revenue_completeness": {"score": 78, "label": "Monthly 2025 + annual prior years"},
-                "data_coverage": {"score": 68, "label": "3-year P&L path ingested"},
+                "addback_exposure": {"score": 68, "label": "Officer salary $202K vs ~$120K market replacement — $82K addback"},
+                "expense_completeness": {"score": 78, "label": "QB-style GL fully mapped to ontology categories"},
+                "revenue_completeness": {"score": 82, "label": "Monthly 2025 + annual 2023/2024 ingested"},
+                "data_coverage": {"score": 76, "label": "3-year P&L path with complete monthly TTM"},
             },
         },
         "operational_independence": {
-            "composite": 48,
+            "composite": 71,
             "data_confidence": "HIGH",
             "sub_scores": {
-                "owner_comp": {"score": 50, "label": "Owner comp and field leadership overlap"},
-                "key_person": {"score": 44, "label": "Owner-led ops and key estimates"},
-                "management_depth": {"score": 52, "label": "Small leadership bench vs workload"},
-                "staff_stability": {"score": 58, "label": "Field staff tenure mixed"},
+                "owner_comp": {"score": 68, "label": "Owner comp normalized; field ops documented"},
+                "key_person": {"score": 65, "label": "Owner-led customer relationships — key person dependency noted"},
+                "management_depth": {"score": 74, "label": "Field leads identified; bench depth improving"},
+                "staff_stability": {"score": 76, "label": "Field staff tenure stable across core accounts"},
             },
         },
         "customer_risk": {
-            "composite": 35,
+            "composite": 70,
             "data_confidence": "HIGH",
             "sub_scores": {
-                "concentration": {"score": 28, "label": "Top customer ~49% — buyer concentration risk"},
-                "diversification": {"score": 40, "label": "55 active customers; revenue skewed to top 5"},
-                "churn": {"score": 48, "label": "13 dormant accounts — concentration in active base"},
-                "tenure": {"score": 52, "label": "Municipal relationships multi-year but lumpy"},
+                "concentration": {"score": 58, "label": "Top customer ~49% — concentration risk flagged for buyer review"},
+                "diversification": {"score": 76, "label": "68 customers total; 55 active — solid breadth for field services"},
+                "churn": {"score": 72, "label": "13 dormant accounts; 55 active customers retained"},
+                "tenure": {"score": 80, "label": "Municipal relationships multi-year with strong renewal history"},
             },
         },
         "management_team": {
-            "composite": 52,
+            "composite": 72,
             "data_confidence": "MEDIUM",
             "sub_scores": {
-                "completeness": {"score": 54, "label": "Ops + field leads identified"},
-                "size": {"score": 55, "label": "13 employees — lean vs revenue"},
-                "ownership": {"score": 48, "label": "Owner-director role central"},
-                "role_coverage": {"score": 50, "label": "Gaps in commercial / BD coverage"},
+                "completeness": {"score": 72, "label": "Ops + field leads identified; BD coverage gap noted"},
+                "size": {"score": 70, "label": "25 employees — lean field services structure"},
+                "ownership": {"score": 68, "label": "Owner-director role central; succession path in progress"},
+                "role_coverage": {"score": 74, "label": "Core operational roles covered; commercial expansion needed"},
             },
         },
         "growth_drivers": {
-            "composite": 42,
+            "composite": 78,
             "data_confidence": "MEDIUM",
             "sub_scores": {
-                "revenue_cagr": {"score": 48, "label": "YoY growth uneven — project-driven"},
-                "new_customers": {"score": 38, "label": "Limited new logo pipeline vs TTM"},
-                "contract_pipeline": {"score": 40, "label": "No formal BD cadence"},
+                "revenue_cagr": {"score": 76, "label": "2023→2025 TTM growth: $2.79M → $4.20M (+50% over 2 years)"},
+                "new_customers": {"score": 72, "label": "Active customer count stable; new logo acquisition limited"},
+                "contract_pipeline": {"score": 74, "label": "Pipeline coverage below 1.0x; formal BD cadence in development"},
             },
         },
     },
@@ -220,7 +216,7 @@ DEMO_DATA = {
                 "name": "Legal & Corporate",
                 "icon": "shield",
                 "docs": [
-                    {"name": "Certificate of Formation (Colorado)", "status": "complete", "size": "380 KB"},
+                    {"name": "Certificate of Formation (California)", "status": "complete", "size": "380 KB"},
                     {"name": "Operating Agreement — 2023 Amended", "status": "complete", "size": "1.4 MB"},
                     {"name": "Buy-Sell Agreement (2024)", "status": "complete", "size": "890 KB"},
                     {"name": "EIN Confirmation Letter (IRS)", "status": "complete", "size": "160 KB"},
