@@ -31,6 +31,7 @@ def update_user_subscription(
     stripe_subscription_id: Optional[str],
     tier: Optional[str],
     status: str,
+    billing_interval: str = "monthly",
 ) -> dict:
     """Upsert the subscription record for a Clerk user."""
     sub = db.query(UserSubscription).filter(UserSubscription.user_id == user_id).first()
@@ -42,27 +43,28 @@ def update_user_subscription(
     sub.stripe_subscription_id = stripe_subscription_id
     sub.tier = tier
     sub.status = status
+    sub.billing_interval = billing_interval
     sub.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(sub)
-    return {
-        "user_id": sub.user_id,
-        "tier": sub.tier,
-        "status": sub.status,
-        "stripe_customer_id": sub.stripe_customer_id,
-        "stripe_subscription_id": sub.stripe_subscription_id,
-    }
+    return _subscription_to_dict(sub)
 
 
 def get_user_subscription(db: Session, user_id: str) -> Optional[dict]:
-    """Return tier and status for a user, or None if no subscription exists."""
+    """Return tier, status, and billing details for a user, or None if no subscription exists."""
     sub = db.query(UserSubscription).filter(UserSubscription.user_id == user_id).first()
     if sub is None:
         return None
+    return _subscription_to_dict(sub)
+
+
+def _subscription_to_dict(sub: UserSubscription) -> dict:
     return {
         "user_id": sub.user_id,
         "tier": sub.tier,
         "status": sub.status,
+        "billing_interval": sub.billing_interval,
+        "max_companies": sub.max_companies,
         "stripe_customer_id": sub.stripe_customer_id,
         "stripe_subscription_id": sub.stripe_subscription_id,
     }

@@ -125,8 +125,9 @@ export default function BuyerLens() {
   const [preferredBuyers, setPreferredBuyers] = useState([])
   const [expandedId, setExpandedId] = useState(null)
   const [initiatives, setInitiatives] = useState([])
-  const [draft, setDraft] = useState({ status: 'open', response_text: '', mitigating_initiative_id: '' })
+  const [draft, setDraft] = useState({ status: 'open', response_text: '', answer_draft: '', mitigating_initiative_id: '' })
   const [savingId, setSavingId] = useState(null)
+  const [generatingDraftId, setGeneratingDraftId] = useState(null)
 
   const load = useCallback(() => {
     if (companyId == null || companyId < 1) {
@@ -166,8 +167,24 @@ export default function BuyerLens() {
     setDraft({
       status: q.tracking_status ?? 'open',
       response_text: q.response_text ?? '',
+      answer_draft: q.answer_draft ?? '',
       mitigating_initiative_id: q.mitigating_initiative_id != null ? String(q.mitigating_initiative_id) : '',
     })
+  }
+
+  async function generateDraft(q) {
+    setGeneratingDraftId(q.id)
+    try {
+      const result = await apiClient.post(
+        `/api/analytics/buyer-questions/${companyId}/${q.id}/generate-draft`,
+        {}
+      )
+      setDraft(d => ({ ...d, answer_draft: result.answer_draft || '' }))
+      toast.success('AI draft generated')
+    } catch (e) {
+      toast.error(e?.message || 'Draft generation failed')
+    }
+    setGeneratingDraftId(null)
   }
 
   async function saveTracking(q) {
@@ -176,6 +193,7 @@ export default function BuyerLens() {
       const body = {
         status: draft.status,
         response_text: draft.response_text.trim() || null,
+        answer_draft: draft.answer_draft.trim() || null,
         mitigating_initiative_id: draft.mitigating_initiative_id === '' ? null : Number(draft.mitigating_initiative_id),
       }
       await apiClient.patch(`/api/analytics/buyer-questions/${companyId}/${q.id}`, body)
@@ -262,6 +280,24 @@ export default function BuyerLens() {
 
       {data && (
         <>
+          {/* Completion progress */}
+          {(() => {
+            const answered = allQs.filter(q => ['answered', 'mitigated'].includes(trackingStatusOf(q))).length
+            const pct = allQs.length > 0 ? Math.round(answered / allQs.length * 100) : 0
+            return (
+              <div className="rounded-xl border border-border bg-card p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Answer completion</p>
+                  <span className="text-[11px] font-bold text-card-foreground">{answered} / {allQs.length} answered</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">{pct}% ready for diligence</p>
+              </div>
+            )
+          })()}
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-center">
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Critical</p>
@@ -445,12 +481,32 @@ export default function BuyerLens() {
                           </div>
                         </div>
                         <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[10px] text-muted-foreground uppercase tracking-wider">AI answer draft</label>
+                            <button
+                              type="button"
+                              disabled={generatingDraftId === q.id}
+                              onClick={() => generateDraft(q)}
+                              className="text-[10px] font-semibold px-2 py-1 rounded border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 transition-colors"
+                            >
+                              {generatingDraftId === q.id ? 'Generating…' : '✦ Generate AI draft'}
+                            </button>
+                          </div>
+                          <textarea
+                            value={draft.answer_draft}
+                            onChange={e => setDraft(d => ({ ...d, answer_draft: e.target.value }))}
+                            rows={4}
+                            placeholder="AI-generated answer will appear here. Click 'Generate AI draft' or write your own…"
+                            className="w-full text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-muted-foreground placeholder:text-muted-foreground/45 focus:text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/40"
+                          />
+                        </div>
+                        <div>
                           <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Response / notes</label>
                           <textarea
                             value={draft.response_text}
                             onChange={e => setDraft(d => ({ ...d, response_text: e.target.value }))}
-                            rows={3}
-                            placeholder="Draft answer, data room location, or mitigation plan…"
+                            rows={2}
+                            placeholder="Data room location, advisor notes, or mitigation plan…"
                             className="w-full text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-muted-foreground placeholder:text-muted-foreground/45 focus:text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/40"
                           />
                         </div>

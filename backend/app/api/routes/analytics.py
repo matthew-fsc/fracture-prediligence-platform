@@ -5,13 +5,14 @@ import mimetypes
 from datetime import datetime
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import Annotated, Optional
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_company_scope, get_company_write_scope
 from app.api.routes.companies import company_to_dict
+from app.core.analytics_events import track
 from app.core.database import get_db
 from app.middleware.auth import CurrentUser, get_current_user, get_current_user_optional
 from app.analytics.a1_metric_computation import compute_metrics
@@ -257,11 +258,14 @@ def delete_company_logo(company: CompanyScoped):
 @router.get("/company-financial/{company_id}/logo")
 def download_company_logo(company: CompanyScoped):
     """Serve the uploaded logo for preview (same auth as other company-scoped routes)."""
-    path = resolve_company_logo_path(company.id)
-    if not path:
+    location = resolve_company_logo_path(company.id)
+    if not location:
         raise HTTPException(status_code=404, detail="No logo uploaded")
-    media_type, _ = mimetypes.guess_type(str(path))
-    return FileResponse(path, media_type=media_type or "application/octet-stream")
+    # S3 returns a presigned URL — redirect the client directly to it.
+    if location.startswith(("http://", "https://")):
+        return RedirectResponse(url=location, status_code=302)
+    media_type, _ = mimetypes.guess_type(location)
+    return FileResponse(location, media_type=media_type or "application/octet-stream")
 
 
 @router.get("/market-benchmarks/{company_id}")
@@ -571,6 +575,10 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    track("drs_score_fetched", user_id=company.owner_user_id or "anon", properties={
+        "company_id": company.id,
+    })
 
 
 @router.get("/scores/{company_id}/history")
@@ -953,6 +961,8 @@ def get_buyer_questions(company: CompanyScoped, db: Session = Depends(get_db)):
 class BuyerQuestionPatch(BaseModel):
     status: str = "open"
     response_text: Optional[str] = None
+    answer_draft: Optional[str] = None
+    reviewed_by: Optional[str] = None
     mitigating_initiative_id: Optional[int] = None
 
 
@@ -976,6 +986,10 @@ def patch_buyer_question(
         db.add(row)
     row.status = body.status
     row.response_text = body.response_text
+    if body.answer_draft is not None:
+        row.answer_draft = body.answer_draft
+    if body.reviewed_by is not None:
+        row.reviewed_by = body.reviewed_by
     row.mitigating_initiative_id = body.mitigating_initiative_id
     db.commit()
     db.refresh(row)
@@ -983,7 +997,106 @@ def patch_buyer_question(
         "question_id": question_id,
         "tracking_status": row.status,
         "response_text": row.response_text,
+        "answer_draft": row.answer_draft,
+        "reviewed_by": row.reviewed_by,
+        "ai_draft_generated_at": row.ai_draft_generated_at.isoformat() if row.ai_draft_generated_at else None,
         "mitigating_initiative_id": row.mitigating_initiative_id,
+    }
+
+
+@router.post("/buyer-questions/{company_id}/{question_id}/generate-draft")
+async def generate_buyer_question_draft(
+    company: CompanyScoped,
+    question_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Use the AI Copilot to generate a data-grounded answer draft for a buyer question.
+    The draft is written to BuyerQuestionState.answer_draft. Enforces the same monthly
+    token budget as the main Copilot (reads from AICopilotUsage).
+    """
+    from datetime import datetime, timezone
+    from app.analytics.a13_buyer_questions import generate_buyer_questions
+    from app.api.routes.copilot import _build_context, _current_month, _get_tier_limit, _get_usage, _record_usage
+    from app.core.config import settings as _cfg
+    from app.ontology.models import AICopilotUsage, UserSubscription
+
+    if not _cfg.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="AI Copilot not configured")
+
+    try:
+        import anthropic
+    except ImportError:
+        raise HTTPException(status_code=503, detail="Anthropic SDK not installed")
+
+    # Resolve question text from the generated list
+    try:
+        from app.services.analytics_service import compute_category_modules
+        modules = compute_category_modules(company.id, db)
+        cat_scores = {k: round(modules[k].composite, 1) for k in modules}
+        questions = generate_buyer_questions(cat_scores)
+        question = next((q for q in questions if q.id == question_id), None)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not resolve question: {exc}")
+
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found for this company")
+
+    # Token budget check — use company owner as the user
+    user_id = company.owner_user_id or "anon"
+    sub = db.query(UserSubscription).filter(UserSubscription.user_id == user_id).first()
+    tier = sub.tier if sub else None
+    limit = _get_tier_limit(tier)
+    month = _current_month()
+
+    if limit > 0:
+        usage = _get_usage(db, user_id, month)
+        if (usage.tokens_input + usage.tokens_output) >= limit:
+            raise HTTPException(status_code=429, detail="Monthly AI usage limit reached")
+
+    context = _build_context(company.id, db)
+    prompt = (
+        f"A PE or strategic buyer has asked the following due diligence question:\n\n"
+        f"\"{question.question}\"\n\n"
+        f"Using only the company data provided, draft a concise, factual answer (3–5 sentences) "
+        f"that an M&A advisor could refine and present to the buyer. "
+        f"If the data is insufficient to answer fully, say so and describe what evidence would strengthen the answer.\n\n"
+        f"Data needed per buyer: {question.data_needed}"
+    )
+
+    try:
+        client = anthropic.Anthropic(api_key=_cfg.ANTHROPIC_API_KEY)
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=512,
+            system=f"You are an M&A pre-diligence advisor. Company data:\n{context}",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        draft_text = response.content[0].text if response.content else ""
+        tokens_in = response.usage.input_tokens if response.usage else 0
+        tokens_out = response.usage.output_tokens if response.usage else 0
+        _record_usage(db, user_id, month, tokens_in, tokens_out)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AI service error: {exc}")
+
+    # Persist draft to BuyerQuestionState
+    row = (
+        db.query(BuyerQuestionState)
+        .filter(BuyerQuestionState.company_id == company.id, BuyerQuestionState.question_id == question_id)
+        .first()
+    )
+    if not row:
+        row = BuyerQuestionState(company_id=company.id, question_id=question_id)
+        db.add(row)
+    row.answer_draft = draft_text
+    row.ai_draft_generated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(row)
+
+    return {
+        "question_id": question_id,
+        "answer_draft": row.answer_draft,
+        "ai_draft_generated_at": row.ai_draft_generated_at.isoformat(),
     }
 
 

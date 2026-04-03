@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.analytics.a9_drs_composite import CategoryScores, compute_drs
 from app.api.deps import get_company_scope
+from app.core.analytics_events import track
 from app.core.database import get_db
 from app.analytics.a14_report_generator import generate_report_pdf, REPORT_BUILDERS
 from app.analytics.ebitda_basis import ebitda_basis_for_company
@@ -109,6 +110,12 @@ def generate_report(
             db.commit()
         except Exception:
             db.rollback()
+        track("report_generated", user_id=company.owner_user_id or "anon", properties={
+            "company_id": company.id,
+            "report_type": report_type,
+            "drs_score": snap,
+            "ev_estimate": ev_snap,
+        })
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
