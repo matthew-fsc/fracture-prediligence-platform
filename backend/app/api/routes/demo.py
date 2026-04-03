@@ -10,7 +10,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -343,8 +342,9 @@ DEMO_ACCESS_TOKEN_EXPIRE_DAYS = 7
 
 
 def _encode_demo_access_token() -> str:
+    from jose import jwt as _jwt
     expire = datetime.now(timezone.utc) + timedelta(days=DEMO_ACCESS_TOKEN_EXPIRE_DAYS)
-    return jwt.encode(
+    return _jwt.encode(
         {"sub": "demo_access", "exp": expire},
         settings.SECRET_KEY,
         algorithm=settings.ALGORITHM,
@@ -352,10 +352,11 @@ def _encode_demo_access_token() -> str:
 
 
 def _demo_token_valid(token: str) -> bool:
+    from jose import JWTError as _JWTError, jwt as _jwt
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = _jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload.get("sub") == "demo_access"
-    except JWTError:
+    except _JWTError:
         return False
 
 
