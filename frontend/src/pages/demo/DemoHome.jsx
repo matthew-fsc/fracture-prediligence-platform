@@ -365,7 +365,7 @@ export default function DemoHome() {
 
         {/* Monthly Revenue Chart */}
         <div style={CARD_STYLE}>
-          <h2 style={SECTION_HEADING}>Monthly Revenue — 2024</h2>
+          <h2 style={SECTION_HEADING}>Monthly Revenue — 2025</h2>
           <p style={{ color: '#8A9BB0', fontFamily: "'DM Sans', sans-serif", fontSize: 12, margin: '0 0 16px 0' }}>
             Retainer-driven professional services — TTM {fmtDollar(company.ttm_revenue)}
           </p>

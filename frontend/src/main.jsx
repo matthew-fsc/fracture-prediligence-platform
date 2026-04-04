@@ -3,12 +3,20 @@ import ReactDOM from 'react-dom/client'
 import { ClerkProvider } from '@clerk/react'
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
+import posthog from 'posthog-js'
 import ClerkAuthBridge from './components/auth/ClerkAuthBridge.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import App from './App.jsx'
 import './index.css'
 import { ApiError } from './lib/apiClient'
 import { toast } from './lib/notify'
+
+// PostHog — initialises only when VITE_POSTHOG_KEY is set; no-op otherwise.
+const _PH_KEY  = (import.meta.env.VITE_POSTHOG_KEY  || '').trim()
+const _PH_HOST = (import.meta.env.VITE_POSTHOG_HOST || 'https://app.posthog.com').trim()
+if (_PH_KEY) {
+  posthog.init(_PH_KEY, { api_host: _PH_HOST, capture_pageview: true, autocapture: false })
+}
 
 /** Trimmed — stray whitespace in .env breaks Clerk JS load. */
 const PUBLISHABLE_KEY = (import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim()
@@ -53,8 +61,8 @@ if (PUBLISHABLE_KEY) {
     <React.StrictMode>
       <ClerkProvider
         publishableKey={PUBLISHABLE_KEY}
-        afterSignInUrl="/Home"
-        afterSignUpUrl="/dashboard/onboarding"
+        afterSignInUrl="/auth-redirect"
+        afterSignUpUrl="/role-select"
         afterSignOutUrl="/"
       >
         <ClerkAuthBridge>

@@ -7,10 +7,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import ensure_company_access
+from app.api.deps import ensure_company_access, ensure_company_write_access
+from app.core.analytics_events import track
+from app.core.config import settings
 from app.core.database import get_db
-from app.middleware.auth import CurrentUser, get_current_user, get_current_user_optional  # get_current_user used by create_company
-from app.ontology.models import Company
+from app.middleware.auth import CurrentUser, get_current_user, get_current_user_optional
+from app.ontology.models import (
+    ClientAccess, ClientAccessStatus, Company, CompanyEngagementBilling,
+    UserProfile, UserRole, UserSubscription,
+)
 
 router = APIRouter()
 
@@ -74,13 +79,35 @@ def list_companies(
     user: Optional[CurrentUser] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
-    q = db.query(Company)
-    if user:
-        q = q.filter(Company.owner_user_id == user.user_id)
-    else:
+    if not user:
         # No token: return only unowned (demo/shared) companies
-        q = q.filter(Company.owner_user_id.is_(None))
-    rows = q.order_by(Company.id).all()
+        rows = db.query(Company).filter(Company.owner_user_id.is_(None)).order_by(Company.id).all()
+        return [company_to_dict(r) for r in rows]
+
+    # Check if this user is a CLIENT — return their linked company instead
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user.user_id).first()
+    if profile and profile.role == UserRole.CLIENT:
+        access_rows = (
+            db.query(ClientAccess)
+            .filter(
+                ClientAccess.client_user_id == user.user_id,
+                ClientAccess.status == ClientAccessStatus.ACCEPTED,
+            )
+            .all()
+        )
+        company_ids = [a.company_id for a in access_rows]
+        if not company_ids:
+            return []
+        rows = db.query(Company).filter(Company.id.in_(company_ids)).order_by(Company.id).all()
+        return [company_to_dict(r) for r in rows]
+
+    # Advisor: return companies they own
+    rows = (
+        db.query(Company)
+        .filter(Company.owner_user_id == user.user_id)
+        .order_by(Company.id)
+        .all()
+    )
     return [company_to_dict(r) for r in rows]
 
 
@@ -90,6 +117,31 @@ def create_company(
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # Engagement limit gate (1C): check active company count vs plan limit
+    sub = db.query(UserSubscription).filter(UserSubscription.user_id == user.user_id).first()
+    max_companies = sub.max_companies if sub else settings.PLAN_MAX_COMPANIES_PRO
+    active_count = db.query(Company).filter(Company.owner_user_id == user.user_id).count()
+
+    billing_status = "included"
+    if active_count >= max_companies:
+        overage_price_id = settings.STRIPE_ENGAGEMENT_OVERAGE_PRICE_ID
+        if not overage_price_id:
+            # Overage billing not configured — allow creation but flag it
+            billing_status = "add_on"
+        elif not (sub and sub.stripe_subscription_id):
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "message": f"Plan limit reached ({active_count} of {max_companies} engagements). "
+                               "Add an engagement slot or upgrade your plan.",
+                    "action": "add_engagement",
+                    "current_count": active_count,
+                    "max_companies": max_companies,
+                },
+            )
+        else:
+            billing_status = "add_on"  # caller should POST /api/add-engagement after creation
+
     company = Company(
         name=data.name,
         industry=data.industry,
@@ -100,9 +152,26 @@ def create_company(
         owner_user_id=user.user_id,
     )
     db.add(company)
+    db.flush()  # get company.id before adding billing record
+
+    billing = CompanyEngagementBilling(
+        company_id=company.id,
+        user_id=user.user_id,
+        billing_status=billing_status,
+    )
+    db.add(billing)
     db.commit()
     db.refresh(company)
-    return company_to_dict(company)
+
+    track("company_created", user_id=user.user_id, properties={
+        "company_id": company.id,
+        "billing_status": billing_status,
+        "total_companies": active_count + 1,
+    })
+
+    result = company_to_dict(company)
+    result["billing_status"] = billing_status
+    return result
 
 
 @router.get("/{company_id}")
@@ -119,10 +188,10 @@ def get_company(
 def patch_company(
     company_id: int,
     body: CompanyPatch,
-    user: Optional[CurrentUser] = Depends(get_current_user_optional),
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    row = ensure_company_access(company_id, user, db)
+    row = ensure_company_write_access(company_id, user, db)
     data = body.model_dump(exclude_unset=True)
     for k, v in data.items():
         setattr(row, k, v)

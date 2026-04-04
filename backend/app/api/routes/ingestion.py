@@ -7,6 +7,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_company_scope
+from app.core.analytics_events import track
 from app.core.config import settings
 from app.core.database import get_db
 from app.ontology.models import Company
@@ -68,6 +69,14 @@ async def upload_file(
     )
     db.commit()
     db.refresh(job)
+
+    track("file_uploaded", user_id=company.owner_user_id or "anon", properties={
+        "company_id": company.id,
+        "source_type": source_type,
+        "file_size_bytes": len(data),
+        "pipeline_status": job.current_status,
+        "row_count": job.row_count,
+    })
 
     return {
         "job_id":         job.id,

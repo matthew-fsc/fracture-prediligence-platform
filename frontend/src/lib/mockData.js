@@ -6,7 +6,7 @@ export const company = {
   name: 'ABC Company Inc',
   initials: 'AC',
   industry: 'Field Services — Traffic Management & Transportation',
-  employees: 25,
+  employees: 13,
   founded: 2009,
   status: 'Active Engagement',
   stage: 'Pre-Diligence',
@@ -28,13 +28,16 @@ export const kpis = {
   payrollRatio: 29.2,
 }
 
+// Category scores derived from drs.contributions in demo.py — each score × weight = contribution; contributions sum to 72.0
+// revenue_quality: 17.5/0.25=70  financial_integrity: 14.8/0.20=74  operational_independence: 14.2/0.20=71
+// customer_risk: 10.5/0.15=70  management_team: 7.2/0.10=72  growth_drivers: 7.8/0.10=78
 export const drsCategories = [
-  { name: 'Revenue Quality',          score: 78, weight: 0.25, tier: 'Investment' },
-  { name: 'Financial Integrity',      score: 89, weight: 0.20, tier: 'Strong' },
-  { name: 'Operational Independence', score: 74, weight: 0.20, tier: 'Conditional' },
-  { name: 'Customer Risk',            score: 69, weight: 0.15, tier: 'Conditional' },
-  { name: 'Management & Team',        score: 72, weight: 0.10, tier: 'Conditional' },
-  { name: 'Growth Drivers',           score: 68, weight: 0.10, tier: 'Conditional' },
+  { name: 'Revenue Quality',          score: 70, weight: 0.25, tier: 'Investment Grade' },
+  { name: 'Financial Integrity',      score: 74, weight: 0.20, tier: 'Investment Grade' },
+  { name: 'Operational Independence', score: 71, weight: 0.20, tier: 'Investment Grade' },
+  { name: 'Customer Risk',            score: 70, weight: 0.15, tier: 'Investment Grade' },
+  { name: 'Management & Team',        score: 72, weight: 0.10, tier: 'Investment Grade' },
+  { name: 'Growth Drivers',           score: 78, weight: 0.10, tier: 'Investment Grade' },
 ]
 
 export const ebitdaRecast = {
@@ -63,19 +66,20 @@ export const customerConcentration = [
   { name: 'Others (63)',  revenuePct: 21.0, revenue:   881_429, contractStatus: 'Mixed',  tenure: null },
 ]
 
+// Seasonal monthly breakdown matching demo.py DEMO_DATA monthly_revenue (sum = $4,196,172)
 export const monthlyRevenue = [
-  { month: "Jan '25", revenue: 349_681 },
-  { month: "Feb '25", revenue: 349_681 },
-  { month: "Mar '25", revenue: 349_681 },
-  { month: "Apr '25", revenue: 349_681 },
-  { month: "May '25", revenue: 349_681 },
-  { month: "Jun '25", revenue: 349_681 },
-  { month: "Jul '25", revenue: 349_681 },
-  { month: "Aug '25", revenue: 349_681 },
-  { month: "Sep '25", revenue: 349_681 },
-  { month: "Oct '25", revenue: 349_681 },
-  { month: "Nov '25", revenue: 349_681 },
-  { month: "Dec '25", revenue: 349_681 },
+  { month: "Jan '25", revenue: 226_593 },
+  { month: "Feb '25", revenue: 234_986 },
+  { month: "Mar '25", revenue: 310_517 },
+  { month: "Apr '25", revenue: 373_459 },
+  { month: "May '25", revenue: 423_813 },
+  { month: "Jun '25", revenue: 436_402 },
+  { month: "Jul '25", revenue: 444_794 },
+  { month: "Aug '25", revenue: 415_421 },
+  { month: "Sep '25", revenue: 394_440 },
+  { month: "Oct '25", revenue: 360_871 },
+  { month: "Nov '25", revenue: 297_928 },
+  { month: "Dec '25", revenue: 276_948 },
 ]
 
 export const valueCreationLevers = [
