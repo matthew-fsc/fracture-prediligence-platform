@@ -78,7 +78,7 @@ function DemoHeader({ demoData, slug, personalized }) {
         <div className="flex items-center gap-1 sm:gap-2 flex-wrap min-w-0">
           {drs != null && (
             <span className={cn('text-xs font-semibold', drsColor)}>
-              {Math.round(drs)}/100
+              {drs.toFixed(1)}/100
               <span className="text-muted-foreground font-normal ml-1">
                 Readiness{tier ? ` · ${tier}` : ''}
               </span>
@@ -203,6 +203,18 @@ export default function DemoShell({ slug = null }) {
     queryClient.prefetchQuery({
       queryKey: ['advisory-workflow', 1],
       queryFn: () => apiClient.get('/api/analytics/advisory-workflow/1'),
+      staleTime: demoStale,
+      ...quiet,
+    })
+    queryClient.prefetchQuery({
+      queryKey: ['engagement-profile', 1],
+      queryFn: () => apiClient.get('/api/analytics/engagement-profile/1').catch(() => null),
+      staleTime: demoStale,
+      ...quiet,
+    })
+    queryClient.prefetchQuery({
+      queryKey: ['score-history', 1],
+      queryFn: () => apiClient.get('/api/analytics/scores/1/history'),
       staleTime: demoStale,
       ...quiet,
     })
