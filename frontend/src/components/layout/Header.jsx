@@ -223,7 +223,7 @@ export default function Header({
             {!scoresError && !scoresLoading && hasScoreData && (
               <>
                 <span className={cn('text-xs font-semibold', drsColor)}>
-                  {drs != null ? `${Math.round(drs)}/100` : '—'}
+                  {drs != null ? `${drs.toFixed(1)}/100` : '—'}
                   <span className="text-muted-foreground font-normal ml-1">
                     Readiness{tier ? ` · ${tier}` : ''}
                   </span>
