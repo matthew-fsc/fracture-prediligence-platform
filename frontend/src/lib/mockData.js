@@ -31,14 +31,47 @@ export const kpis = {
 // Category scores derived from drs.contributions in demo.py — each score × weight = contribution; contributions sum to 72.0
 // revenue_quality: 17.5/0.25=70  financial_integrity: 14.8/0.20=74  operational_independence: 14.2/0.20=71
 // customer_risk: 10.5/0.15=70  management_team: 7.2/0.10=72  growth_drivers: 7.8/0.10=78
+//
+// Confidence levels per category (based on demo seeded record counts):
+//   revenue_quality:          MEDIUM — 36 TTM rows (≥12 but <50 for HIGH)
+//   financial_integrity:      MEDIUM — ~84 financial records (≥24 but <100 for HIGH)
+//   operational_independence: HIGH   — 13 employee records (≥10)
+//   customer_risk:            HIGH   — 68 customers (≥20)
+//   management_team:          HIGH   — 13 staff records (≥5)
+//   growth_drivers:           HIGH   — multi-year revenue + customer history
 export const drsCategories = [
-  { name: 'Revenue Quality',          score: 70, weight: 0.25, tier: 'Investment Grade' },
-  { name: 'Financial Integrity',      score: 74, weight: 0.20, tier: 'Investment Grade' },
-  { name: 'Operational Independence', score: 71, weight: 0.20, tier: 'Investment Grade' },
-  { name: 'Customer Risk',            score: 70, weight: 0.15, tier: 'Investment Grade' },
-  { name: 'Management & Team',        score: 72, weight: 0.10, tier: 'Investment Grade' },
-  { name: 'Growth Drivers',           score: 78, weight: 0.10, tier: 'Investment Grade' },
+  { name: 'Revenue Quality',          score: 70, weight: 0.25, tier: 'Investment Grade', confidence: 'MEDIUM', scoreRange: { conservative: 68, base: 70, optimistic: 71 } },
+  { name: 'Financial Integrity',      score: 74, weight: 0.20, tier: 'Investment Grade', confidence: 'MEDIUM', scoreRange: { conservative: 72, base: 74, optimistic: 75 } },
+  { name: 'Operational Independence', score: 71, weight: 0.20, tier: 'Investment Grade', confidence: 'HIGH',   scoreRange: { conservative: 71, base: 71, optimistic: 71 } },
+  { name: 'Customer Risk',            score: 70, weight: 0.15, tier: 'Investment Grade', confidence: 'HIGH',   scoreRange: { conservative: 70, base: 70, optimistic: 70 } },
+  { name: 'Management & Team',        score: 72, weight: 0.10, tier: 'Investment Grade', confidence: 'HIGH',   scoreRange: { conservative: 72, base: 72, optimistic: 72 } },
+  { name: 'Growth Drivers',           score: 78, weight: 0.10, tier: 'Investment Grade', confidence: 'HIGH',   scoreRange: { conservative: 78, base: 78, optimistic: 78 } },
 ]
+
+// DRS confidence summary — mirrors the shape returned by the live API's
+// drs.confidence_summary field (built by backend/app/core/confidence.py).
+// Overall = MEDIUM because revenue_quality and financial_integrity have limited
+// row counts.  Band: MEDIUM multipliers (×0.97 conservative, ×1.02 optimistic)
+// applied to affected category scores; composite shifts base 72 → [70, 74].
+export const drsConfidence = {
+  overall_level: 'MEDIUM',
+  score_range: { conservative: 70, base: 72, optimistic: 74 },
+  band_width: 4,
+  category_levels: {
+    revenue_quality:          'MEDIUM',
+    financial_integrity:      'MEDIUM',
+    operational_independence: 'HIGH',
+    customer_risk:            'HIGH',
+    management_team:          'HIGH',
+    growth_drivers:           'HIGH',
+  },
+  factors: [
+    'Limited data for Revenue Quality — minor uncertainty applied. HIGH requires ≥50 revenue rows; MEDIUM requires ≥12.',
+    'Limited data for Financial Integrity — minor uncertainty applied. HIGH requires ≥100 financial records; MEDIUM requires ≥24.',
+  ],
+  low_categories: [],
+  medium_categories: ['revenue_quality', 'financial_integrity'],
+}
 
 export const ebitdaRecast = {
   reportedNetIncome: 1_743_357,
