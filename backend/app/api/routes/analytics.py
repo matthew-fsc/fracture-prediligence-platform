@@ -32,6 +32,7 @@ from app.analytics.a13_buyer_questions import generate_buyer_questions
 from app.analytics.owner_readiness import compute_owner_readiness
 from app.core.config import settings
 from app.core.scoring_rules import SCORING_RULES, SCORING_RULES_VERSION
+from app.core.confidence import band_multiplier, build_confidence_summary
 from app.ontology.models import (
     AdvisorOverride,
     QualitativeInputs,
@@ -455,18 +456,18 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
             customer_risk=adj_scores["customer_risk"],
             management_team=adj_scores["management_team"],
             growth_drivers=adj_scores["growth_drivers"],
-            revenue_quality_conservative=adj_scores["revenue_quality"] * (settings.DRS_CONFIDENCE_LOW_MULTIPLIER if rev.data_confidence == "LOW" else 1.0),
-            financial_integrity_conservative=adj_scores["financial_integrity"] * (settings.DRS_CONFIDENCE_LOW_MULTIPLIER if fin.data_confidence == "LOW" else 1.0),
-            operational_independence_conservative=adj_scores["operational_independence"] * (settings.DRS_CONFIDENCE_LOW_MULTIPLIER if ops.data_confidence == "LOW" else 1.0),
-            customer_risk_conservative=adj_scores["customer_risk"] * (settings.DRS_CONFIDENCE_LOW_MULTIPLIER if cust.data_confidence == "LOW" else 1.0),
-            management_team_conservative=adj_scores["management_team"] * (settings.DRS_CONFIDENCE_LOW_MULTIPLIER if mgmt.data_confidence == "LOW" else 1.0),
-            growth_drivers_conservative=adj_scores["growth_drivers"] * (settings.DRS_CONFIDENCE_LOW_MULTIPLIER if growth.data_confidence == "LOW" else 1.0),
-            revenue_quality_optimistic=min(100, adj_scores["revenue_quality"] * (settings.DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER if rev.data_confidence == "LOW" else 1.0)),
-            financial_integrity_optimistic=min(100, adj_scores["financial_integrity"] * (settings.DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER if fin.data_confidence == "LOW" else 1.0)),
-            operational_independence_optimistic=min(100, adj_scores["operational_independence"] * (settings.DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER if ops.data_confidence == "LOW" else 1.0)),
-            customer_risk_optimistic=min(100, adj_scores["customer_risk"] * (settings.DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER if cust.data_confidence == "LOW" else 1.0)),
-            management_team_optimistic=min(100, adj_scores["management_team"] * (settings.DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER if mgmt.data_confidence == "LOW" else 1.0)),
-            growth_drivers_optimistic=min(100, adj_scores["growth_drivers"] * (settings.DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER if growth.data_confidence == "LOW" else 1.0)),
+            revenue_quality_conservative=adj_scores["revenue_quality"] * band_multiplier(rev.data_confidence, "conservative"),
+            financial_integrity_conservative=adj_scores["financial_integrity"] * band_multiplier(fin.data_confidence, "conservative"),
+            operational_independence_conservative=adj_scores["operational_independence"] * band_multiplier(ops.data_confidence, "conservative"),
+            customer_risk_conservative=adj_scores["customer_risk"] * band_multiplier(cust.data_confidence, "conservative"),
+            management_team_conservative=adj_scores["management_team"] * band_multiplier(mgmt.data_confidence, "conservative"),
+            growth_drivers_conservative=adj_scores["growth_drivers"] * band_multiplier(growth.data_confidence, "conservative"),
+            revenue_quality_optimistic=min(100, adj_scores["revenue_quality"] * band_multiplier(rev.data_confidence, "optimistic")),
+            financial_integrity_optimistic=min(100, adj_scores["financial_integrity"] * band_multiplier(fin.data_confidence, "optimistic")),
+            operational_independence_optimistic=min(100, adj_scores["operational_independence"] * band_multiplier(ops.data_confidence, "optimistic")),
+            customer_risk_optimistic=min(100, adj_scores["customer_risk"] * band_multiplier(cust.data_confidence, "optimistic")),
+            management_team_optimistic=min(100, adj_scores["management_team"] * band_multiplier(mgmt.data_confidence, "optimistic")),
+            growth_drivers_optimistic=min(100, adj_scores["growth_drivers"] * band_multiplier(growth.data_confidence, "optimistic")),
         )
         drs = compute_drs(cat)
 
@@ -508,16 +509,31 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
         except Exception:
             pass
 
+        _conf_summary = build_confidence_summary(
+            category_scores={
+                "revenue_quality":          rev_d,
+                "financial_integrity":      fin_d,
+                "operational_independence": ops_d,
+                "customer_risk":            cust_d,
+                "management_team":          mgmt_d,
+                "growth_drivers":           growth_d,
+            },
+            drs_base=drs.base_drs,
+            drs_conservative=drs.conservative_drs,
+            drs_optimistic=drs.optimistic_drs,
+        )
+
         return {
             "company_id": company.id,
             "drs": {
-                "base":           drs.base_drs,
-                "conservative":   drs.conservative_drs,
-                "optimistic":     drs.optimistic_drs,
-                "tier":           drs.tier.value,
-                "contributions":  drs.category_contributions,
-                "has_overrides":  has_overrides,
+                "base":               drs.base_drs,
+                "conservative":       drs.conservative_drs,
+                "optimistic":         drs.optimistic_drs,
+                "tier":               drs.tier.value,
+                "contributions":      drs.category_contributions,
+                "has_overrides":      has_overrides,
                 "qualitative_complete": qual_complete,
+                "confidence_summary": _conf_summary.to_dict(),
             },
             "category_scores": {
                 "revenue_quality":          rev_d,
