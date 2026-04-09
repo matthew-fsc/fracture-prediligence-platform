@@ -140,7 +140,102 @@ uvicorn app.main:app --reload --port 8000
 # → http://localhost:8000
 ```
 
-The Vite dev server (`npm run dev` on port 5173) proxies `/api` to `http://127.0.0.1:8004` — set `uvicorn` to port **8004** in dev if you use that proxy, or change `vite.config.js` to match your API port.
+The Vite dev server (`npm run dev` on port 5173) proxies `/api` to `http://127.0.0.1:8000` — run `uvicorn` on port **8000** (the default) and the proxy works out of the box.
+
+---
+
+## Happy Path — End-to-End Walkthrough
+
+This is the canonical flow every engineer should be able to run locally before touching any feature work.
+
+### Prerequisites
+
+- PostgreSQL 16 running locally (or via `docker compose up db`)
+- Python 3.11+ and Node 18+ installed
+- `backend/.env` populated from `backend/.env.example` (at minimum `DATABASE_URL` and `SECRET_KEY`)
+
+### Step 1 — Boot the stack
+
+```bash
+# Terminal A — backend
+cd backend
+source .venv/bin/activate
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+
+# Terminal B — frontend
+cd frontend
+npm run dev
+```
+
+Open **http://localhost:5173**. The Vite dev server proxies all `/api` requests to port 8000.
+
+### Step 2 — Load the demo company
+
+On first boot, the app auto-seeds **ABC Company Inc** (company `id=1`) — a 13-employee traffic-management field-services business with 3 years of synthetic QuickBooks P&L. If the seed did not run automatically:
+
+```bash
+cd backend
+python scripts/seed_abc_company.py
+```
+
+Expected result: 68 customers, 36 months of revenue streams, COGS + OPEX + OWNER expense rows. See [`docs/DEMO_FIXTURE.md`](docs/DEMO_FIXTURE.md) for full fixture spec.
+
+### Step 3 — Review ingested data (Blueprint I)
+
+1. Navigate to **Data Sources** in the sidebar.
+2. The pre-loaded ingestion job (`seed-demo-abc-qb-pl-v1`) should show status `COMPLETE`.
+3. Open **Field Mapping** — 8 source columns are pre-mapped with confidence scores; 2 are flagged for review (`Memo / Description`, `Class`).
+
+### Step 4 — Run the analytical engine (Blueprint II)
+
+Hit the analytics endpoint directly or navigate to the **Dashboard**:
+
+```bash
+curl http://localhost:8000/api/analytics/drs/1
+```
+
+Expected output:
+```json
+{
+  "drs": 72,
+  "tier": "INVESTMENT",
+  "confidence_band": { "conservative": 70, "base": 72, "optimistic": 74 }
+}
+```
+
+Full scoring breakdown across 6 categories is available at `/api/analytics/full/1`.
+
+### Step 5 — Review the DRS dashboard
+
+1. **Dashboard** → DRS gauge reads ~72 (Investment Grade), EV range $9.8M–$11.3M.
+2. **EBITDA Recast** → Reported NI $1.74M, owner comp addback $82.2K → Defensible EBITDA $1.83M.
+3. **Customer Risk** → Top 5 customers = 78.4% of TTM revenue (concentration flag).
+4. **Initiative Roadmap** → 3–5 value creation items ranked by EV impact.
+
+### Step 6 — AI Copilot
+
+With `ANTHROPIC_API_KEY` set in `backend/.env`:
+
+```bash
+curl -X POST http://localhost:8000/api/copilot/chat \
+  -H "Authorization: Bearer <dev-jwt>" \
+  -H "Content-Type: application/json" \
+  -d '{"company_id": 1, "message": "What is driving customer concentration risk?"}'
+```
+
+### Step 7 — Generate a report
+
+`POST /api/reports/generate` with `{"company_id": 1, "template_id": "advisor_summary"}` returns a downloadable PDF/DOCX at `/api/reports/<id>/download`.
+
+### Step 8 — Verify tests pass
+
+```bash
+cd backend
+pytest tests/ -v
+```
+
+All 5 test files should pass: company access isolation, demo data integrity, market benchmarks, scoring rules, and settings.
 
 ---
 
