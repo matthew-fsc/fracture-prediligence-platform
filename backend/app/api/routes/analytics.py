@@ -507,7 +507,7 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
                 automation_pct=float(qual.automation_pct) if qual and qual.automation_pct is not None else None,
             )
         except Exception:
-            pass
+            logger.warning("Owner readiness score computation failed for company_id=%s", company.id, exc_info=True)
 
         _conf_summary = build_confidence_summary(
             category_scores={

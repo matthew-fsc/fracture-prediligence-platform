@@ -6,6 +6,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 
 from app.api.routes import ingestion, analytics, companies, reports, demo, library
@@ -26,10 +28,6 @@ def _bootstrap_db():
     # Import all models so Base knows about them (UserProfile, ClientAccess included)
     import app.ontology.models           # noqa: F401
     import app.ontology.ingestion_models  # noqa: F401
-
-    # Dev-only: sync ORM metadata to a local DB. In production, create_all races Alembic (duplicate objects).
-    if settings.APP_ENV.lower() == "development":
-        Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
     try:
@@ -85,10 +83,8 @@ def _bootstrap_db():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if settings.APP_ENV.lower() == "production" and settings.SECRET_KEY == "change-me-in-production":
-        logger.warning(
-            "SECRET_KEY is still the default; set a strong random SECRET_KEY in production."
-        )
+    run_production_startup_checks()
+
     # Run DB bootstrap in a background thread so /health responds immediately.
     # Railway's health check must pass before traffic is routed — bootstrap must not block yield.
     import asyncio
@@ -105,6 +101,9 @@ async def lifespan(app: FastAPI):
     yield
 
 
+from app.core.rate_limiting import limiter
+from app.core.startup_checks import run_production_startup_checks
+
 app = FastAPI(
     title="Pre-Diligence Platform API",
     description="Fracture Systems — Blueprint I & II backend",
@@ -112,12 +111,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
 
 app.include_router(ingestion.router,  prefix="/api/ingestion",  tags=["ingestion"])
