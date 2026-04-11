@@ -95,12 +95,19 @@ async def upload_file(
 
 
 @router.get("/jobs/{company_id}")
-def list_jobs(company: CompanyScoped, db: Session = Depends(get_db)):
-    """List all ingestion jobs for a company."""
+def list_jobs(
+    company: CompanyScoped,
+    db: Session = Depends(get_db),
+    limit: int = 50,
+    offset: int = 0,
+):
+    """List ingestion jobs for a company. Supports pagination via limit/offset."""
     jobs = (
         db.query(IngestionJob)
         .filter(IngestionJob.company_id == company.id)
         .order_by(IngestionJob.created_at.desc())
+        .limit(min(limit, 200))   # API-1: cap at 200 rows per page
+        .offset(offset)
         .all()
     )
     return [

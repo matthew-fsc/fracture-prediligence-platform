@@ -1,4 +1,5 @@
 import logging
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -22,14 +23,13 @@ FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
 
 def _bootstrap_db():
-    """Seed data and dev-only create_all. Production/staging schema must come from Alembic only."""
+    """Seed data on startup. Production/staging schema must come from Alembic only."""
     # Import all models so Base knows about them (UserProfile, ClientAccess included)
     import app.ontology.models           # noqa: F401
     import app.ontology.ingestion_models  # noqa: F401
 
-    # Dev-only: sync ORM metadata to a local DB. In production, create_all races Alembic (duplicate objects).
-    if settings.APP_ENV.lower() == "development":
-        Base.metadata.create_all(bind=engine)
+    # DB-2: create_all() removed — all schema changes must go through Alembic migrations.
+    # Run `alembic upgrade head` before starting the app (or set RUN_MIGRATIONS=true in Docker).
 
     db = SessionLocal()
     try:
@@ -83,12 +83,57 @@ def _bootstrap_db():
         db.close()
 
 
+def _validate_production_config():
+    """SEC-1/SEC-2/CFG-1: Fail fast if critical env vars are missing or insecure in production."""
+    env = settings.APP_ENV.lower()
+    if env != "production":
+        return
+
+    # SEC-1: Reject default SECRET_KEY in production (JWT forgery risk)
+    if settings.SECRET_KEY == "change-me-in-production":
+        raise RuntimeError(
+            "SECURITY: SECRET_KEY is still the default value. "
+            "Generate a strong key with: openssl rand -hex 32"
+        )
+
+    # SEC-2: Unsigned Stripe webhooks must never be enabled in production
+    if settings.ALLOW_UNSIGNED_STRIPE_WEBHOOKS:
+        raise RuntimeError(
+            "SECURITY: ALLOW_UNSIGNED_STRIPE_WEBHOOKS=true is not allowed in production. "
+            "This flag is only for local Stripe CLI testing (APP_ENV=development)."
+        )
+
+    # CFG-1: Required credentials must be set
+    _required = {
+        "CLERK_SECRET_KEY": settings.CLERK_SECRET_KEY,
+        "CLERK_JWKS_URL": settings.CLERK_JWKS_URL,
+        "STRIPE_SECRET_KEY": settings.STRIPE_SECRET_KEY,
+        "STRIPE_WEBHOOK_SECRET": settings.STRIPE_WEBHOOK_SECRET,
+        "ANTHROPIC_API_KEY": settings.ANTHROPIC_API_KEY,
+    }
+    missing = [k for k, v in _required.items() if not v or v.startswith("replace-me") or v.startswith("sk_test_replace")]
+    if missing:
+        raise RuntimeError(
+            f"CRITICAL: The following required environment variables are not configured for production: "
+            f"{', '.join(missing)}"
+        )
+
+
+def _check_db_connectivity():
+    """DEPLOY-1: Verify database is reachable before accepting traffic."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as exc:
+        raise RuntimeError(f"DEPLOY-1: Database is not reachable at startup: {exc}") from exc
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if settings.APP_ENV.lower() == "production" and settings.SECRET_KEY == "change-me-in-production":
-        logger.warning(
-            "SECRET_KEY is still the default; set a strong random SECRET_KEY in production."
-        )
+    # Fail fast on misconfiguration before accepting any traffic
+    _validate_production_config()
+    _check_db_connectivity()
+
     # Run DB bootstrap in a background thread so /health responds immediately.
     # Railway's health check must pass before traffic is routed — bootstrap must not block yield.
     import asyncio
@@ -112,13 +157,24 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# SEC-5: Restrict CORS to explicit methods and headers instead of wildcard
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["content-type", "authorization", "x-admin-key", "x-request-id"],
 )
+
+
+# OBS-2: Attach a unique request ID to every request for log correlation
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 app.include_router(ingestion.router,  prefix="/api/ingestion",  tags=["ingestion"])
 app.include_router(analytics.router,  prefix="/api/analytics",  tags=["analytics"])

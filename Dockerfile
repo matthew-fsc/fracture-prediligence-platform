@@ -36,6 +36,11 @@ WORKDIR /app/backend
 # Do not set PORT here — Railway (and other hosts) inject PORT at runtime; uvicorn must bind to that value.
 EXPOSE 8000
 
+# DEPLOY-4: Container health check — orchestrators use this to detect unhealthy replicas.
+# Uses /health (liveness, no DB) so the container is not killed during a slow DB migration.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
 ENTRYPOINT ["/app/backend/docker-entrypoint.sh"]
 # Explicit empty CMD: some hosts pass a start command as container args; keep entrypoint in control.
 CMD []
