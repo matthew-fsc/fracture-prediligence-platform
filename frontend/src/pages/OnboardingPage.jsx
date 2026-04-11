@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cloud, CheckCircle, Circle } from 'lucide-react'
-import { useCompanyId } from '../context/CompanyContext'
-import { apiUrl, apiClient } from '../lib/apiClient'
+import { Cloud, CheckCircle, Circle, AlertTriangle } from 'lucide-react'
+import { apiClient } from '../lib/apiClient'
 import { withCompanyQuery } from '../lib/navLinks'
 import { marketingColors as COLORS } from '../theme/marketingColors'
 
@@ -105,7 +104,7 @@ const ENTITY_TYPES = [
 function ProgressBar({ step }) {
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 40 }}>
-      {[1, 2, 3].map((n) => ( // 1=Client, 2=Upload, 3=Interview
+      {[1, 2, 3].map((n) => (
         <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div
             style={{
@@ -123,7 +122,12 @@ function ProgressBar({ step }) {
               transition: 'background 0.3s ease',
             }}
           >
-            {n < step ? '?' : n}
+            {/* Show checkmark SVG for completed steps, number for current/future */}
+            {n < step ? (
+              <svg width="12" height="9" viewBox="0 0 12 9" fill="none">
+                <path d="M1 4.5L4.5 8L11 1" stroke={COLORS.bg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : n}
           </div>
           {n < 3 && (
             <div
@@ -142,9 +146,26 @@ function ProgressBar({ step }) {
 }
 
 // ---------------------------------------------------------------------------
+// Inline error banner
+// ---------------------------------------------------------------------------
+function ErrorBanner({ message }) {
+  if (!message) return null
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(239,68,68,0.1)',
+      border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px',
+      marginBottom: 20,
+    }}>
+      <AlertTriangle size={14} color="#EF4444" />
+      <span style={{ color: '#EF4444', fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>{message}</span>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Step 1 — Add first client
 // ---------------------------------------------------------------------------
-function Step1({ onNext }) {
+function Step1({ onNext, saving, error }) {
   const saved = readOnboarding().step1
   const [form, setForm] = useState({
     name: '',
@@ -187,6 +208,8 @@ function Step1({ onNext }) {
       <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, margin: '0 0 32px 0' }}>
         This creates your first client engagement and pre-diligence workspace.
       </p>
+
+      <ErrorBanner message={error} />
 
       <div style={{ marginBottom: 20 }}>
         <label style={LABEL_STYLE}>Client Name</label>
@@ -232,8 +255,8 @@ function Step1({ onNext }) {
         </select>
       </div>
 
-      <button type="submit" style={BTN_PRIMARY}>
-        Add Client & Continue ?
+      <button type="submit" disabled={saving} style={{ ...BTN_PRIMARY, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+        {saving ? 'Creating…' : 'Add Client & Continue →'}
       </button>
     </form>
   )
@@ -242,7 +265,7 @@ function Step1({ onNext }) {
 // ---------------------------------------------------------------------------
 // Step 2 — Upload first document
 // ---------------------------------------------------------------------------
-function Step2({ onNext, onSkip }) {
+function Step2({ onNext, onSkip, uploading, error }) {
   const [file, setFile] = useState(null)
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef(null)
@@ -283,22 +306,24 @@ function Step2({ onNext, onSkip }) {
         Upload your first document
       </h2>
       <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, margin: '0 0 32px 0' }}>
-        For now, the uploaded file will be analyzed in your first engagement.
-        Accepted: PDF, XLSX, CSV, DOCX.
+        Upload a QuickBooks export, P&L, or revenue report to seed the analysis.
+        Accepted: PDF, XLSX, CSV, DOCX — Max 25MB.
       </p>
+
+      <ErrorBanner message={error} />
 
       {/* Drop zone */}
       <div
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => !uploading && inputRef.current?.click()}
         style={{
           border: `2px dashed ${dragging ? COLORS.gold : COLORS.border}`,
           borderRadius: 10,
           padding: '48px 24px',
           textAlign: 'center',
-          cursor: 'pointer',
+          cursor: uploading ? 'not-allowed' : 'pointer',
           background: dragging ? 'rgba(201,151,58,0.05)' : COLORS.inputBg,
           transition: 'all 0.2s ease',
           marginBottom: 20,
@@ -313,7 +338,11 @@ function Step2({ onNext, onSkip }) {
             display: 'block',
           }}
         />
-        {file ? (
+        {uploading ? (
+          <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, margin: 0 }}>
+            Uploading…
+          </p>
+        ) : file ? (
           <p style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontSize: 14, margin: 0, fontWeight: 500 }}>
             {file.name}
           </p>
@@ -339,17 +368,17 @@ function Step2({ onNext, onSkip }) {
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         <button
           onClick={() => onNext(file)}
-          disabled={!file}
+          disabled={!file || uploading}
           style={{
             ...BTN_PRIMARY,
-            opacity: file ? 1 : 0.5,
-            cursor: file ? 'pointer' : 'not-allowed',
+            opacity: file && !uploading ? 1 : 0.5,
+            cursor: file && !uploading ? 'pointer' : 'not-allowed',
           }}
         >
-          Upload & Continue ?
+          {uploading ? 'Uploading…' : 'Upload & Continue →'}
         </button>
-        <button onClick={onSkip} style={BTN_GHOST}>
-          Skip for now ?
+        <button onClick={onSkip} disabled={uploading} style={{ ...BTN_GHOST, opacity: uploading ? 0.4 : 1 }}>
+          Skip for now →
         </button>
       </div>
     </div>
@@ -379,6 +408,7 @@ function SliderRow({ label, value, onChange, min = 0, max = 100, step = 5, leftL
 
 // ---------------------------------------------------------------------------
 // Step 3 — Advisor Interview (qualitative questionnaire)
+// companyId is passed as a prop (created in Step 1); never uses context.
 // ---------------------------------------------------------------------------
 const CONTRACT_TYPES = [
   { value: 'msa',      label: 'MSA / Annual Contract' },
@@ -393,8 +423,7 @@ const MARKET_OPTS = [
   { value: 'undifferentiated', label: 'Undifferentiated — competing on price or availability', score: 10 },
 ]
 
-function Step3({ onNext, onSkip }) {
-  const companyId = useCompanyId()
+function Step3({ onNext, onSkip, companyId }) {
   const saved3 = readOnboarding().step3
   const [form, setForm] = useState({
     owner_hours_per_week: '',
@@ -419,18 +448,20 @@ function Step3({ onNext, onSkip }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await apiClient.post(`/api/analytics/qualitative/${companyId}`, {
-        owner_hours_per_week:   form.owner_hours_per_week !== '' ? Number(form.owner_hours_per_week) : null,
-        sop_pct:                Number(form.sop_pct),
-        mgmt_qualified:         form.mgmt_qualified !== '' ? Number(form.mgmt_qualified) : null,
-        mgmt_total_functions:   form.mgmt_total_functions !== '' ? Number(form.mgmt_total_functions) : null,
-        contract_pct:           Number(form.contract_pct),
-        customer_contract_type: form.customer_contract_type || null,
-        key_person_revenue_pct: Number(form.key_person_revenue_pct),
-        pipeline_value:         form.pipeline_value !== '' ? Number(form.pipeline_value) : null,
-        market_positioning:     form.market_positioning || null,
-      })
-    } catch (_) { /* non-blocking */ }
+      if (companyId) {
+        await apiClient.post(`/api/analytics/qualitative/${companyId}`, {
+          owner_hours_per_week:   form.owner_hours_per_week !== '' ? Number(form.owner_hours_per_week) : null,
+          sop_pct:                Number(form.sop_pct),
+          mgmt_qualified:         form.mgmt_qualified !== '' ? Number(form.mgmt_qualified) : null,
+          mgmt_total_functions:   form.mgmt_total_functions !== '' ? Number(form.mgmt_total_functions) : null,
+          contract_pct:           Number(form.contract_pct),
+          customer_contract_type: form.customer_contract_type || null,
+          key_person_revenue_pct: Number(form.key_person_revenue_pct),
+          pipeline_value:         form.pipeline_value !== '' ? Number(form.pipeline_value) : null,
+          market_positioning:     form.market_positioning || null,
+        })
+      }
+    } catch (_) { /* non-blocking — advisor can update in Engagement Intake */ }
     setSaving(false)
     onNext()
   }
@@ -560,11 +591,11 @@ function Step3({ onNext, onSkip }) {
       </div>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <button onClick={handleSave} disabled={saving} style={{ ...BTN_PRIMARY, opacity: saving ? 0.7 : 1 }}>
-          {saving ? 'Saving—' : 'Save & Continue ?'}
+        <button onClick={handleSave} disabled={saving} style={{ ...BTN_PRIMARY, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+          {saving ? 'Saving…' : 'Save & Continue →'}
         </button>
-        <button onClick={onSkip} style={BTN_GHOST}>
-          Skip — complete later ?
+        <button onClick={onSkip} disabled={saving} style={{ ...BTN_GHOST, opacity: saving ? 0.4 : 1 }}>
+          Skip — complete later →
         </button>
       </div>
     </div>
@@ -574,10 +605,20 @@ function Step3({ onNext, onSkip }) {
 // ---------------------------------------------------------------------------
 // Success state
 // ---------------------------------------------------------------------------
-function Success({ toIntake }) {
+function Success({ companyId }) {
+  const hasCompany = companyId != null && Number.isFinite(companyId) && companyId > 0
   return (
     <div style={{ textAlign: 'center', padding: '40px 0' }}>
-      <div style={{ fontSize: 48, marginBottom: 20 }}>??</div>
+      {/* Checkmark circle */}
+      <div style={{
+        width: 64, height: 64, borderRadius: '50%', background: 'rgba(74,190,164,0.15)',
+        border: '2px solid #4ABEA4', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', margin: '0 auto 20px',
+      }}>
+        <svg width="28" height="21" viewBox="0 0 28 21" fill="none">
+          <path d="M2 10.5L10 18.5L26 2" stroke="#4ABEA4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
       <h2
         style={{
           color: COLORS.offWhite,
@@ -587,12 +628,12 @@ function Success({ toIntake }) {
           margin: '0 0 12px 0',
         }}
       >
-        You're all set.
+        You&rsquo;re all set.
       </h2>
       <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 15, margin: '0 0 32px 0' }}>
-        {toIntake
+        {hasCompany
           ? 'Next: capture owner goals and exit timeline in Engagement Intake.'
-          : 'Taking you to your dashboard...'}
+          : 'Taking you to your dashboard…'}
       </p>
       <div
         style={{
@@ -615,22 +656,95 @@ function Success({ toIntake }) {
 // ---------------------------------------------------------------------------
 export default function OnboardingPage() {
   const navigate = useNavigate()
-  const companyId = useCompanyId()
   const [step, setStep] = useState(() => {
     const s = readOnboarding().step
     return typeof s === 'number' && s >= 1 && s <= 3 ? s : 1
   })
   const [done, setDone] = useState(false)
 
+  // Company created in Step 1 — passed as prop to Step 3 for qualitative save.
+  const [createdCompanyId, setCreatedCompanyId] = useState(() => {
+    const saved = readOnboarding().createdCompanyId
+    return typeof saved === 'number' ? saved : null
+  })
+
+  // Step 1 state
+  const [step1Saving, setStep1Saving] = useState(false)
+  const [step1Error, setStep1Error] = useState(null)
+
+  // Step 2 state
+  const [step2Uploading, setStep2Uploading] = useState(false)
+  const [step2Error, setStep2Error] = useState(null)
+
   useEffect(() => {
     writeOnboarding({ step })
   }, [step])
 
+  // -------------------------------------------------------------------------
+  // Step 1 handler: create the company via API, then advance
+  // -------------------------------------------------------------------------
+  const handleStep1Next = async (form) => {
+    setStep1Saving(true)
+    setStep1Error(null)
+    try {
+      const company = await apiClient.post('/api/companies/', {
+        name: form.name.trim(),
+        industry: form.industry || null,
+        entity_type: form.entityType || null,
+        // revenueRange is not a backend field — stored in localStorage for future use
+      })
+      const newId = company?.id ?? null
+      setCreatedCompanyId(newId)
+      writeOnboarding({ createdCompanyId: newId })
+      setStep(2)
+    } catch (err) {
+      setStep1Error(err?.message ?? 'Failed to create client. Please try again.')
+    } finally {
+      setStep1Saving(false)
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Step 2 handler: upload file if present, then advance to step 3
+  // -------------------------------------------------------------------------
+  const handleStep2Next = async (file) => {
+    if (!file) {
+      setStep(3)
+      return
+    }
+    setStep2Uploading(true)
+    setStep2Error(null)
+    try {
+      if (createdCompanyId) {
+        const formData = new FormData()
+        formData.append('file', file)
+        // Guess source_type from extension for better pipeline suggestions
+        const ext = file.name.split('.').pop()?.toLowerCase()
+        const sourceType = ext === 'csv' || ext === 'xlsx' ? 'quickbooks' : 'other'
+        formData.append('source_type', sourceType)
+        await apiClient.postMultipart(`/api/ingestion/upload/${createdCompanyId}`, formData)
+      }
+      setStep(3)
+    } catch (err) {
+      // Non-fatal: show error but let the user skip
+      setStep2Error(err?.message ?? 'Upload failed. You can skip and upload later from the dashboard.')
+    } finally {
+      setStep2Uploading(false)
+    }
+  }
+
+  const handleStep2Skip = () => setStep(3)
+
+  // -------------------------------------------------------------------------
+  // Finish: navigate to Engagement Intake if we have a company, else Home
+  // -------------------------------------------------------------------------
   const finish = () => {
+    // Clear onboarding draft so re-visiting the page starts fresh
+    try { localStorage.removeItem(ONBOARDING_STORAGE_KEY) } catch { /* ignore */ }
     setDone(true)
     setTimeout(() => {
-      if (companyId != null && Number.isFinite(companyId) && companyId > 0) {
-        navigate(withCompanyQuery('/EngagementIntake', companyId), { replace: true })
+      if (createdCompanyId != null && Number.isFinite(createdCompanyId) && createdCompanyId > 0) {
+        navigate(withCompanyQuery('/EngagementIntake', createdCompanyId), { replace: true })
       } else {
         navigate('/Home', { replace: true })
       }
@@ -706,26 +820,31 @@ export default function OnboardingPage() {
         }}
       >
         {done ? (
-          <Success toIntake={companyId != null && Number.isFinite(companyId) && companyId > 0} />
+          <Success companyId={createdCompanyId} />
         ) : (
           <>
             <ProgressBar step={step} />
 
             {step === 1 && (
               <Step1
-                onNext={() => setStep(2)}
+                onNext={handleStep1Next}
+                saving={step1Saving}
+                error={step1Error}
               />
             )}
             {step === 2 && (
               <Step2
-                onNext={() => setStep(3)}
-                onSkip={() => setStep(3)}
+                onNext={handleStep2Next}
+                onSkip={handleStep2Skip}
+                uploading={step2Uploading}
+                error={step2Error}
               />
             )}
             {step === 3 && (
               <Step3
-                onNext={() => finish()}
-                onSkip={() => finish()}
+                onNext={finish}
+                onSkip={finish}
+                companyId={createdCompanyId}
               />
             )}
           </>

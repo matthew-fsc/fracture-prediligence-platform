@@ -35,7 +35,9 @@ export default function RoleSelectPage() {
     try {
       await apiClient.post('/api/me', { role: selected })
       await refreshProfile()
-      navigate(selected === 'ADVISOR' ? '/Home' : '/client/dashboard', { replace: true })
+      // New advisors go to onboarding wizard; returning sign-ins go to /auth-redirect.
+      // New clients wait for an advisor invite — send them to the waiting state.
+      navigate(selected === 'ADVISOR' ? '/dashboard/onboarding' : '/client/dashboard', { replace: true })
     } catch (err) {
       setError(err?.message ?? 'Something went wrong. Please try again.')
       setSaving(false)
