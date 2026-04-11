@@ -15,13 +15,19 @@ export function apiUrl(path) {
   return API_BASE ? `${API_BASE}${p}` : p
 }
 
+// SEC-4: Use sessionStorage (cleared on tab close) instead of localStorage to
+// limit XSS exposure window for the admin key.
 export function getStoredAdminKey() {
-  return localStorage.getItem(ADMIN_KEY_STORAGE) || ''
+  return sessionStorage.getItem(ADMIN_KEY_STORAGE) || ''
 }
 
 export function setStoredAdminKey(key) {
   if (!key) return
-  localStorage.setItem(ADMIN_KEY_STORAGE, key)
+  sessionStorage.setItem(ADMIN_KEY_STORAGE, key)
+}
+
+export function clearStoredAdminKey() {
+  sessionStorage.removeItem(ADMIN_KEY_STORAGE)
 }
 
 /** Async () => Clerk session JWT or null — set by ClerkAuthBridge when Clerk is active. */

@@ -45,7 +45,10 @@ export default function InitiativeImpact() {
   useEffect(() => {
     apiClient.get(`/api/analytics/value-gap/${companyId}`)
       .then(setGapData)
-      .catch(() => {})
+      .catch((err) => {
+        // Non-fatal: value gap chart degrades gracefully when unavailable
+        console.error('[InitiativeImpact] value-gap fetch failed:', err?.message)
+      })
   }, [companyId])
 
   const [libraryInits, setLibraryInits] = useState([])

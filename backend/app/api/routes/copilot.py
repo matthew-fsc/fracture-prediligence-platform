@@ -178,9 +178,9 @@ def _build_context(company_id: int, db: Session) -> str:
                     if motivations:
                         lines.append(f"  Owner motivations: {', '.join(motivations)}")
                 except Exception:
-                    pass
+                    logger.debug("Failed to parse owner_motivations_json", exc_info=True)
     except Exception:
-        pass
+        logger.warning("Failed to load engagement profile for copilot context", exc_info=True)
 
     # --- Qualitative inputs ---
     try:
@@ -201,7 +201,7 @@ def _build_context(company_id: int, db: Session) -> str:
             if qi.market_positioning:
                 lines.append(f"  Market positioning: {qi.market_positioning}")
     except Exception:
-        pass
+        logger.warning("Failed to load qualitative inputs for copilot context", exc_info=True)
 
     return "\n".join(lines) if lines else "No company data available yet."
 
@@ -283,7 +283,8 @@ async def copilot_chat(
     start_ms = int(time.time() * 1000)
 
     try:
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        # PERF-2: 30s timeout prevents hung requests if the Anthropic API is slow
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=30.0)
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=1024,

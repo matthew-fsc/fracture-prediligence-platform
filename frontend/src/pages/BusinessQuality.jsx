@@ -60,16 +60,27 @@ export default function BusinessQuality() {
   const companyId = useCompanyId()
   const [scores, setScores] = useState(null)
   const [metrics, setMetrics] = useState(null)
+  const [fetchError, setFetchError] = useState(null)
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   useEffect(() => {
-    apiClient.get(`/api/analytics/scores/${companyId}`)
-      .then(setScores)
-      .catch(() => {})
-    apiClient.get(`/api/analytics/metrics/${companyId}`)
-      .then(setMetrics)
-      .catch(() => {})
+    setFetchError(null)
+    Promise.all([
+      apiClient.get(`/api/analytics/scores/${companyId}`),
+      apiClient.get(`/api/analytics/metrics/${companyId}`),
+    ])
+      .then(([s, m]) => { setScores(s); setMetrics(m) })
+      .catch((err) => setFetchError(err?.message || 'Failed to load business quality data'))
   }, [companyId])
+
+  if (fetchError) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        {fetchError}
+      </div>
+    )
+  }
 
   if (scores === null || metrics === null) {
     return (
