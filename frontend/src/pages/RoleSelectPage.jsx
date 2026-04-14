@@ -165,7 +165,7 @@ export default function RoleSelectPage() {
           title="Business Owner"
           description="I own or operate a business and I'm working with an advisor toward a liquidity event or exit."
           bullets={[
-            'View my company's readiness score',
+            "View my company's readiness score",
             'See my enterprise value range',
             'Track value-creation initiatives',
             'Share my goals & exit preferences',

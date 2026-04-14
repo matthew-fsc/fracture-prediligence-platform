@@ -5,6 +5,7 @@ from fastapi import HTTPException
 
 from app.api.deps import ensure_company_access
 from app.middleware.auth import CurrentUser
+from app.ontology.models import Company, CompanyAccessGrant, ClientAccess
 
 
 class _Q:
@@ -14,16 +15,25 @@ class _Q:
     def filter(self, *a, **k):
         return self
 
+    def with_for_update(self):
+        return self
+
     def first(self):
         return self._row
 
 
 class _DB:
+    """
+    Mock DB that returns the company for Company queries and None for
+    all other models (CompanyAccessGrant, ClientAccess, etc.).
+    """
     def __init__(self, company):
         self._company = company
 
-    def query(self, _model):
-        return _Q(self._company)
+    def query(self, model):
+        if model is Company:
+            return _Q(self._company)
+        return _Q(None)
 
 
 class _Co:

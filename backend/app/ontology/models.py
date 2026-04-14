@@ -374,6 +374,7 @@ class CompanyInitiative(Base):
     company_id:                 Mapped[int]             = mapped_column(ForeignKey("companies.id"), index=True)
     title:                      Mapped[str]             = mapped_column(String(512))
     category:                   Mapped[Optional[str]]   = mapped_column(String(64), nullable=True)
+    status:                     Mapped[str]             = mapped_column(String(32), default="planned")
     timeline:                   Mapped[Optional[str]]   = mapped_column(String(128), nullable=True)
     cost_estimate:              Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
     ev_impact_estimate:         Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)

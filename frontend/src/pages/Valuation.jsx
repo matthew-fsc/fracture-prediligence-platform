@@ -338,7 +338,7 @@ function EbitdaBasisPanel({ companyId, metrics, onSaved }) {
   const inputCls = 'mt-1 w-full bg-secondary border border-border rounded-lg px-3 py-2 text-xs text-muted-foreground placeholder:text-muted-foreground/40 focus:text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 transition-colors'
 
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
+    <div id="ebitda-basis" className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-secondary/30">
         <div className="flex items-center gap-2">
           <Scale className="w-4 h-4 text-muted-foreground" />
@@ -561,8 +561,26 @@ export default function Valuation() {
     ? 'border-amber-500/20 bg-amber-500/10 text-amber-400'
     : 'border-red-500/20 bg-red-500/10 text-red-400'
 
+  // Normalization setup check — D&A and income tax both null means advisor hasn't configured the basis yet
+  const normalizationNeeded =
+    metrics?.depreciation_amortization_ttm == null && metrics?.income_tax_expense_ttm == null
+
   return (
     <div className="space-y-6 max-w-[1400px]">
+      {normalizationNeeded && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-5 py-4 flex items-start gap-3">
+          <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-400">EBITDA normalization fields not configured</p>
+            <p className="text-xs text-amber-300/70 mt-0.5">
+              Enter D&amp;A, owner market rate, interest, and income tax in the{' '}
+              <a href="#ebitda-basis" className="underline hover:text-amber-300">EBITDA Basis panel</a> below
+              to ensure the valuation uses your actual numbers rather than pipeline estimates.
+            </p>
+          </div>
+        </div>
+      )}
+
       <SectionHeader
         title="EBITDA / EV Calculation Engine"
         subtitle="Reported EBITDA → Addback Schedule → Defensible EBITDA → Enterprise Value"

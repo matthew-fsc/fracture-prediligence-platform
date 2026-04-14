@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, CheckCircle, AlertCircle } from 'lucide-react'
+import { ArrowRight, CheckCircle, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { Skeleton } from '../components/ui/Skeleton'
 import { cn } from '../lib/utils'
@@ -139,6 +139,13 @@ export default function DataMapping() {
     () => (reviewOnly ? mappings.filter(m => m.requires_review) : mappings),
     [mappings, reviewOnly],
   )
+  const [errorsOpen, setErrorsOpen] = useState(false)
+
+  // Build lookup: raw_header → sample_values[] from schema profile
+  const sampleValueMap = useMemo(() => {
+    const cols = selected?.schema?.columns ?? []
+    return Object.fromEntries(cols.map(c => [c.raw_header, c.sample_values ?? []]))
+  }, [selected])
 
   if (!companyReady) {
     return (
@@ -241,6 +248,9 @@ export default function DataMapping() {
                 >
                   <p className="text-xs font-medium truncate">{job.filename}</p>
                   <p className="text-[11px] opacity-60 mt-0.5">{job.status} · {job.row_count ?? 0} rows</p>
+                  {job.error_count > 0 && (
+                    <p className="text-[10px] text-red-400 mt-0.5">{job.error_count} parse errors</p>
+                  )}
                 </button>
               ))}
             </div>
@@ -278,6 +288,46 @@ export default function DataMapping() {
                     </div>
                   ))}
                 </div>
+
+                {/* Extraction errors panel */}
+                {selected.error_count > 0 && (
+                  <div className="rounded-xl border border-red-500/20 bg-red-500/5 overflow-hidden mb-4">
+                    <button
+                      type="button"
+                      onClick={() => setErrorsOpen(o => !o)}
+                      className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-red-500/10 transition-colors"
+                    >
+                      <span className="flex items-center gap-2 text-sm font-semibold text-red-400">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        {selected.error_count.toLocaleString()} row{selected.error_count !== 1 ? 's' : ''} failed to parse
+                        <span className="text-[11px] font-normal text-red-300/70">
+                          ({((selected.error_count / (selected.row_count || 1)) * 100).toFixed(1)}% of {selected.row_count?.toLocaleString()} rows)
+                        </span>
+                      </span>
+                      {errorsOpen
+                        ? <ChevronDown className="w-4 h-4 text-red-400" />
+                        : <ChevronRight className="w-4 h-4 text-red-400" />}
+                    </button>
+                    {errorsOpen && (
+                      <div className="border-t border-red-500/20 px-4 pb-4 pt-3 space-y-2 max-h-72 overflow-y-auto">
+                        {selected.errors && typeof selected.errors === 'object' && Object.keys(selected.errors).length > 0 ? (
+                          Object.entries(selected.errors).map(([key, val]) => (
+                            <div key={key} className="rounded-lg border border-red-500/15 bg-red-500/5 p-2">
+                              <p className="text-[11px] font-semibold text-red-400 font-mono mb-0.5">{key}</p>
+                              <p className="text-[11px] text-muted-foreground break-all">
+                                {typeof val === 'string' ? val : JSON.stringify(val)}
+                              </p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">
+                            {selected.error_count} rows could not be parsed. Re-upload the file with corrected formatting to reduce parse failures.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Mappings */}
                 <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
@@ -342,6 +392,15 @@ export default function DataMapping() {
                             <span className="text-xs font-mono text-primary">{m.ontology_field ?? '—'}</span>
                           )}
                           <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{m.match_detail}</p>
+                          {(sampleValueMap[m.source_column] ?? []).length > 0 && (
+                            <div className="flex items-center gap-1 mt-1 flex-wrap">
+                              {(sampleValueMap[m.source_column]).slice(0, 4).map((v, vi) => (
+                                <span key={vi} className="text-[10px] font-mono px-1 py-0.5 rounded bg-muted/60 border border-border/40 text-muted-foreground/70 max-w-[120px] truncate" title={String(v)}>
+                                  {String(v)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <span className="text-[11px] text-muted-foreground w-20 text-right flex-shrink-0 capitalize">{m.entity_type ?? '—'}</span>
                         <span className={cn('text-xs font-bold w-10 text-right flex-shrink-0', confidenceColor(m.confidence))}>

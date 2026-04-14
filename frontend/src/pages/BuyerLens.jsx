@@ -474,9 +474,31 @@ export default function BuyerLens() {
                               className="w-full text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-muted-foreground focus:text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
                             >
                               <option value="">— None —</option>
-                              {initiatives.map(i => (
-                                <option key={i.id} value={String(i.id)}>{i.title}</option>
-                              ))}
+                              {(() => {
+                                const STATUS_LABEL = { planned: 'planned', in_progress: 'in progress', complete: 'done' }
+                                const same = initiatives.filter(i => i.category === q.category)
+                                const other = initiatives.filter(i => i.category !== q.category)
+                                return (
+                                  <>
+                                    {same.length > 0 && (
+                                      <optgroup label={`Suggested — ${CATEGORY_LABELS[q.category] ?? q.category}`}>
+                                        {same.map(i => (
+                                          <option key={i.id} value={String(i.id)}>
+                                            {i.title}{i.status ? ` [${STATUS_LABEL[i.status] ?? i.status}]` : ''}
+                                          </option>
+                                        ))}
+                                      </optgroup>
+                                    )}
+                                    {other.length > 0 && (
+                                      <optgroup label="Other initiatives">
+                                        {other.map(i => (
+                                          <option key={i.id} value={String(i.id)}>{i.title}</option>
+                                        ))}
+                                      </optgroup>
+                                    )}
+                                  </>
+                                )
+                              })()}
                             </select>
                           </div>
                         </div>

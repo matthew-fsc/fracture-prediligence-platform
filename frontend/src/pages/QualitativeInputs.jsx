@@ -17,16 +17,16 @@ export default function QualitativeInputs() {
   const companyId = useCompanyId()
   const [form, setForm] = useState({
     owner_hours_per_week: '',
-    sop_pct: 50,
-    automation_pct: 30,
-    mgmt_qualified: 0,
+    sop_pct: null,
+    automation_pct: null,
+    mgmt_qualified: '',
     mgmt_total_functions: 4,
     pipeline_value: '',
     market_positioning: '',
-    repeatability_pct: 50,
-    contract_pct: 50,
+    repeatability_pct: null,
+    contract_pct: null,
     customer_contract_type: '',
-    key_person_revenue_pct: 50,
+    key_person_revenue_pct: null,
   })
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -40,16 +40,16 @@ export default function QualitativeInputs() {
         if (d?.inputs) {
           setForm({
             owner_hours_per_week:   d.inputs.owner_hours_per_week ?? '',
-            sop_pct:                d.inputs.sop_pct ?? 50,
-            automation_pct:         d.inputs.automation_pct ?? 30,
-            mgmt_qualified:         d.inputs.mgmt_qualified ?? 0,
+            sop_pct:                d.inputs.sop_pct ?? null,
+            automation_pct:         d.inputs.automation_pct ?? null,
+            mgmt_qualified:         d.inputs.mgmt_qualified ?? '',
             mgmt_total_functions:   d.inputs.mgmt_total_functions ?? 4,
             pipeline_value:         d.inputs.pipeline_value ?? '',
             market_positioning:     d.inputs.market_positioning ?? '',
-            repeatability_pct:      d.inputs.repeatability_pct ?? 50,
-            contract_pct:           d.inputs.contract_pct ?? 50,
+            repeatability_pct:      d.inputs.repeatability_pct ?? null,
+            contract_pct:           d.inputs.contract_pct ?? null,
             customer_contract_type: d.inputs.customer_contract_type ?? '',
-            key_person_revenue_pct: d.inputs.key_person_revenue_pct ?? 50,
+            key_person_revenue_pct: d.inputs.key_person_revenue_pct ?? null,
           })
         }
         setLoaded(true)
@@ -66,10 +66,10 @@ export default function QualitativeInputs() {
 
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setSaved(false) }
 
-  const a4Complete = form.owner_hours_per_week !== ''
-  // Sliders default to numeric values, so only the explicit-choice field gates completion
-  const a3Complete = form.customer_contract_type !== ''
-  const a7Complete = form.pipeline_value !== '' && form.market_positioning !== '' && form.repeatability_pct !== ''
+  // A section is complete only when all required fields are explicitly set (not null/empty defaults)
+  const a4Complete = form.owner_hours_per_week !== '' && form.sop_pct !== null && form.automation_pct !== null
+  const a3Complete = form.customer_contract_type !== '' && form.contract_pct !== null && form.key_person_revenue_pct !== null
+  const a7Complete = form.pipeline_value !== '' && form.market_positioning !== '' && form.repeatability_pct !== null
   const allComplete = a4Complete && a3Complete && a7Complete
 
   const handleSave = async () => {
@@ -77,16 +77,16 @@ export default function QualitativeInputs() {
     try {
       const payload = {
         owner_hours_per_week:   form.owner_hours_per_week !== '' ? Number(form.owner_hours_per_week) : null,
-        sop_pct:                Number(form.sop_pct),
-        automation_pct:         Number(form.automation_pct),
+        sop_pct:                form.sop_pct !== null ? Number(form.sop_pct) : null,
+        automation_pct:         form.automation_pct !== null ? Number(form.automation_pct) : null,
         mgmt_qualified:         form.mgmt_qualified !== '' ? Number(form.mgmt_qualified) : null,
         mgmt_total_functions:   form.mgmt_total_functions !== '' ? Number(form.mgmt_total_functions) : null,
         pipeline_value:         form.pipeline_value !== '' ? Number(form.pipeline_value) : null,
         market_positioning:     form.market_positioning || null,
-        repeatability_pct:      Number(form.repeatability_pct),
-        contract_pct:           Number(form.contract_pct),
+        repeatability_pct:      form.repeatability_pct !== null ? Number(form.repeatability_pct) : null,
+        contract_pct:           form.contract_pct !== null ? Number(form.contract_pct) : null,
         customer_contract_type: form.customer_contract_type || null,
-        key_person_revenue_pct: Number(form.key_person_revenue_pct),
+        key_person_revenue_pct: form.key_person_revenue_pct !== null ? Number(form.key_person_revenue_pct) : null,
       }
       await apiClient.post(`/api/analytics/qualitative/${companyId}`, payload)
       setSaved(true)
@@ -152,15 +152,18 @@ export default function QualitativeInputs() {
             What percentage of active customers have a signed contract, MSA, or retainer agreement in place?
           </p>
           <div className="space-y-1.5">
+            {form.contract_pct === null && (
+              <p className="text-[11px] text-amber-400 font-medium">Move the slider to set a value — required for section completion</p>
+            )}
             <div className="flex justify-between text-[11px] text-muted-foreground">
               <span>0% — all handshake / verbal</span>
-              <span className="font-bold text-foreground">{form.contract_pct}%</span>
+              <span className="font-bold text-foreground">{form.contract_pct !== null ? `${form.contract_pct}%` : '—'}</span>
               <span>100% — fully contracted</span>
             </div>
-            <input type="range" min={0} max={100} step={5} value={form.contract_pct}
+            <input type="range" min={0} max={100} step={5} value={form.contract_pct ?? 50}
               onChange={e => set('contract_pct', e.target.value)}
               className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary" />
-            {form.contract_pct !== '' && (
+            {form.contract_pct !== null && (
               <p className={cn('text-[11px] font-semibold',
                 Number(form.contract_pct) >= 80 ? 'text-emerald-400' :
                 Number(form.contract_pct) >= 50 ? 'text-amber-400' : 'text-red-400')}>
@@ -213,15 +216,18 @@ export default function QualitativeInputs() {
             Approximately what percentage of revenue is attributable to the owner's personal relationships — customers who would follow the owner if they left the business?
           </p>
           <div className="space-y-1.5">
+            {form.key_person_revenue_pct === null && (
+              <p className="text-[11px] text-amber-400 font-medium">Move the slider to set a value — required for section completion</p>
+            )}
             <div className="flex justify-between text-[11px] text-muted-foreground">
               <span>0% — no personal dependency</span>
-              <span className="font-bold text-foreground">{form.key_person_revenue_pct}%</span>
+              <span className="font-bold text-foreground">{form.key_person_revenue_pct !== null ? `${form.key_person_revenue_pct}%` : '—'}</span>
               <span>100% — fully owner-dependent</span>
             </div>
-            <input type="range" min={0} max={100} step={5} value={form.key_person_revenue_pct}
+            <input type="range" min={0} max={100} step={5} value={form.key_person_revenue_pct ?? 50}
               onChange={e => set('key_person_revenue_pct', e.target.value)}
               className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary" />
-            {form.key_person_revenue_pct !== '' && (
+            {form.key_person_revenue_pct !== null && (
               <span className={cn('text-[11px] font-bold px-2 py-0.5 rounded border inline-block',
                 Number(form.key_person_revenue_pct) <= 20 ? 'border-emerald-500/20 text-emerald-400 bg-emerald-500/10' :
                 Number(form.key_person_revenue_pct) <= 50 ? 'border-amber-500/20 text-amber-400 bg-amber-500/10' :
@@ -290,12 +296,15 @@ export default function QualitativeInputs() {
             What percentage of core operational processes have written SOPs? (onboarding, service delivery, account management, billing)
           </p>
           <div className="space-y-1.5">
+            {form.sop_pct === null && (
+              <p className="text-[11px] text-amber-400 font-medium">Move the slider to set a value — required for section completion</p>
+            )}
             <div className="flex justify-between text-[11px] text-muted-foreground">
               <span>0% — none documented</span>
-              <span className="font-bold text-foreground">{form.sop_pct}%</span>
+              <span className="font-bold text-foreground">{form.sop_pct !== null ? `${form.sop_pct}%` : '—'}</span>
               <span>100% — fully documented</span>
             </div>
-            <input type="range" min={0} max={100} step={5} value={form.sop_pct}
+            <input type="range" min={0} max={100} step={5} value={form.sop_pct ?? 50}
               onChange={e => set('sop_pct', e.target.value)}
               className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary" />
           </div>
@@ -310,12 +319,15 @@ export default function QualitativeInputs() {
             What percentage of repetitive operational tasks (invoicing, reporting, scheduling) are handled by a system rather than a person?
           </p>
           <div className="space-y-1.5">
+            {form.automation_pct === null && (
+              <p className="text-[11px] text-amber-400 font-medium">Move the slider to set a value — required for section completion</p>
+            )}
             <div className="flex justify-between text-[11px] text-muted-foreground">
               <span>0% — fully manual</span>
-              <span className="font-bold text-foreground">{form.automation_pct}%</span>
+              <span className="font-bold text-foreground">{form.automation_pct !== null ? `${form.automation_pct}%` : '—'}</span>
               <span>100% — fully automated</span>
             </div>
-            <input type="range" min={0} max={100} step={5} value={form.automation_pct}
+            <input type="range" min={0} max={100} step={5} value={form.automation_pct ?? 30}
               onChange={e => set('automation_pct', e.target.value)}
               className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary" />
           </div>
@@ -432,12 +444,15 @@ export default function QualitativeInputs() {
             What percentage of revenue comes from standardized, repeatable offerings vs. fully custom work?
           </p>
           <div className="space-y-1.5">
+            {form.repeatability_pct === null && (
+              <p className="text-[11px] text-amber-400 font-medium">Move the slider to set a value — required for section completion</p>
+            )}
             <div className="flex justify-between text-[11px] text-muted-foreground">
               <span>0% — fully custom</span>
-              <span className="font-bold text-foreground">{form.repeatability_pct}%</span>
+              <span className="font-bold text-foreground">{form.repeatability_pct !== null ? `${form.repeatability_pct}%` : '—'}</span>
               <span>100% — fully standardized</span>
             </div>
-            <input type="range" min={0} max={100} step={5} value={form.repeatability_pct}
+            <input type="range" min={0} max={100} step={5} value={form.repeatability_pct ?? 50}
               onChange={e => set('repeatability_pct', e.target.value)}
               className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-primary" />
           </div>
