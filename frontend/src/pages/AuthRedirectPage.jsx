@@ -12,11 +12,21 @@
 
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useUserRole } from '../context/UserRoleContext'
+import { apiClient } from '../lib/apiClient'
 
 export default function AuthRedirectPage() {
   const navigate = useNavigate()
   const { role, loading } = useUserRole()
+  const isAdvisor = role === 'ADVISOR'
+  const { data: companies = [], isLoading: companiesLoading } = useQuery({
+    queryKey: ['companies'],
+    queryFn: () => apiClient.get('/api/companies'),
+    enabled: !loading && isAdvisor,
+    retry: false,
+    meta: { suppressErrorToast: true },
+  })
 
   useEffect(() => {
     if (loading) return
@@ -33,9 +43,14 @@ export default function AuthRedirectPage() {
     } else if (role === 'CLIENT') {
       navigate('/client/dashboard', { replace: true })
     } else {
+      if (companiesLoading) return
+      if (!Array.isArray(companies) || companies.length === 0) {
+        navigate('/dashboard/onboarding', { replace: true })
+        return
+      }
       navigate('/Home', { replace: true })
     }
-  }, [role, loading, navigate])
+  }, [role, loading, navigate, companies, companiesLoading])
 
   return (
     <div

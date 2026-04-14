@@ -158,7 +158,7 @@ export default function App() {
             />
 
             {/* Lowercase aliases → dashboard routes */}
-            <Route path="/home" element={<Navigate to="/Home" replace />} />
+            <Route path="/home" element={<Navigate to="/auth-redirect" replace />} />
             <Route path="/companyworkspace" element={<Navigate to="/CompanyWorkspace" replace />} />
             <Route path="/connectors" element={<Navigate to="/Connectors" replace />} />
             <Route path="/datamapping" element={<Navigate to="/DataMapping" replace />} />

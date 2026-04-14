@@ -6,16 +6,18 @@ import { marketingColors as C, clerkMarketingAppearance, clerkEmbedText } from '
 
 const HAS_CLERK = Boolean((import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim())
 
-/** Same-origin path only; default /Home */
+/** Same-origin path only; default /auth-redirect */
 function safePostSignInUrl(raw) {
-  if (raw == null || raw === '') return '/Home'
+  if (raw == null || raw === '') return '/auth-redirect'
   let s = typeof raw === 'string' ? raw.trim() : ''
   try {
     s = decodeURIComponent(s)
   } catch {
-    return '/Home'
+    return '/auth-redirect'
   }
-  if (!s.startsWith('/') || s.startsWith('//')) return '/Home'
+  if (!s.startsWith('/') || s.startsWith('//')) return '/auth-redirect'
+  // Legacy redirects to dashboard root skip role-aware/bootstrap flow.
+  if (s.toLowerCase() === '/home') return '/auth-redirect'
   return s
 }
 
