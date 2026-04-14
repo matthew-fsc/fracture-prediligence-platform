@@ -1,13 +1,20 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
-import { Target, ChevronDown, ChevronRight, AlertTriangle, ArrowRight, TrendingUp, Info, BookOpen } from 'lucide-react'
+import { Target, ChevronDown, ChevronRight, AlertTriangle, ArrowRight, TrendingUp, Info, BookOpen, CheckCircle, Clock, Circle, Plus, Trash2 } from 'lucide-react'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useCompanyId } from '../context/CompanyContext'
 import { apiClient } from '../lib/apiClient'
+import { toast } from '../lib/notify'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { getDrsCategoryStyle } from '../lib/drsCategoryColors'
+
+const INITIATIVE_STATUS_CFG = {
+  planned:     { icon: Circle,       label: 'Planned',     color: 'text-muted-foreground', border: 'border-border',          bg: 'bg-muted/20'        },
+  in_progress: { icon: Clock,        label: 'In Progress', color: 'text-blue-400',         border: 'border-blue-500/30',     bg: 'bg-blue-500/5'      },
+  complete:    { icon: CheckCircle,  label: 'Complete',    color: 'text-emerald-400',       border: 'border-emerald-500/30',  bg: 'bg-emerald-500/5'   },
+}
 
 const MITIGATION_TARGETS = {
   revenue_quality: {
@@ -66,12 +73,53 @@ function ScoreBar({ current, target, label }) {
 }
 
 // ── Detailed gap card ─────────────────────────────────────────────────────
-function GapCategoryCard({ d, rank, totalGap }) {
+function GapCategoryCard({ d, rank, totalGap, initiatives = [], onInitiativeChange }) {
+  const companyId = useCompanyId()
   const [open, setOpen] = useState(false)
+  const [addingTitle, setAddingTitle] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [saving, setSaving] = useState(false)
   const cat = getDrsCategoryStyle(d.category)
   const weakSubs = d.weak_sub_scores ?? []
   const mitigationMap = MITIGATION_TARGETS[d.category] ?? {}
   const pctOfGap = totalGap > 0 ? (d.ev_uplift / totalGap * 100) : 0
+  const categoryInitiatives = initiatives.filter(i => i.category === d.category)
+
+  async function updateStatus(initiativeId, newStatus) {
+    try {
+      await apiClient.patch(`/api/analytics/initiatives/${companyId}/${initiativeId}`, { status: newStatus })
+      onInitiativeChange()
+    } catch (e) {
+      toast.error(e?.message || 'Could not update status')
+    }
+  }
+
+  async function deleteInitiative(initiativeId) {
+    try {
+      await apiClient.del(`/api/analytics/initiatives/${companyId}/${initiativeId}`)
+      onInitiativeChange()
+    } catch (e) {
+      toast.error(e?.message || 'Could not delete initiative')
+    }
+  }
+
+  async function createInitiative() {
+    if (!addingTitle.trim()) return
+    setSaving(true)
+    try {
+      await apiClient.post(`/api/analytics/initiatives/${companyId}`, {
+        title: addingTitle.trim(),
+        category: d.category,
+        status: 'planned',
+      })
+      setAddingTitle('')
+      setAdding(false)
+      onInitiativeChange()
+    } catch (e) {
+      toast.error(e?.message || 'Could not create initiative')
+    }
+    setSaving(false)
+  }
 
   return (
     <div className={cn('rounded-xl border bg-card overflow-hidden transition-all', cat.border)}>
@@ -170,6 +218,81 @@ function GapCategoryCard({ d, rank, totalGap }) {
             </div>
           )}
 
+          {/* Initiatives for this category */}
+          <div className="px-4 pb-2">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                Initiatives
+                {categoryInitiatives.length > 0 && (
+                  <span className="ml-1.5 font-normal text-muted-foreground/60">
+                    ({categoryInitiatives.filter(i => i.status === 'complete').length}/{categoryInitiatives.length} complete)
+                  </span>
+                )}
+              </p>
+              <button
+                type="button"
+                onClick={() => setAdding(a => !a)}
+                className="text-[11px] text-primary hover:underline flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3" /> Add
+              </button>
+            </div>
+
+            {adding && (
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  autoFocus
+                  value={addingTitle}
+                  onChange={e => setAddingTitle(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && createInitiative()}
+                  placeholder="Initiative title…"
+                  className="flex-1 text-xs bg-background border border-border rounded px-2 py-1.5 text-muted-foreground placeholder:text-muted-foreground/45 focus:text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                />
+                <button
+                  type="button"
+                  onClick={createInitiative}
+                  disabled={saving || !addingTitle.trim()}
+                  className="text-xs px-2.5 py-1.5 bg-primary text-primary-foreground rounded font-medium hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {saving ? '…' : 'Add'}
+                </button>
+                <button type="button" onClick={() => { setAdding(false); setAddingTitle('') }} className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
+              </div>
+            )}
+
+            {categoryInitiatives.length === 0 && !adding && (
+              <p className="text-[11px] text-muted-foreground/60 italic mb-2">No initiatives yet — add one to track progress on this gap.</p>
+            )}
+
+            {categoryInitiatives.map(init => {
+              const scfg = INITIATIVE_STATUS_CFG[init.status] ?? INITIATIVE_STATUS_CFG.planned
+              const SIcon = scfg.icon
+              return (
+                <div key={init.id} className={cn('flex items-center gap-2 rounded-lg border px-3 py-2 mb-1.5 text-xs', scfg.border, scfg.bg)}>
+                  <SIcon className={cn('w-3.5 h-3.5 flex-shrink-0', scfg.color)} />
+                  <span className="flex-1 text-foreground truncate">{init.title}</span>
+                  <select
+                    value={init.status}
+                    onChange={e => updateStatus(init.id, e.target.value)}
+                    className="bg-transparent border border-border/60 rounded px-1 py-0.5 text-[11px] text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  >
+                    <option value="planned">Planned</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="complete">Complete</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => deleteInitiative(init.id)}
+                    className="text-muted-foreground/40 hover:text-red-400 transition-colors"
+                    aria-label="Delete initiative"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+
           {/* Methodology — collapsed into a compact disclosure */}
           {d.methodology && (
             <div className="px-4 pb-4">
@@ -201,6 +324,7 @@ export default function ValueGap() {
   usePageTitle('Value Gap Analysis')
   const companyId = useCompanyId()
   const companyReady = companyId != null && companyId > 0
+  const queryClient = useQueryClient()
 
   const liveQuery = useQuery({
     queryKey: ['analytics-scores', companyId],
@@ -212,6 +336,12 @@ export default function ValueGap() {
     queryFn: () => apiClient.get(`/api/analytics/value-gap/${companyId}`),
     enabled: companyReady,
   })
+  const initiativesQuery = useQuery({
+    queryKey: ['analytics-initiatives', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/initiatives/${companyId}`),
+    enabled: companyReady,
+    staleTime: 30_000,
+  })
   const triggeredQuery = useQuery({
     queryKey: ['library-triggered', companyId],
     queryFn: () => apiClient.get(`/api/analytics/library-triggered/${companyId}`),
@@ -221,6 +351,7 @@ export default function ValueGap() {
 
   const liveData = liveQuery.data ?? null
   const gapData = gapQuery.data ?? null
+  const initiatives = initiativesQuery.data?.initiatives ?? []
   const loading = liveQuery.isPending || gapQuery.isPending
   const pageError =
     liveQuery.isError ? liveQuery.error?.message
@@ -491,7 +622,14 @@ export default function ValueGap() {
           {/* Category gap cards */}
           <div className="space-y-3">
             {drivers.map((d, i) => (
-              <GapCategoryCard key={d.category} d={d} rank={i + 1} totalGap={totalDriverUplift} />
+              <GapCategoryCard
+                key={d.category}
+                d={d}
+                rank={i + 1}
+                totalGap={totalDriverUplift}
+                initiatives={initiatives}
+                onInitiativeChange={() => queryClient.invalidateQueries({ queryKey: ['analytics-initiatives', companyId] })}
+              />
             ))}
           </div>
         </div>

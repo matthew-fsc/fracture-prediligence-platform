@@ -413,6 +413,48 @@ export default function EngagementIntake() {
         }
       />
 
+      {/* ── Workflow stage rail ──────────────────────────────────────────── */}
+      {(() => {
+        const STAGES = [
+          { n: 1, label: 'Client Profile',  path: '/EngagementIntake', current: true },
+          { n: 2, label: 'Upload Data',     path: '/DataMapping',      current: false },
+          { n: 3, label: 'DRS Score',       path: '/Readiness',        current: false },
+          { n: 4, label: 'Valuation',       path: '/Valuation',        current: false },
+          { n: 5, label: 'Value Gap',       path: '/ValueGap',         current: false },
+          { n: 6, label: 'Buyer Prep',      path: '/BuyerLens',        current: false },
+          { n: 7, label: 'Reports',         path: '/Reports',          current: false },
+        ]
+        return (
+          <div className="rounded-xl border border-border bg-card/50 px-4 py-3 overflow-x-auto">
+            <div className="flex items-center min-w-max gap-0">
+              {STAGES.map((s, idx) => (
+                <div key={s.n} className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => navigate(resolvePath(s.path, pathname))}
+                    className={cn(
+                      'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors',
+                      s.current
+                        ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/40',
+                    )}
+                  >
+                    <span className={cn(
+                      'w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0',
+                      s.current ? 'bg-primary text-primary-foreground' : 'bg-muted/60 text-muted-foreground',
+                    )}>{s.n}</span>
+                    {s.label}
+                  </button>
+                  {idx < STAGES.length - 1 && (
+                    <ArrowRight className="w-3 h-3 text-muted-foreground/30 flex-shrink-0 mx-0.5" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Completion progress */}
       <div className="rounded-xl border border-border bg-card p-4">
         <div className="flex items-center justify-between mb-2">

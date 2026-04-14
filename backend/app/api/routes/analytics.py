@@ -1116,14 +1116,44 @@ async def generate_buyer_question_draft(
     }
 
 
+_VALID_INITIATIVE_STATUSES = {"planned", "in_progress", "complete"}
+
+
 class InitiativeCreate(BaseModel):
     title: str
     category: Optional[str] = None
+    status: str = "planned"
     timeline: Optional[str] = None
     cost_estimate: Optional[float] = None
     ev_impact_estimate: Optional[float] = None
     advisor_ev_override: Optional[float] = None
     depends_on_initiative_id: Optional[int] = None
+
+
+class InitiativeUpdate(BaseModel):
+    title: Optional[str] = None
+    category: Optional[str] = None
+    status: Optional[str] = None
+    timeline: Optional[str] = None
+    cost_estimate: Optional[float] = None
+    ev_impact_estimate: Optional[float] = None
+    advisor_ev_override: Optional[float] = None
+    depends_on_initiative_id: Optional[int] = None
+
+
+def _initiative_dict(r: "CompanyInitiative") -> dict:
+    return {
+        "id": r.id,
+        "title": r.title,
+        "category": r.category,
+        "status": getattr(r, "status", "planned"),
+        "timeline": r.timeline,
+        "cost_estimate": float(r.cost_estimate) if r.cost_estimate is not None else None,
+        "ev_impact_estimate": float(r.ev_impact_estimate) if r.ev_impact_estimate is not None else None,
+        "advisor_ev_override": float(r.advisor_ev_override) if r.advisor_ev_override is not None else None,
+        "depends_on_initiative_id": r.depends_on_initiative_id,
+        "source": r.source,
+    }
 
 
 @router.get("/initiatives/{company_id}")
@@ -1136,20 +1166,7 @@ def list_initiatives(company: CompanyScoped, db: Session = Depends(get_db)):
     )
     return {
         "company_id": company.id,
-        "initiatives": [
-            {
-                "id": r.id,
-                "title": r.title,
-                "category": r.category,
-                "timeline": r.timeline,
-                "cost_estimate": float(r.cost_estimate) if r.cost_estimate is not None else None,
-                "ev_impact_estimate": float(r.ev_impact_estimate) if r.ev_impact_estimate is not None else None,
-                "advisor_ev_override": float(r.advisor_ev_override) if r.advisor_ev_override is not None else None,
-                "depends_on_initiative_id": r.depends_on_initiative_id,
-                "source": r.source,
-            }
-            for r in rows
-        ],
+        "initiatives": [_initiative_dict(r) for r in rows],
     }
 
 
@@ -1159,10 +1176,12 @@ def create_initiative(
     body: InitiativeCreate,
     db: Session = Depends(get_db),
 ):
+    status = body.status if body.status in _VALID_INITIATIVE_STATUSES else "planned"
     row = CompanyInitiative(
         company_id=company.id,
         title=body.title,
         category=body.category,
+        status=status,
         timeline=body.timeline,
         cost_estimate=body.cost_estimate,
         ev_impact_estimate=body.ev_impact_estimate,
@@ -1173,17 +1192,59 @@ def create_initiative(
     db.add(row)
     db.commit()
     db.refresh(row)
-    return {
-        "id": row.id,
-        "title": row.title,
-        "category": row.category,
-        "timeline": row.timeline,
-        "cost_estimate": float(row.cost_estimate) if row.cost_estimate is not None else None,
-        "ev_impact_estimate": float(row.ev_impact_estimate) if row.ev_impact_estimate is not None else None,
-        "advisor_ev_override": float(row.advisor_ev_override) if row.advisor_ev_override is not None else None,
-        "depends_on_initiative_id": row.depends_on_initiative_id,
-        "source": row.source,
-    }
+    return _initiative_dict(row)
+
+
+@router.patch("/initiatives/{company_id}/{initiative_id}")
+def update_initiative(
+    company: CompanyScoped,
+    initiative_id: int,
+    body: InitiativeUpdate,
+    db: Session = Depends(get_db),
+):
+    row = (
+        db.query(CompanyInitiative)
+        .filter(CompanyInitiative.id == initiative_id, CompanyInitiative.company_id == company.id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Initiative not found.")
+    if body.title is not None:
+        row.title = body.title
+    if body.category is not None:
+        row.category = body.category
+    if body.status is not None and body.status in _VALID_INITIATIVE_STATUSES:
+        row.status = body.status
+    if body.timeline is not None:
+        row.timeline = body.timeline
+    if body.cost_estimate is not None:
+        row.cost_estimate = body.cost_estimate
+    if body.ev_impact_estimate is not None:
+        row.ev_impact_estimate = body.ev_impact_estimate
+    if body.advisor_ev_override is not None:
+        row.advisor_ev_override = body.advisor_ev_override
+    if body.depends_on_initiative_id is not None:
+        row.depends_on_initiative_id = body.depends_on_initiative_id
+    db.commit()
+    db.refresh(row)
+    return _initiative_dict(row)
+
+
+@router.delete("/initiatives/{company_id}/{initiative_id}", status_code=204)
+def delete_initiative(
+    company: CompanyScoped,
+    initiative_id: int,
+    db: Session = Depends(get_db),
+):
+    row = (
+        db.query(CompanyInitiative)
+        .filter(CompanyInitiative.id == initiative_id, CompanyInitiative.company_id == company.id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Initiative not found.")
+    db.delete(row)
+    db.commit()
 
 
 def _build_recast_payload(company_id: int, db: Session) -> dict:

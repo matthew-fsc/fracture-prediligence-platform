@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
-import { ChevronDown, ChevronRight, Edit2, Check, X, Info, Shield } from 'lucide-react'
+import { ChevronDown, ChevronRight, Edit2, Check, X, Info, Shield, AlertTriangle } from 'lucide-react'
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine,
@@ -423,6 +423,19 @@ export default function Readiness() {
 
   return (
     <div className="space-y-5 max-w-[1400px]">
+      {drs < 40 && (
+        <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-5 py-4 flex items-start gap-3" role="alert">
+          <Shield className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-red-400">Pre-Diligence Required — Company Not Market-Ready</p>
+            <p className="text-xs text-red-300/80 mt-1">
+              A DRS below 40 indicates fundamental gaps that a buyer's diligence team will identify immediately.
+              Do not proceed to market outreach. Prioritize the Value Gap initiatives to reach a minimum of 55 (Conditional) before engaging any buyers.
+            </p>
+          </div>
+        </div>
+      )}
+
       <SectionHeader
         title="Diligence Readiness Score"
         subtitle="Weighted scoring framework — Revenue Quality · Financial Integrity · Operational Independence · Customer Risk · Management · Growth"

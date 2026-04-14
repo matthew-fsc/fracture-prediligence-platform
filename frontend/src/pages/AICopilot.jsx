@@ -62,8 +62,9 @@ export default function AICopilot() {
       content: "Hello! I'm your Pre-Diligence AI Copilot. I have access to your company's diligence data and can answer questions about your DRS score, enterprise value, gaps, buyer risks, and initiatives. What would you like to know?",
     }
   ])
-  const [input, setInput]     = useState('')
-  const [loading, setLoading] = useState(false)
+  const [input, setInput]       = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [tokenUsage, setTokenUsage] = useState(null)   // { tokens_used_this_month, monthly_limit, tokens_this_request }
   const bottomRef = useRef(null)
 
   const companyReady = companyId != null && companyId > 0
@@ -99,6 +100,7 @@ export default function AICopilot() {
         history,
       })
       answer = data.reply
+      if (data.usage) setTokenUsage(data.usage)
     } catch {
       answer = buildLocalAnswer(userMsg, scores)
     }
@@ -176,7 +178,7 @@ export default function AICopilot() {
       )}
 
       {/* Suggested questions */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-3">
         {SUGGESTED_QUESTIONS.map(q => (
           <button
             key={q}
@@ -187,6 +189,39 @@ export default function AICopilot() {
           </button>
         ))}
       </div>
+
+      {/* Token usage meter */}
+      {tokenUsage && tokenUsage.monthly_limit != null && (
+        <div className="mb-4 rounded-lg border border-border bg-muted/20 px-3 py-2 space-y-1">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-muted-foreground">Monthly AI usage</span>
+            <span className={
+              tokenUsage.tokens_used_this_month / tokenUsage.monthly_limit >= 0.9
+                ? 'font-bold text-red-400'
+                : tokenUsage.tokens_used_this_month / tokenUsage.monthly_limit >= 0.7
+                ? 'font-bold text-amber-400'
+                : 'font-medium text-muted-foreground'
+            }>
+              {(tokenUsage.tokens_used_this_month / 1000).toFixed(0)}k / {(tokenUsage.monthly_limit / 1000).toFixed(0)}k tokens
+            </span>
+          </div>
+          <div className="h-1 bg-muted rounded-full overflow-hidden">
+            <div
+              className={
+                tokenUsage.tokens_used_this_month / tokenUsage.monthly_limit >= 0.9
+                  ? 'h-1 bg-red-500 rounded-full transition-all'
+                  : tokenUsage.tokens_used_this_month / tokenUsage.monthly_limit >= 0.7
+                  ? 'h-1 bg-amber-500 rounded-full transition-all'
+                  : 'h-1 bg-primary rounded-full transition-all'
+              }
+              style={{ width: `${Math.min(100, (tokenUsage.tokens_used_this_month / tokenUsage.monthly_limit) * 100).toFixed(1)}%` }}
+            />
+          </div>
+          {tokenUsage.tokens_this_request != null && (
+            <p className="text-[10px] text-muted-foreground/60">Last request: {tokenUsage.tokens_this_request.toLocaleString()} tokens · Resets 1st of next month</p>
+          )}
+        </div>
+      )}
 
       {/* Message thread */}
       <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
