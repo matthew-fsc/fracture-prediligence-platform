@@ -286,6 +286,11 @@ class QualitativeInputs(Base):
     customer_contract_type: Mapped[Optional[str]]   = mapped_column(String(32), nullable=True)       # project|retainer|msa|mix
     key_person_revenue_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 1), nullable=True)   # % revenue tied to owner relationships
     mgmt_covered_functions: Mapped[Optional[str]]   = mapped_column(String(256), nullable=True)      # comma-separated function IDs with qualified manager
+    # A6 qualitative fields (migration 0014)
+    has_crm_pipeline:       Mapped[Optional[bool]]  = mapped_column(Boolean, nullable=True)          # formal CRM pipeline present
+    non_compete_pct:        Mapped[Optional[str]]   = mapped_column(String(32), nullable=True)       # 0|1-50|51-75|76-99|100
+    voluntary_turnover:     Mapped[Optional[str]]   = mapped_column(String(32), nullable=True)       # <10|10-15|15-25|>25
+    comp_vs_market:         Mapped[Optional[str]]   = mapped_column(String(32), nullable=True)       # below_25|below_15|within_15|above
     updated_at:             Mapped[datetime]        = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
@@ -385,6 +390,12 @@ class CompanyInitiative(Base):
     depends_on_initiative_id:   Mapped[Optional[int]]   = mapped_column(ForeignKey("company_initiatives.id"), nullable=True)
     source:                     Mapped[str]             = mapped_column(String(32), default="custom")
     created_at:                 Mapped[datetime]        = mapped_column(DateTime, server_default=func.now())
+    # Engagement plan fields (migration 0015)
+    phase:                      Mapped[Optional[int]]    = mapped_column(Integer, nullable=True)           # 1=Risk / 2=Structural / 3=Value
+    estimated_drs_impact:       Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 2), nullable=True)   # DRS point lift
+    target_completion_date:     Mapped[Optional[date]]   = mapped_column(Date, nullable=True)
+    actual_completion_date:     Mapped[Optional[date]]   = mapped_column(Date, nullable=True)
+    drs_category_key:           Mapped[Optional[str]]    = mapped_column(String(64), nullable=True)       # e.g. "operational_independence"
 
     company: Mapped[Company] = relationship("Company")
 
@@ -757,3 +768,49 @@ class ChannelPartner(Base):
     stripe_coupon_id:  Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
     is_active:         Mapped[bool]          = mapped_column(Boolean, default=True)
     created_at:        Mapped[datetime]      = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# QuickBooks OAuth tokens (QB integration — migration 0013)
+# ---------------------------------------------------------------------------
+
+class QBToken(Base):
+    """
+    Per-company QuickBooks OAuth 2.0 token storage.
+    One row per company; upserted on each OAuth completion / refresh.
+    """
+    __tablename__ = "qb_tokens"
+
+    id:            Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:    Mapped[int]            = mapped_column(ForeignKey("companies.id"), unique=True, index=True)
+    realm_id:      Mapped[str]            = mapped_column(String(128))     # Intuit realm / company id
+    access_token:  Mapped[str]            = mapped_column(Text)
+    refresh_token: Mapped[str]            = mapped_column(Text)
+    expires_at:    Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at:    Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at:    Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    company: Mapped[Company] = relationship("Company")
+
+
+# ---------------------------------------------------------------------------
+# Engagement plans (exit planning layer — migration 0015)
+# ---------------------------------------------------------------------------
+
+class EngagementPlan(Base):
+    """
+    Top-level exit engagement plan for a company.  One row per company.
+    Links the target exit date, target DRS, and current phase to the
+    engagement_initiatives (CompanyInitiative rows with phase set).
+    """
+    __tablename__ = "engagement_plans"
+
+    id:               Mapped[int]             = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:       Mapped[int]             = mapped_column(ForeignKey("companies.id"), unique=True, index=True)
+    target_exit_date: Mapped[Optional[date]]  = mapped_column(Date, nullable=True)
+    target_drs:       Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 2), nullable=True)
+    current_phase:    Mapped[Optional[int]]   = mapped_column(Integer, nullable=True, default=1)  # 1|2|3
+    created_at:       Mapped[datetime]        = mapped_column(DateTime, server_default=func.now())
+    updated_at:       Mapped[datetime]        = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    company: Mapped[Company] = relationship("Company")
