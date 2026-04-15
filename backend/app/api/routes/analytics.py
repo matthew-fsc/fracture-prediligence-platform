@@ -1,8 +1,11 @@
 """Blueprint II analytics engine — API routes."""
 
 import json
+import logging
 import mimetypes
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, RedirectResponse
@@ -147,6 +150,28 @@ def _qual_key_person_score(key_person_pct: float) -> float:
     return 10.0
 
 
+# A6 qualitative helpers (Task 2 — advisory inputs extension)
+
+def _qual_non_compete_score(non_compete_pct: str) -> float:
+    """Score from % key employees with signed non-competes (dropdown band)."""
+    return {"0": 20.0, "1-50": 45.0, "51-75": 65.0, "76-99": 82.0, "100": 95.0}.get(str(non_compete_pct), 50.0)
+
+
+def _qual_voluntary_turnover_score(voluntary_turnover: str) -> float:
+    """Score from 3-yr voluntary employee turnover band."""
+    return {"<10": 90.0, "10-15": 70.0, "15-25": 45.0, ">25": 20.0}.get(str(voluntary_turnover), 50.0)
+
+
+def _qual_comp_vs_market_score(comp_vs_market: str) -> float:
+    """Score from avg employee comp vs. market rate band."""
+    return {
+        "below_25": 25.0,   # >25% below market
+        "below_15": 45.0,   # 15–25% below market
+        "within_15": 75.0,  # Within ±15%
+        "above": 90.0,      # Above market
+    }.get(str(comp_vs_market), 50.0)
+
+
 # ---------------------------------------------------------------------------
 # Pydantic schemas
 # ---------------------------------------------------------------------------
@@ -168,6 +193,11 @@ class QualitativeRequest(BaseModel):
     contract_pct: Optional[float] = None
     customer_contract_type: Optional[str] = None
     key_person_revenue_pct: Optional[float] = None
+    # A6 advisory inputs (Task 2 — migration 0014)
+    has_crm_pipeline: Optional[bool] = None
+    non_compete_pct: Optional[str] = None      # "0"|"1-50"|"51-75"|"76-99"|"100"
+    voluntary_turnover: Optional[str] = None   # "<10"|"10-15"|"15-25"|">25"
+    comp_vs_market: Optional[str] = None       # "below_25"|"below_15"|"within_15"|"above"
 
 
 @router.get("/metrics/{company_id}")
@@ -302,12 +332,21 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
         ops_raw = ops.composite
         rev_raw = rev.composite
         growth_raw = growth.composite
+        mgmt_raw = mgmt.composite
         ops_qual_complete = False
         rev_qual_complete = False
         growth_qual_complete = False
+        mgmt_qual_complete = False
         qual_sub_scores_ops = {}
         qual_sub_scores_rev = {}
         qual_sub_scores_growth = {}
+        qual_sub_scores_mgmt = {}
+
+        # Store financial-only (baseline) composites for DRS diff
+        baseline_ops_raw    = ops.composite
+        baseline_rev_raw    = rev.composite
+        baseline_growth_raw = growth.composite
+        baseline_mgmt_raw   = mgmt.composite
 
         if qual:
             a4_fields = [qual.owner_hours_per_week, qual.sop_pct, qual.automation_pct,
@@ -377,6 +416,43 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
                 rev_raw = rev_qual_composite
                 rev_qual_complete = True
 
+            # --- P2d: Management & Team qualitative override (A6) ---
+            a6_fields = [qual.non_compete_pct, qual.voluntary_turnover, qual.comp_vs_market]
+            if all(v is not None for v in a6_fields):
+                s_noncompete = _qual_non_compete_score(qual.non_compete_pct)
+                s_turnover   = _qual_voluntary_turnover_score(qual.voluntary_turnover)
+                s_comp_mkt   = _qual_comp_vs_market_score(qual.comp_vs_market)
+                # Blend qual inputs into A6 composite: preserve financial sub-scores (60%) + qual overlay (40%)
+                mgmt_qual_composite = round(
+                    mgmt.composite * 0.60
+                    + s_noncompete  * 0.15
+                    + s_turnover    * 0.15
+                    + s_comp_mkt    * 0.10,
+                    1,
+                )
+                mgmt_raw = mgmt_qual_composite
+                mgmt_qual_complete = True
+                qual_sub_scores_mgmt = {
+                    "non_compete_coverage": {
+                        "score": s_noncompete,
+                        "value": qual.non_compete_pct,
+                        "label": f"{qual.non_compete_pct}% staff with non-competes",
+                        "source": "advisor_input",
+                    },
+                    "retention_history": {
+                        "score": s_turnover,
+                        "value": qual.voluntary_turnover,
+                        "label": f"{qual.voluntary_turnover}% voluntary turnover (3yr)",
+                        "source": "advisor_input",
+                    },
+                    "comp_vs_market": {
+                        "score": s_comp_mkt,
+                        "value": qual.comp_vs_market,
+                        "label": qual.comp_vs_market.replace("_", " ") + " market comp",
+                        "source": "advisor_input",
+                    },
+                }
+
         # --- P1: Load advisor overrides ---
         overrides_rows = db.query(AdvisorOverride).filter(
             AdvisorOverride.company_id == company.id
@@ -388,8 +464,18 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
             "financial_integrity":      round(fin.composite, 1),
             "operational_independence": round(ops_raw, 1),
             "customer_risk":            round(cust.composite, 1),
-            "management_team":          round(mgmt.composite, 1),
+            "management_team":          round(mgmt_raw, 1),
             "growth_drivers":           round(growth_raw, 1),
+        }
+
+        # Baseline scores: financial data only (no qualitative overrides) — used for DRS diff
+        baseline_scores = {
+            "revenue_quality":          round(baseline_rev_raw, 1),
+            "financial_integrity":      round(fin.composite, 1),
+            "operational_independence": round(baseline_ops_raw, 1),
+            "customer_risk":            round(cust.composite, 1),
+            "management_team":          round(baseline_mgmt_raw, 1),
+            "growth_drivers":           round(baseline_growth_raw, 1),
         }
 
         def apply_override(key, raw):
@@ -398,6 +484,7 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
             return raw
 
         adj_scores = {k: round(apply_override(k, v), 1) for k, v in raw_scores.items()}
+        baseline_adj_scores = {k: round(apply_override(k, v), 1) for k, v in baseline_scores.items()}
 
         # --- Build category score dicts with override metadata ---
         def enrich(key, base_dict, raw_composite, adj_composite):
@@ -426,7 +513,15 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
         rev_d  = enrich("revenue_quality", rev_base, raw_scores["revenue_quality"], adj_scores["revenue_quality"])
         fin_d  = enrich("financial_integrity",       fin.to_dict(),    raw_scores["financial_integrity"],       adj_scores["financial_integrity"])
         cust_d = enrich("customer_risk",             cust.to_dict(),   raw_scores["customer_risk"],             adj_scores["customer_risk"])
-        mgmt_d = enrich("management_team",           mgmt.to_dict(),   raw_scores["management_team"],           adj_scores["management_team"])
+        mgmt_base = mgmt.to_dict()
+        if mgmt_qual_complete:
+            mgmt_base["sub_scores"].update(qual_sub_scores_mgmt)
+            mgmt_base["qualitative_complete"] = True
+        else:
+            mgmt_base["qualitative_complete"] = False
+            for k in mgmt_base.get("sub_scores", {}):
+                mgmt_base["sub_scores"][k]["source"] = "financial_data"
+        mgmt_d = enrich("management_team", mgmt_base, raw_scores["management_team"], adj_scores["management_team"])
 
         ops_base = ops.to_dict()
         if ops_qual_complete:
@@ -471,6 +566,17 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
         )
         drs = compute_drs(cat)
 
+        # --- Baseline DRS: financial data only, no qualitative overrides ---
+        baseline_cat = CategoryScores(
+            revenue_quality=baseline_adj_scores["revenue_quality"],
+            financial_integrity=baseline_adj_scores["financial_integrity"],
+            operational_independence=baseline_adj_scores["operational_independence"],
+            customer_risk=baseline_adj_scores["customer_risk"],
+            management_team=baseline_adj_scores["management_team"],
+            growth_drivers=baseline_adj_scores["growth_drivers"],
+        )
+        baseline_drs = compute_drs(baseline_cat)
+
         from decimal import Decimal as _Decimal
         basis = _ebitda_basis(company.id, db)
         ebitda_dec = _Decimal(str(round(basis["ebitda_normalized_ttm"], 2)))
@@ -483,7 +589,7 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
         ev = compute_enterprise_value(ebitda_dec, tier_for_ev, market_context=mctx)
         valuation_summary = format_ev_valuation_summary(ev)
 
-        qual_complete = ops_qual_complete and growth_qual_complete and rev_qual_complete
+        qual_complete = ops_qual_complete and growth_qual_complete and rev_qual_complete and mgmt_qual_complete
         has_overrides = bool(override_map)
 
         # --- PRE: Owner Personal Readiness Score ---
@@ -534,6 +640,18 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
                 "has_overrides":      has_overrides,
                 "qualitative_complete": qual_complete,
                 "confidence_summary": _conf_summary.to_dict(),
+                # Baseline (financial data only) — used for advisory input diff display
+                "baseline": {
+                    "base":        baseline_drs.base_drs,
+                    "conservative": baseline_drs.conservative_drs,
+                    "optimistic":   baseline_drs.optimistic_drs,
+                    "tier":         baseline_drs.tier.value,
+                },
+                # Per-category delta: advisory inputs vs. financial-only baseline
+                "advisory_delta": {
+                    k: round(adj_scores[k] - baseline_adj_scores[k], 1)
+                    for k in adj_scores
+                },
             },
             "category_scores": {
                 "revenue_quality":          rev_d,
@@ -1637,6 +1755,11 @@ def get_qualitative(company: CompanyScoped, db: Session = Depends(get_db)):
             "contract_pct":           float(row.contract_pct)           if row.contract_pct           is not None else None,
             "customer_contract_type": row.customer_contract_type,
             "key_person_revenue_pct": float(row.key_person_revenue_pct) if row.key_person_revenue_pct is not None else None,
+            # A6 advisory inputs (Task 2)
+            "has_crm_pipeline":      row.has_crm_pipeline,
+            "non_compete_pct":       row.non_compete_pct,
+            "voluntary_turnover":    row.voluntary_turnover,
+            "comp_vs_market":        row.comp_vs_market,
             "updated_at":             row.updated_at.isoformat(),
         },
     }
@@ -1656,6 +1779,11 @@ def _qualitative_snapshot(row: QualitativeInputs) -> dict:
         "contract_pct": float(row.contract_pct) if row.contract_pct is not None else None,
         "customer_contract_type": row.customer_contract_type,
         "key_person_revenue_pct": float(row.key_person_revenue_pct) if row.key_person_revenue_pct is not None else None,
+        # A6 advisory inputs (Task 2)
+        "has_crm_pipeline":   row.has_crm_pipeline,
+        "non_compete_pct":    row.non_compete_pct,
+        "voluntary_turnover": row.voluntary_turnover,
+        "comp_vs_market":     row.comp_vs_market,
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
     }
 

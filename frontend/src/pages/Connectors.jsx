@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Upload, AlertCircle, FileText, RefreshCw, ChevronRight, Trash2, RotateCcw, Info } from 'lucide-react'
+import { Upload, AlertCircle, FileText, RefreshCw, ChevronRight, Trash2, RotateCcw, Info, Plug, CheckCircle2, XCircle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { useCompanyId } from '../context/CompanyContext'
@@ -52,9 +52,56 @@ export default function Connectors() {
   const [sourceType, setSourceType] = useState('unknown')
   const [error, setError]           = useState(null)
   const [retryingId, setRetryingId] = useState(null)
+  const [qbFetching, setQbFetching] = useState(false)
   const fileRef = useRef()
 
   const companyReady = companyId != null && companyId >= 1
+
+  const { data: qbStatus } = useQuery({
+    queryKey: ['qb-status', companyId],
+    queryFn: () => apiClient.get(`/api/qb/status/${companyId}`),
+    enabled: companyReady && !isDemo,
+    staleTime: 60_000,
+  })
+
+  async function connectQuickBooks() {
+    if (!companyReady) return
+    try {
+      const { authorize_url } = await apiClient.get(`/api/qb/authorize/${companyId}`)
+      // Open OAuth consent page; callback will redirect back to this page
+      window.location.href = authorize_url
+    } catch (e) {
+      toast.error(e.message || 'Could not start QuickBooks connection')
+    }
+  }
+
+  async function fetchFromQuickBooks() {
+    if (!companyReady) return
+    setQbFetching(true)
+    try {
+      const result = await apiClient.post(`/api/qb/fetch/${companyId}`, {})
+      await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
+      const count = result.jobs_created?.length ?? 0
+      toast.success(`QuickBooks sync complete — ${count} dataset${count !== 1 ? 's' : ''} ingested`)
+      if (result.errors?.length) {
+        result.errors.forEach(e => toast.error(`QB fetch error: ${e}`))
+      }
+    } catch (e) {
+      toast.error(e.message || 'QuickBooks fetch failed')
+    } finally {
+      setQbFetching(false)
+    }
+  }
+
+  async function disconnectQuickBooks() {
+    try {
+      await apiClient.del(`/api/qb/disconnect/${companyId}`)
+      await qc.invalidateQueries({ queryKey: ['qb-status', companyId] })
+      toast.success('QuickBooks disconnected')
+    } catch (e) {
+      toast.error(e.message || 'Disconnect failed')
+    }
+  }
 
   const {
     data: jobs = [],
@@ -191,6 +238,69 @@ export default function Connectors() {
         </div>
       </div>
 
+
+      {/* QuickBooks Direct Connection */}
+      {!demoReadOnly && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <Plug className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-card-foreground">Connect QuickBooks</p>
+              <p className="text-xs text-muted-foreground">Pull P&amp;L, invoices, and customers directly via OAuth — no export needed</p>
+            </div>
+            {qbStatus?.connected && (
+              <span className="ml-auto flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Connected
+              </span>
+            )}
+          </div>
+
+          {qbStatus?.connected ? (
+            <div className="flex items-center gap-3">
+              <div className="flex-1 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+                <p className="text-xs text-muted-foreground">Realm ID: <span className="font-mono text-card-foreground">{qbStatus.realm_id}</span></p>
+                {qbStatus.expires_at && (
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Token expires: {new Date(qbStatus.expires_at).toLocaleString()}</p>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={fetchFromQuickBooks}
+                  disabled={qbFetching}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors"
+                >
+                  {qbFetching ? <RefreshCw className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  {qbFetching ? 'Syncing...' : 'Sync Now'}
+                </button>
+                <button
+                  type="button"
+                  onClick={disconnectQuickBooks}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-red-500/30 text-red-400 rounded-lg text-xs font-semibold hover:bg-red-500/10 transition-colors"
+                >
+                  <XCircle className="w-3 h-3" /> Disconnect
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={connectQuickBooks}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              <Plug className="w-4 h-4" /> Connect QuickBooks
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-border" />
+        <span className="text-[11px] text-muted-foreground uppercase tracking-widest font-semibold">or upload manually</span>
+        <div className="flex-1 h-px bg-border" />
+      </div>
 
       {/* Upload area — full uploader only outside demo */}
       {demoReadOnly ? (

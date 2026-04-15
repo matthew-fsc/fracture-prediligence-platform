@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
-import { ChevronDown, ChevronRight, Edit2, Check, X, Info, Shield, AlertTriangle } from 'lucide-react'
+import { ChevronDown, ChevronRight, Edit2, Check, X, Info, Shield, AlertTriangle, HelpCircle } from 'lucide-react'
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine,
@@ -396,6 +396,9 @@ export default function Readiness() {
   const cats = data?.category_scores ?? {}
   const qualComplete = data?.drs?.qualitative_complete
   const hasOverrides = data?.drs?.has_overrides
+  const drsConservative = data?.drs?.conservative ?? drs
+  const drsOptimistic = data?.drs?.optimistic ?? drs
+  const confidenceSummary = data?.drs?.confidence_summary ?? null
 
   // Dynamic colors for overall score display
   const arcStroke   = drs >= 70 ? 'hsl(160,84%,39%)' : drs >= 55 ? 'hsl(43,96%,56%)' : 'hsl(0,72%,51%)'
@@ -614,6 +617,53 @@ export default function Readiness() {
                 {tier.label}
               </span>
             </div>
+
+            {/* Confidence band: conservative / base / optimistic */}
+            {(drsConservative !== drs || drsOptimistic !== drs) && (
+              <div className="w-full rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Confidence Band</p>
+                  {confidenceSummary && (
+                    <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded-full border',
+                      confidenceSummary.overall_level === 'HIGH'
+                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                        : confidenceSummary.overall_level === 'MEDIUM'
+                        ? 'border-amber-500/30 bg-amber-500/10 text-amber-400'
+                        : 'border-red-500/30 bg-red-500/10 text-red-400')}>
+                      {confidenceSummary.overall_level}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-1 text-center">
+                  {[
+                    { label: 'Conservative', val: drsConservative, color: 'text-red-400' },
+                    { label: 'Base', val: drs, color: scoreColor(drs), primary: true },
+                    { label: 'Optimistic', val: drsOptimistic, color: 'text-emerald-400' },
+                  ].map(({ label, val, color, primary }) => (
+                    <div key={label} className={cn('rounded p-1.5', primary ? 'bg-primary/5 border border-primary/20' : 'bg-muted/10')}>
+                      <p className={cn('text-base font-black tabular-nums', color)}>{Math.round(val)}</p>
+                      <p className="text-[10px] text-muted-foreground">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Range bar */}
+                <div className="relative h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div className="absolute h-full bg-primary/30 rounded-full"
+                    style={{
+                      left: `${drsConservative}%`,
+                      width: `${Math.max(0, drsOptimistic - drsConservative)}%`,
+                    }} />
+                  <div className="absolute h-full w-1 bg-primary rounded-full -translate-x-0.5"
+                    style={{ left: `${drs}%` }} />
+                </div>
+                {confidenceSummary?.factors?.[0] && (
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    {confidenceSummary.factors[0]}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="w-full space-y-1.5 pt-3 border-t border-border">
               {breakdown.map(b => (
                 <div key={b.key} className="flex items-center justify-between text-[11px]">

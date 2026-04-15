@@ -19,5 +19,7 @@ fpdf2>=2.7.0
 stripe>=7.0.0
 boto3>=1.35.0
 posthog>=3.5.0
+intuit-oauth>=1.2.6
+python-quickbooks>=0.9.4
 pytest>=8.3.0
 pytest-asyncio>=0.24.0
