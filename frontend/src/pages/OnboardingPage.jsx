@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Cloud, CheckCircle, Circle } from 'lucide-react'
-import { useCompanyId } from '../context/CompanyContext'
+import { useCompany, useCompanyId } from '../context/CompanyContext'
 import { apiUrl, apiClient } from '../lib/apiClient'
 import { withCompanyQuery } from '../lib/navLinks'
 import { marketingColors as COLORS } from '../theme/marketingColors'
@@ -123,7 +123,7 @@ function ProgressBar({ step }) {
               transition: 'background 0.3s ease',
             }}
           >
-            {n < step ? '?' : n}
+            {n < step ? '✓' : n}
           </div>
           {n < 3 && (
             <div
@@ -144,7 +144,7 @@ function ProgressBar({ step }) {
 // ---------------------------------------------------------------------------
 // Step 1 — Add first client
 // ---------------------------------------------------------------------------
-function Step1({ onNext }) {
+function Step1({ onNext, submitting }) {
   const saved = readOnboarding().step1
   const [form, setForm] = useState({
     name: '',
@@ -232,8 +232,8 @@ function Step1({ onNext }) {
         </select>
       </div>
 
-      <button type="submit" style={BTN_PRIMARY}>
-        Add Client & Continue ?
+      <button type="submit" disabled={submitting} style={{ ...BTN_PRIMARY, opacity: submitting ? 0.7 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}>
+        {submitting ? 'Adding Client...' : 'Add Client and Continue'}
       </button>
     </form>
   )
@@ -346,10 +346,10 @@ function Step2({ onNext, onSkip }) {
             cursor: file ? 'pointer' : 'not-allowed',
           }}
         >
-          Upload & Continue ?
+          Upload and Continue
         </button>
         <button onClick={onSkip} style={BTN_GHOST}>
-          Skip for now ?
+          Skip for now
         </button>
       </div>
     </div>
@@ -561,10 +561,10 @@ function Step3({ onNext, onSkip }) {
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         <button onClick={handleSave} disabled={saving} style={{ ...BTN_PRIMARY, opacity: saving ? 0.7 : 1 }}>
-          {saving ? 'Saving—' : 'Save & Continue ?'}
+          {saving ? 'Saving...' : 'Save and Continue'}
         </button>
         <button onClick={onSkip} style={BTN_GHOST}>
-          Skip — complete later ?
+          Skip - complete later
         </button>
       </div>
     </div>
@@ -577,7 +577,7 @@ function Step3({ onNext, onSkip }) {
 function Success({ toIntake }) {
   return (
     <div style={{ textAlign: 'center', padding: '40px 0' }}>
-      <div style={{ fontSize: 48, marginBottom: 20 }}>??</div>
+      <div style={{ fontSize: 48, marginBottom: 20 }}>✓</div>
       <h2
         style={{
           color: COLORS.offWhite,
@@ -615,12 +615,35 @@ function Success({ toIntake }) {
 // ---------------------------------------------------------------------------
 export default function OnboardingPage() {
   const navigate = useNavigate()
+  const { setCompanyId } = useCompany()
   const companyId = useCompanyId()
   const [step, setStep] = useState(() => {
     const s = readOnboarding().step
     return typeof s === 'number' && s >= 1 && s <= 3 ? s : 1
   })
   const [done, setDone] = useState(false)
+  const [creatingCompany, setCreatingCompany] = useState(false)
+
+  const handleStep1Next = async (form) => {
+    if (creatingCompany) return
+    setCreatingCompany(true)
+    try {
+      const created = await apiClient.post('/api/companies', {
+        name: form.name?.trim(),
+        industry: form.industry || null,
+        entity_type: form.entityType || null,
+      })
+      if (created?.id) {
+        setCompanyId(created.id)
+      }
+      setStep(2)
+    } catch {
+      // Keep onboarding usable even if company creation endpoint is transiently unavailable.
+      setStep(2)
+    } finally {
+      setCreatingCompany(false)
+    }
+  }
 
   useEffect(() => {
     writeOnboarding({ step })
@@ -713,7 +736,8 @@ export default function OnboardingPage() {
 
             {step === 1 && (
               <Step1
-                onNext={() => setStep(2)}
+                onNext={handleStep1Next}
+                submitting={creatingCompany}
               />
             )}
             {step === 2 && (

@@ -121,7 +121,7 @@ export default function SignInPage() {
       <p style={{ color: clerkEmbedText.tertiary, fontFamily: "'DM Sans', sans-serif", fontSize: 13, marginTop: 24 }}>
         No account?{' '}
         <Link to="/sign-up" style={{ color: C.gold, textDecoration: 'none' }}>
-          Create one ?
+          Create one
         </Link>
       </p>
     </div>
