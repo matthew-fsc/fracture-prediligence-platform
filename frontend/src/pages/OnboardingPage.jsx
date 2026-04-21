@@ -86,9 +86,9 @@ const INDUSTRIES = [
 
 const REVENUE_RANGES = [
   'Under $1M',
-  '$1M—$2.5M',
-  '$2.5M—$5M',
-  '$5M—$10M',
+  '$1M-$2.5M',
+  '$2.5M-$5M',
+  '$5M-$10M',
   '$10M+',
 ]
 
@@ -329,7 +329,7 @@ function Step2({ onNext, onSkip }) {
               Drag & drop or click to browse
             </p>
             <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 12, margin: 0 }}>
-              PDF, XLSX, CSV, DOCX — Max 25MB
+              PDF, XLSX, CSV, DOCX - Max 25MB
             </p>
           </>
         )}
@@ -395,8 +395,8 @@ const CONTRACT_TYPES = [
 
 const MARKET_OPTS = [
   { value: 'defined',          label: 'Defined ICP + clear differentiation + repeatable sales motion', score: 80 },
-  { value: 'moderate',         label: 'Moderate — some differentiation, inconsistent execution', score: 45 },
-  { value: 'undifferentiated', label: 'Undifferentiated — competing on price or availability', score: 10 },
+  { value: 'moderate',         label: 'Moderate - some differentiation, inconsistent execution', score: 45 },
+  { value: 'undifferentiated', label: 'Undifferentiated - competing on price or availability', score: 10 },
 ]
 
 function Step3({ onNext, onSkip }) {
@@ -483,7 +483,7 @@ function Step3({ onNext, onSkip }) {
         </div>
 
         <SliderRow label="SOP Documentation" value={form.sop_pct}
-          onChange={v => set('sop_pct', v)} leftLabel="0% — none" rightLabel="100% — fully documented" />
+          onChange={v => set('sop_pct', v)} leftLabel="0% - none" rightLabel="100% - fully documented" />
 
         <div style={{ marginBottom: 20 }}>
           <label style={LABEL_STYLE}>Management Depth (qualified managers / total core functions)</label>
@@ -504,7 +504,7 @@ function Step3({ onNext, onSkip }) {
         <SectionTitle>Revenue Contracts &amp; Key Person</SectionTitle>
 
         <SliderRow label="% customers with formal contract or MSA" value={form.contract_pct}
-          onChange={v => set('contract_pct', v)} leftLabel="0% — verbal only" rightLabel="100% — fully contracted" />
+          onChange={v => set('contract_pct', v)} leftLabel="0% - verbal only" rightLabel="100% - fully contracted" />
 
         <div style={{ marginBottom: 20 }}>
           <label style={LABEL_STYLE}>Primary contract type</label>
@@ -528,7 +528,7 @@ function Step3({ onNext, onSkip }) {
         </div>
 
         <SliderRow label="% revenue tied to owner's personal relationships" value={form.key_person_revenue_pct}
-          onChange={v => set('key_person_revenue_pct', v)} leftLabel="0% — institutionalized" rightLabel="100% — fully owner-dependent" />
+          onChange={v => set('key_person_revenue_pct', v)} leftLabel="0% - institutionalized" rightLabel="100% - fully owner-dependent" />
 
         <SectionTitle>Growth</SectionTitle>
 
@@ -588,7 +588,7 @@ function Step3({ onNext, onSkip }) {
 function Success({ toIntake }) {
   return (
     <div style={{ textAlign: 'center', padding: '40px 0' }}>
-      <div style={{ fontSize: 48, marginBottom: 20 }}>✓</div>
+      <div style={{ fontSize: 48, marginBottom: 20 }}>OK</div>
       <h2
         style={{
           color: COLORS.offWhite,
@@ -782,7 +782,7 @@ export default function OnboardingPage() {
             textAlign: 'center',
           }}
         >
-          Step {step} of 3 — {step === 3 ? 'Interview answers can be updated later in Engagement Intake' : 'You can always finish this later from Settings'}
+          Step {step} of 3 - {step === 3 ? 'Interview answers can be updated later in Engagement Intake' : 'You can always finish this later from Settings'}
         </p>
       )}
     </div>

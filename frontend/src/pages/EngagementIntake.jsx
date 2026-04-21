@@ -19,7 +19,7 @@ import { drsCategoryStyles } from '../lib/drsCategoryColors'
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const TX_TYPES = [
-  { value: '', label: '— Select —' },
+  { value: '', label: '- Select -' },
   { value: 'strategic_sale', label: 'Strategic sale' },
   { value: 'esop', label: 'ESOP' },
   { value: 'mbo', label: 'Management buyout (MBO)' },
@@ -70,13 +70,13 @@ const TIER_OPTIONS = [
 
 const MARKET_OPTIONS = [
   { value: 'defined', label: 'Defined ICP + clear differentiation + repeatable sales motion', score: 80 },
-  { value: 'moderate', label: 'Moderate positioning — some differentiation, inconsistent execution', score: 45 },
-  { value: 'undifferentiated', label: 'Undifferentiated or unclear — competing on price/availability', score: 10 },
+  { value: 'moderate', label: 'Moderate positioning - some differentiation, inconsistent execution', score: 45 },
+  { value: 'undifferentiated', label: 'Undifferentiated or unclear - competing on price/availability', score: 10 },
 ]
 
 const CONTRACT_TYPES = [
   { value: 'msa', label: 'MSA / Annual Contract', sub: 'Highest buyer confidence' },
-  { value: 'retainer', label: 'Retainer / Subscription', sub: 'Recurring — strong signal' },
+  { value: 'retainer', label: 'Retainer / Subscription', sub: 'Recurring - strong signal' },
   { value: 'project', label: 'Project-Based', sub: 'Lower predictability' },
   { value: 'mix', label: 'Mix of Above', sub: 'Document each relationship' },
 ]
@@ -238,6 +238,15 @@ export default function EngagementIntake() {
   const [auditOpen, setAuditOpen] = useState(false)
   const [auditEntries, setAuditEntries] = useState([])
 
+  const readOnboardingDraft = useCallback(() => {
+    try {
+      const raw = localStorage.getItem('fracture_onboarding_v1')
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  }, [])
+
   const ready = companyId != null && companyId > 0
   const setQ = useCallback((k, v) => { setQual(f => ({ ...f, [k]: v })); setSaved(false) }, [])
   const markDirty = useCallback(() => setSaved(false), [])
@@ -270,6 +279,7 @@ export default function EngagementIntake() {
         const ep = epRes.status === 'fulfilled' ? epRes.value : null
         const qd = qdRes.status === 'fulfilled' ? qdRes.value : null
         const company = companyRes.status === 'fulfilled' ? companyRes.value : null
+        const onboardingDraft = readOnboardingDraft()
 
         if (ep) {
           setGoals(ep.owner_goals_narrative ?? '')
@@ -285,6 +295,10 @@ export default function EngagementIntake() {
           setBuyers(Array.isArray(ep.preferred_buyer_types) ? ep.preferred_buyer_types : [])
           if (ep.updated_at) setLastSavedAt(new Date(ep.updated_at))
         }
+        if (!ep && onboardingDraft?.step1) {
+          const s1 = onboardingDraft.step1
+          setIndustry((prev) => prev || s1.industry || '')
+        }
         if (qd?.inputs) {
           const i = qd.inputs
           setQual({
@@ -299,6 +313,19 @@ export default function EngagementIntake() {
             customer_contract_type: i.customer_contract_type ?? '',
             key_person_revenue_pct: i.key_person_revenue_pct ?? 50,
           })
+        }
+        if (!qd?.inputs && onboardingDraft?.step3) {
+          const s3 = onboardingDraft.step3
+          setQual((prev) => ({
+            ...prev,
+            owner_hours_per_week: s3.owner_hours_per_week ?? prev.owner_hours_per_week,
+            sop_pct: s3.sop_pct ?? prev.sop_pct,
+            pipeline_value: s3.pipeline_value ?? prev.pipeline_value,
+            market_positioning: s3.market_positioning ?? prev.market_positioning,
+            contract_pct: s3.contract_pct ?? prev.contract_pct,
+            customer_contract_type: s3.customer_contract_type ?? prev.customer_contract_type,
+            key_person_revenue_pct: s3.key_person_revenue_pct ?? prev.key_person_revenue_pct,
+          }))
         }
         if (company) {
           setEmployeeCount(company.total_headcount != null ? String(company.total_headcount) : '')
@@ -406,7 +433,7 @@ export default function EngagementIntake() {
         <SectionHeader title="Client Profile" subtitle="All advisor-sourced context that financial data cannot capture." />
         <div className="rounded-xl border border-border bg-card p-8 text-center">
           <NotebookPen className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-sm font-medium text-foreground">
+          <p className="text-sm font-semibold text-foreground">
             {hydratingCompany ? 'Loading client context...' : 'No client selected'}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
@@ -414,6 +441,15 @@ export default function EngagementIntake() {
               ? 'Finding your first available client.'
               : 'Select or create a client in the header to begin intake.'}
           </p>
+          {!hydratingCompany && (
+            <button
+              type="button"
+              onClick={() => navigate('/Home')}
+              className="mt-3 inline-flex items-center rounded-md border border-border bg-muted/30 px-3 py-1.5 text-xs text-foreground hover:bg-muted/50"
+            >
+              Go to Home
+            </button>
+          )}
         </div>
       </div>
     )
@@ -443,7 +479,7 @@ export default function EngagementIntake() {
                 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shadow-primary/25',
               )}>
               <Save className="w-3.5 h-3.5" />
-              {saving ? 'Saving…' : 'Save All'}
+              {saving ? 'Saving...' : 'Save All'}
             </button>
           </div>
         }
@@ -587,7 +623,7 @@ export default function EngagementIntake() {
               <FieldLabel optional>Non-negotiables</FieldLabel>
               <textarea value={nonNegotiables} onChange={e => { setNonNegotiables(e.target.value); markDirty() }}
                 rows={3}
-                placeholder="Deal structure requirements that cannot be compromised — e.g. no earnouts, no PE rollup, employees must be retained for 24 months, keep HQ in current city…"
+                placeholder="Deal structure requirements that cannot be compromised - e.g. no earnouts, no PE rollup, employees must be retained for 24 months, keep HQ in current city..."
                 className={textareaCls} />
             </div>
 
@@ -596,7 +632,7 @@ export default function EngagementIntake() {
               <FieldLabel optional>Additional context / narrative</FieldLabel>
               <textarea value={goals} onChange={e => { setGoals(e.target.value); markDirty() }}
                 rows={3}
-                placeholder="Any additional background on the owner's situation, personal circumstances, or qualitative expectations not captured above…"
+                placeholder="Any additional background on the owner's situation, personal circumstances, or qualitative expectations not captured above..."
                 className={textareaCls} />
             </div>
           </SectionCard>
@@ -613,7 +649,7 @@ export default function EngagementIntake() {
               <div>
                 <FieldLabel>Exit timeline</FieldLabel>
                 <select value={exitTimeline} onChange={e => { setExitTimeline(e.target.value); markDirty() }} className={inputCls}>
-                  <option value="">— Select horizon —</option>
+                  <option value="">- Select horizon -</option>
                   {TIMELINE_PRESETS.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
