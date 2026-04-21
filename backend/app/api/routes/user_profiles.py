@@ -19,7 +19,7 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.middleware.auth import CurrentUser, get_current_user
+from app.middleware.auth import CurrentUser, get_current_user, get_current_user_optional
 from app.ontology.models import (
     ClientAccess, ClientAccessStatus, Company,
     UserProfile, UserRole,
@@ -69,10 +69,16 @@ def _profile_response(profile: Optional[UserProfile], db: Session) -> dict:
 
 @router.get("/me")
 def get_my_profile(
-    user: CurrentUser = Depends(get_current_user),
+    user: Optional[CurrentUser] = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
-    """Return the calling user's profile (role + linked company for CLIENTs)."""
+    """Return the calling user's profile (role + linked company for CLIENTs).
+
+    Anonymous callers receive an empty profile so frontend boot can proceed
+    while Clerk finishes loading in development.
+    """
+    if not user:
+        return {"role": None, "company": None}
     profile = _get_or_none(db, user.user_id)
     return _profile_response(profile, db)
 
