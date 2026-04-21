@@ -112,6 +112,9 @@ function RoleGuard({ children, requireAdvisor = false, requireClient = false }) 
 
   // No role set → prompt role selection
   if (role === null) {
+    // If an advisor-only route is requested, allow access so the app can render
+    // while profile bootstrap catches up (avoids redirect loops/blank states).
+    if (requireAdvisor && !requireClient) return children
     // Avoid redirect loops while the user is on role bootstrap routes.
     if (isRoleBootstrapPath) return children
     return <Navigate to="/role-select" replace state={{ from: location }} />
