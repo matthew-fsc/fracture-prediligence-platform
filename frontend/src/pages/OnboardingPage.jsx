@@ -144,7 +144,7 @@ function ProgressBar({ step }) {
 // ---------------------------------------------------------------------------
 // Step 1 — Add first client
 // ---------------------------------------------------------------------------
-function Step1({ onNext, submitting }) {
+function Step1({ onNext, submitting, submitError }) {
   const saved = readOnboarding().step1
   const [form, setForm] = useState({
     name: '',
@@ -232,6 +232,11 @@ function Step1({ onNext, submitting }) {
         </select>
       </div>
 
+      {submitError && (
+        <p role="alert" style={{ color: '#F87171', fontFamily: "'DM Sans', sans-serif", fontSize: 12, margin: '0 0 12px 0' }}>
+          {submitError}
+        </p>
+      )}
       <button type="submit" disabled={submitting} style={{ ...BTN_PRIMARY, opacity: submitting ? 0.7 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}>
         {submitting ? 'Adding Client...' : 'Add Client and Continue'}
       </button>
@@ -623,10 +628,12 @@ export default function OnboardingPage() {
   })
   const [done, setDone] = useState(false)
   const [creatingCompany, setCreatingCompany] = useState(false)
+  const [step1SubmitError, setStep1SubmitError] = useState('')
 
   const handleStep1Next = async (form) => {
     if (creatingCompany) return
     setCreatingCompany(true)
+    setStep1SubmitError('')
     try {
       const created = await apiClient.post('/api/companies', {
         name: form.name?.trim(),
@@ -635,11 +642,12 @@ export default function OnboardingPage() {
       })
       if (created?.id) {
         setCompanyId(created.id)
+        setStep(2)
+      } else {
+        setStep1SubmitError('Could not create company. Please try again.')
       }
-      setStep(2)
-    } catch {
-      // Keep onboarding usable even if company creation endpoint is transiently unavailable.
-      setStep(2)
+    } catch (err) {
+      setStep1SubmitError(err?.message || 'Could not create company. Please try again.')
     } finally {
       setCreatingCompany(false)
     }
@@ -738,6 +746,7 @@ export default function OnboardingPage() {
               <Step1
                 onNext={handleStep1Next}
                 submitting={creatingCompany}
+                submitError={step1SubmitError}
               />
             )}
             {step === 2 && (

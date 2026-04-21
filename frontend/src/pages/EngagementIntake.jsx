@@ -195,6 +195,7 @@ export default function EngagementIntake() {
   const { pathname } = useLocation()
 
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState(null)
@@ -243,46 +244,59 @@ export default function EngagementIntake() {
   useEffect(() => {
     if (!ready) { setLoading(false); return }
     setLoading(true)
-    Promise.all([
-      apiClient.get(`/api/analytics/engagement-profile/${companyId}`).catch(() => null),
-      apiClient.get(`/api/analytics/qualitative/${companyId}`).catch(() => null),
-      apiClient.get(`/api/companies/${companyId}`).catch(() => null),
-    ]).then(([ep, qd, company]) => {
-      if (ep) {
-        setGoals(ep.owner_goals_narrative ?? '')
-        setMotivations(Array.isArray(ep.owner_motivations) ? ep.owner_motivations : [])
-        setPostExit(ep.post_exit_plans ?? '')
-        setNonNegotiables(ep.non_negotiables ?? '')
-        setEngagementStartDate(ep.engagement_start_date ?? '')
-        setExitTimeline(ep.exit_timeline ?? '')
-        setTargetVal(ep.target_valuation != null ? String(ep.target_valuation) : '')
-        setGap(ep.personal_financial_gap != null ? String(ep.personal_financial_gap) : '')
-        setTxType(ep.transaction_type ?? '')
-        setBuyerNotes(ep.buyer_universe_notes ?? '')
-        setBuyers(Array.isArray(ep.preferred_buyer_types) ? ep.preferred_buyer_types : [])
-        if (ep.updated_at) setLastSavedAt(new Date(ep.updated_at))
-      }
-      if (qd?.inputs) {
-        const i = qd.inputs
-        setQual({
-          owner_hours_per_week: i.owner_hours_per_week ?? '',
-          sop_pct: i.sop_pct ?? 50,
-          automation_pct: i.automation_pct ?? 30,
-          mgmt_covered: i.mgmt_covered_functions ? i.mgmt_covered_functions.split(',').filter(Boolean) : [],
-          pipeline_value: i.pipeline_value ?? '',
-          market_positioning: i.market_positioning ?? '',
-          repeatability_pct: i.repeatability_pct ?? 50,
-          contract_pct: i.contract_pct ?? 50,
-          customer_contract_type: i.customer_contract_type ?? '',
-          key_person_revenue_pct: i.key_person_revenue_pct ?? 50,
-        })
-      }
-      if (company) {
-        setEmployeeCount(company.total_headcount != null ? String(company.total_headcount) : '')
-        setFoundedYear(company.founded != null ? String(company.founded) : '')
-        setIndustry(company.industry ?? '')
-      }
-    }).finally(() => setLoading(false))
+    setLoadError('')
+    Promise.allSettled([
+      apiClient.get(`/api/analytics/engagement-profile/${companyId}`),
+      apiClient.get(`/api/analytics/qualitative/${companyId}`),
+      apiClient.get(`/api/companies/${companyId}`),
+    ])
+      .then(([epRes, qdRes, companyRes]) => {
+        const ep = epRes.status === 'fulfilled' ? epRes.value : null
+        const qd = qdRes.status === 'fulfilled' ? qdRes.value : null
+        const company = companyRes.status === 'fulfilled' ? companyRes.value : null
+
+        if (ep) {
+          setGoals(ep.owner_goals_narrative ?? '')
+          setMotivations(Array.isArray(ep.owner_motivations) ? ep.owner_motivations : [])
+          setPostExit(ep.post_exit_plans ?? '')
+          setNonNegotiables(ep.non_negotiables ?? '')
+          setEngagementStartDate(ep.engagement_start_date ?? '')
+          setExitTimeline(ep.exit_timeline ?? '')
+          setTargetVal(ep.target_valuation != null ? String(ep.target_valuation) : '')
+          setGap(ep.personal_financial_gap != null ? String(ep.personal_financial_gap) : '')
+          setTxType(ep.transaction_type ?? '')
+          setBuyerNotes(ep.buyer_universe_notes ?? '')
+          setBuyers(Array.isArray(ep.preferred_buyer_types) ? ep.preferred_buyer_types : [])
+          if (ep.updated_at) setLastSavedAt(new Date(ep.updated_at))
+        }
+        if (qd?.inputs) {
+          const i = qd.inputs
+          setQual({
+            owner_hours_per_week: i.owner_hours_per_week ?? '',
+            sop_pct: i.sop_pct ?? 50,
+            automation_pct: i.automation_pct ?? 30,
+            mgmt_covered: i.mgmt_covered_functions ? i.mgmt_covered_functions.split(',').filter(Boolean) : [],
+            pipeline_value: i.pipeline_value ?? '',
+            market_positioning: i.market_positioning ?? '',
+            repeatability_pct: i.repeatability_pct ?? 50,
+            contract_pct: i.contract_pct ?? 50,
+            customer_contract_type: i.customer_contract_type ?? '',
+            key_person_revenue_pct: i.key_person_revenue_pct ?? 50,
+          })
+        }
+        if (company) {
+          setEmployeeCount(company.total_headcount != null ? String(company.total_headcount) : '')
+          setFoundedYear(company.founded != null ? String(company.founded) : '')
+          setIndustry(company.industry ?? '')
+        }
+
+        if (!ep && !qd && !company) {
+          setLoadError('Could not load engagement data for this company.')
+        } else if (!company) {
+          setLoadError('Company profile could not be loaded. Some intake sections may be incomplete.')
+        }
+      })
+      .finally(() => setLoading(false))
   }, [companyId, ready])
 
   // Load audit entries
@@ -494,6 +508,11 @@ export default function EngagementIntake() {
         </div>
       ) : (
         <div className="space-y-4">
+          {loadError && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+              <p className="text-xs text-amber-300">{loadError}</p>
+            </div>
+          )}
 
           {/* ── SECTION 1: Owner Goals ──────────────────────────────── */}
           <SectionCard

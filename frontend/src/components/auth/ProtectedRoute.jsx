@@ -14,30 +14,10 @@ import { useAuth } from '@clerk/react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useUserRole } from '../../context/UserRoleContext'
 
-const COLORS = { bg: '#0A1628', gold: '#C9973A', muted: '#8A9BB0' }
-
 function LoadingShell() {
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: COLORS.bg,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <div
-        style={{
-          width: 36,
-          height: 36,
-          border: `3px solid ${COLORS.gold}`,
-          borderTopColor: 'transparent',
-          borderRadius: '50%',
-          animation: 'spin 0.8s linear infinite',
-        }}
-      />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <div className="min-h-screen bg-background dark flex items-center justify-center">
+      <div className="w-9 h-9 rounded-full border-2 border-primary border-t-transparent animate-spin" />
     </div>
   )
 }
