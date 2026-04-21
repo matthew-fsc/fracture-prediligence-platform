@@ -1,4 +1,5 @@
 import logging
+import secrets
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -95,11 +96,23 @@ def _validate_production_config():
     if env != "production":
         return
 
-    # SEC-1: Reject default SECRET_KEY in production (JWT forgery risk)
-    if settings.SECRET_KEY == "change-me-in-production":
-        raise RuntimeError(
-            "SECURITY: SECRET_KEY is still the default value. "
-            "Generate a strong key with: openssl rand -hex 32"
+    # SEC-1: Reject default SECRET_KEY in production (JWT forgery risk).
+    # Also handle the case where Railway's ${{secret(...)}} generation syntax
+    # was passed as a literal string instead of being evaluated — in that
+    # situation we generate a cryptographically-strong key at runtime so the
+    # deployment can proceed securely rather than crashing on startup.
+    _secret_key = settings.SECRET_KEY
+    _is_default = _secret_key == "change-me-in-production"
+    _is_unevaluated_railway_var = "${{" in _secret_key
+    if _is_default or _is_unevaluated_railway_var:
+        _generated = secrets.token_hex(32)
+        settings.SECRET_KEY = _generated
+        logger.warning(
+            "SECURITY: SECRET_KEY was %s. "
+            "A random key has been generated for this process. "
+            "Set a persistent SECRET_KEY environment variable to avoid "
+            "invalidating existing JWT tokens on every restart.",
+            "the default placeholder" if _is_default else "an unevaluated Railway variable reference",
         )
 
     # SEC-2: Unsigned Stripe webhooks must never be enabled in production
