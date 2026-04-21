@@ -121,11 +121,15 @@ function NoClerkNotice() {
 function RoleGuard({ children, requireAdvisor = false, requireClient = false }) {
   const { role, loading } = useUserRole()
   const location = useLocation()
+  const path = (location.pathname || '').toLowerCase()
+  const isRoleBootstrapPath = path === '/role-select' || path.startsWith('/client-invite/')
 
   if (loading) return <LoadingShell />
 
   // No role set → prompt role selection
   if (role === null) {
+    // Avoid redirect loops while the user is on role bootstrap routes.
+    if (isRoleBootstrapPath) return children
     return <Navigate to="/role-select" replace state={{ from: location }} />
   }
 
