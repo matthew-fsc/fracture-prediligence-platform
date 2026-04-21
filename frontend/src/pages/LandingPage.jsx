@@ -88,7 +88,7 @@ function Nav() {
             </>
           ) : (
             <Link
-              to="/sign-in"
+              to="/Home"
               style={{
                 color: COLORS.offWhite,
                 fontFamily: "'DM Sans', sans-serif",
@@ -100,7 +100,7 @@ function Nav() {
                 border: `1px solid ${COLORS.border}`,
               }}
             >
-              Log in
+              Dashboard
             </Link>
           )}
           <Link
