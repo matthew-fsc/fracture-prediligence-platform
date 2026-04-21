@@ -14,13 +14,23 @@ const UserRoleContext = createContext(null)
 
 const HAS_CLERK = Boolean((import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim())
 
-/**
- * Profile shape returned by GET /api/me:
- *   { role: 'ADVISOR' | 'CLIENT' | null, company: { id, name, industry } | null }
- */
-export function UserRoleProvider({ children }) {
+function makeValue(profile, loading, refreshProfile) {
+  const role = profile?.role ?? null
+  return {
+    profile,
+    role,
+    isAdvisor: role === 'ADVISOR',
+    isClient: role === 'CLIENT',
+    clientCompany: profile?.company ?? null,
+    loading,
+    refreshProfile,
+  }
+}
+
+// Only rendered when HAS_CLERK=true and ClerkProvider is in the tree — safe to call useAuth()
+function ClerkUserRoleProvider({ children }) {
   const { isSignedIn, isLoaded } = useAuth()
-  const [profile, setProfileState] = useState(null)   // null = not yet loaded
+  const [profile, setProfileState] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const fetchProfile = useCallback(async () => {
@@ -35,50 +45,44 @@ export function UserRoleProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    if (!HAS_CLERK) {
-      // Dev mode without Clerk: default to ADVISOR so all advisor routes work
-      setProfileState({ role: 'ADVISOR', company: null })
-      setLoading(false)
-      return
-    }
-
-    if (!isLoaded) return  // Clerk not ready yet
-
+    if (!isLoaded) return
     if (!isSignedIn) {
       setProfileState(null)
       setLoading(false)
       return
     }
-
     fetchProfile()
   }, [isLoaded, isSignedIn, fetchProfile])
 
-  /** Called after role selection page submits successfully */
   const refreshProfile = useCallback(() => {
     setLoading(true)
     fetchProfile()
   }, [fetchProfile])
 
-  const role = profile?.role ?? null
-  const isAdvisor = role === 'ADVISOR'
-  const isClient = role === 'CLIENT'
-  const clientCompany = profile?.company ?? null
+  return (
+    <UserRoleContext.Provider value={makeValue(profile, loading, refreshProfile)}>
+      {children}
+    </UserRoleContext.Provider>
+  )
+}
 
-  const value = {
-    profile,
-    role,
-    isAdvisor,
-    isClient,
-    clientCompany,
-    loading,
-    refreshProfile,
-  }
-
+// Used when HAS_CLERK=false — never calls useAuth()
+function DevUserRoleProvider({ children }) {
+  const value = makeValue({ role: 'ADVISOR', company: null }, false, () => {})
   return (
     <UserRoleContext.Provider value={value}>
       {children}
     </UserRoleContext.Provider>
   )
+}
+
+/**
+ * Profile shape returned by GET /api/me:
+ *   { role: 'ADVISOR' | 'CLIENT' | null, company: { id, name, industry } | null }
+ */
+export function UserRoleProvider({ children }) {
+  if (!HAS_CLERK) return <DevUserRoleProvider>{children}</DevUserRoleProvider>
+  return <ClerkUserRoleProvider>{children}</ClerkUserRoleProvider>
 }
 
 export function useUserRole() {
