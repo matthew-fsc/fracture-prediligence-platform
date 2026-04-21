@@ -14,7 +14,7 @@ DRS weight: Financial Integrity = 20% of composite score.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
@@ -35,13 +35,20 @@ class FinancialIntegrityScore:
     revenue_completeness_pct: float
     months_of_data: int
     data_confidence: str
+    # Top addback expense lines for drill-down
+    addback_rows: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
             "company_id": self.company_id,
             "composite":  self.composite,
             "sub_scores": {
-                "addback_exposure":      {"score": self.addback_score,               "value": self.owner_expense_pct,          "label": f"Owner/personal {self.owner_expense_pct:.0f}% of expenses (${self.total_addbacks:,.0f} addbacks)"},
+                "addback_exposure": {
+                    "score": self.addback_score,
+                    "value": self.owner_expense_pct,
+                    "label": f"Owner/personal {self.owner_expense_pct:.0f}% of expenses (${self.total_addbacks:,.0f} addbacks)",
+                    "source_rows": self.addback_rows,
+                },
                 "expense_completeness":  {"score": self.expense_completeness_score,  "value": self.expense_completeness_pct,   "label": f"{self.expense_completeness_pct:.0f}% categorized"},
                 "revenue_completeness":  {"score": self.revenue_completeness_score,  "value": self.revenue_completeness_pct,   "label": f"{self.revenue_completeness_pct:.0f}% with period + type"},
                 "data_coverage":         {"score": self.data_coverage_score,         "value": self.months_of_data,             "label": f"{self.months_of_data} months of data"},
@@ -121,6 +128,21 @@ def compute_financial_integrity(company_id: int, db: Session) -> FinancialIntegr
     total_records = len(expenses) + len(revenue)
     confidence = "HIGH" if total_records >= 100 else "MEDIUM" if total_records >= 24 else "LOW"
 
+    # Build top addback rows for drill-down (largest owner/personal expense lines)
+    addback_expense_lines = [
+        e for e in expenses if e.category in _ADDBACK_CATEGORIES
+    ]
+    addback_expense_lines.sort(key=lambda e: float(e.amount or 0), reverse=True)
+    addback_rows = [
+        {
+            "description": e.description or e.vendor or "Unnamed expense",
+            "category": e.category.value if hasattr(e.category, "value") else str(e.category),
+            "amount": round(float(e.amount or 0), 0),
+            "period": e.period.isoformat() if e.period else None,
+        }
+        for e in addback_expense_lines[:8]
+    ]
+
     return FinancialIntegrityScore(
         company_id=company_id,
         composite=round(composite, 1),
@@ -134,4 +156,5 @@ def compute_financial_integrity(company_id: int, db: Session) -> FinancialIntegr
         revenue_completeness_pct=round(rev_completeness, 1),
         months_of_data=n_months,
         data_confidence=confidence,
+        addback_rows=addback_rows,
     )

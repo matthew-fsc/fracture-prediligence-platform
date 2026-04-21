@@ -3,7 +3,7 @@
 import json
 import mimetypes
 from datetime import datetime
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
@@ -31,7 +31,13 @@ from app.analytics.ebitda_basis import ebitda_basis_for_company
 from app.analytics.a13_buyer_questions import generate_buyer_questions
 from app.analytics.owner_readiness import compute_owner_readiness
 from app.core.config import settings
-from app.core.scoring_rules import SCORING_RULES, SCORING_RULES_VERSION
+from app.core.scoring_rules import (
+    BUYER_PROFILE_LABELS,
+    BUYER_PROFILE_RATIONALE,
+    BUYER_WEIGHT_PROFILES,
+    SCORING_RULES,
+    SCORING_RULES_VERSION,
+)
 from app.core.confidence import band_multiplier, build_confidence_summary
 from app.ontology.models import (
     AdvisorOverride,
@@ -279,13 +285,26 @@ def get_market_benchmarks(company: CompanyScoped, db: Session = Depends(get_db))
 
 
 @router.get("/scores/{company_id}")
-def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
+def get_all_scores(
+    company: CompanyScoped,
+    db: Session = Depends(get_db),
+    buyer_profile: Optional[str] = Query(
+        None,
+        description="Optional buyer-type weight profile: 'pe', 'strategic', or 'financial'. "
+                    "Reweights DRS categories to reflect what each buyer type prioritizes.",
+        pattern="^(pe|strategic|financial)$",
+    ),
+):
     """
     A3–A8: Compute all six DRS category scores from the ontology.
     Applies advisor overrides (P1) and qualitative inputs (P2) when present.
     Returns raw scores, adjusted scores, DRS composite (A9), and enterprise value (A10).
+
+    Pass ?buyer_profile=pe|strategic|financial to reweight the DRS composite
+    for a specific buyer archetype without altering any stored scores.
     """
     try:
+        buyer_weights = BUYER_WEIGHT_PROFILES.get(buyer_profile) if buyer_profile else None
         modules = compute_category_modules(company.id, db)
         rev = modules["revenue_quality"]
         ops = modules["operational_independence"]
@@ -469,7 +488,7 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
             management_team_optimistic=min(100, adj_scores["management_team"] * band_multiplier(mgmt.data_confidence, "optimistic")),
             growth_drivers_optimistic=min(100, adj_scores["growth_drivers"] * band_multiplier(growth.data_confidence, "optimistic")),
         )
-        drs = compute_drs(cat)
+        drs = compute_drs(cat, weights=buyer_weights)
 
         from decimal import Decimal as _Decimal
         basis = _ebitda_basis(company.id, db)
@@ -573,7 +592,22 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
                     for d in pre_result.dimensions
                 ],
             } if pre_result else None,
-            "rules": {"version": SCORING_RULES_VERSION, "category_weights": SCORING_RULES.category_weights},
+            "rules": {
+                "version": SCORING_RULES_VERSION,
+                "category_weights": buyer_weights or dict(SCORING_RULES.category_weights),
+                "default_category_weights": dict(SCORING_RULES.category_weights),
+            },
+            "buyer_profile": {
+                "key": buyer_profile,
+                "label": BUYER_PROFILE_LABELS.get(buyer_profile, "Default"),
+                "weights": buyer_weights,
+                "rationale": BUYER_PROFILE_RATIONALE.get(buyer_profile, ""),
+                "default_weights": dict(SCORING_RULES.category_weights),
+                "weight_deltas": {
+                    k: round((buyer_weights[k] - SCORING_RULES.category_weights[k]) * 100, 1)
+                    for k in SCORING_RULES.category_weights
+                } if buyer_weights else {},
+            } if buyer_profile else None,
             "methodology": {
                 "version": SCORING_RULES_VERSION,
                 "summary": (
@@ -581,7 +615,7 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
                     "Each category is computed from financial ontology data and optional qualitative inputs."
                 ),
                 "category_weights_percent": {
-                    k: round(v * 100, 1) for k, v in SCORING_RULES.category_weights.items()
+                    k: round(v * 100, 1) for k, v in (buyer_weights or SCORING_RULES.category_weights).items()
                 },
                 "tiers": [{"min_drs": lo, "tier": name} for lo, name in SCORING_RULES.drs_tier_thresholds],
                 "value_gap_target_score": SCORING_RULES.value_gap_target_score,

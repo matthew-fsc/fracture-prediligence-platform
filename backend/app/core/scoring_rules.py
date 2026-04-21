@@ -1,6 +1,67 @@
 from dataclasses import dataclass
 
 
+# Buyer-type weight profiles — each overrides the default category_weights when passed
+# to compute_drs(). All values must sum to 1.0.
+#
+# PE: weights operational independence and management team more heavily —
+#     platform buyers assume process; they need the business to run without the founder.
+# Strategic: weights revenue quality and customer risk more heavily —
+#     they're buying a customer book and revenue stream, not just EBITDA.
+# Financial: weights financial integrity most — clean books are non-negotiable,
+#     covenant compliance and audit-readiness matter to lenders behind them.
+BUYER_WEIGHT_PROFILES: dict[str, dict[str, float]] = {
+    "pe": {
+        "revenue_quality":          0.20,
+        "financial_integrity":      0.20,
+        "operational_independence": 0.25,
+        "customer_risk":            0.15,
+        "management_team":          0.15,
+        "growth_drivers":           0.05,
+    },
+    "strategic": {
+        "revenue_quality":          0.30,
+        "financial_integrity":      0.15,
+        "operational_independence": 0.15,
+        "customer_risk":            0.20,
+        "management_team":          0.10,
+        "growth_drivers":           0.10,
+    },
+    "financial": {
+        "revenue_quality":          0.25,
+        "financial_integrity":      0.25,
+        "operational_independence": 0.15,
+        "customer_risk":            0.15,
+        "management_team":          0.10,
+        "growth_drivers":           0.10,
+    },
+}
+
+BUYER_PROFILE_LABELS: dict[str, str] = {
+    "pe":         "Private Equity",
+    "strategic":  "Strategic Acquirer",
+    "financial":  "Financial Buyer",
+}
+
+# Rationale shown in the UI for each buyer profile
+BUYER_PROFILE_RATIONALE: dict[str, str] = {
+    "pe": (
+        "PE buyers prioritize operational independence (25%) and management team (15%) — "
+        "they need the business to run post-close without the founder. "
+        "Growth drivers carry less weight (5%) because PE applies its own playbook."
+    ),
+    "strategic": (
+        "Strategic acquirers prioritize revenue quality (30%) and customer risk (20%) — "
+        "they are buying your customer relationships and revenue streams. "
+        "Operational independence matters less because they absorb the business into their platform."
+    ),
+    "financial": (
+        "Financial buyers and search funds emphasize financial integrity (25%) above all — "
+        "their lenders require audit-quality books. Revenue quality (25%) drives their debt capacity model."
+    ),
+}
+
+
 @dataclass(frozen=True)
 class ScoringRulesV1:
     category_weights: dict[str, float]

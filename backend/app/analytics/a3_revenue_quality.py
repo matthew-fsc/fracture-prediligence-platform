@@ -16,7 +16,7 @@ YoY growth in total recurring revenue, not cohort-based Net Revenue Retention.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
 from math import sqrt
@@ -273,13 +273,20 @@ class RevenueQualityScore:
     revenue_cv_pct: float
     estimated_nrr: float
     data_confidence: str                  # HIGH / MEDIUM / LOW
+    # Revenue type breakdown for drill-down (total by type in TTM window)
+    revenue_type_breakdown: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
             "company_id": self.company_id,
             "composite":  self.composite,
             "sub_scores": {
-                "recurring_rate":   {"score": self.recurring_rate_score,  "value": self.recurring_pct,           "label": f"{self.recurring_pct:.0f}% recurring"},
+                "recurring_rate": {
+                    "score": self.recurring_rate_score,
+                    "value": self.recurring_pct,
+                    "label": f"{self.recurring_pct:.0f}% recurring",
+                    "source_rows": self.revenue_type_breakdown,
+                },
                 "concentration":    {"score": self.concentration_score,   "value": self.hhi,                     "label": "HHI"},
                 "durability":       {"score": self.durability_score,      "value": self.contract_durability_pct, "label": f"{self.contract_durability_pct:.0f}% under durable contract"},
                 "consistency":      {"score": self.consistency_score,     "value": self.revenue_cv_pct,          "label": f"CV {self.revenue_cv_pct:.1f}%"},
@@ -334,6 +341,26 @@ def compute_revenue_quality(company_id: int, db: Session) -> RevenueQualityScore
     row_count = len(revenue_rows)
     confidence = "HIGH" if row_count >= 50 else "MEDIUM" if row_count >= 12 else "LOW"
 
+    # Build revenue type breakdown for drill-down (TTM totals by type)
+    type_totals: dict[str, float] = {}
+    ttm_total = sum(float(r.revenue_gross or 0) for r in ttm_rows)
+    for r in ttm_rows:
+        rtype = (r.revenue_type.value if hasattr(r.revenue_type, "value") else str(r.revenue_type)) or "OTHER"
+        type_totals[rtype] = type_totals.get(rtype, 0.0) + float(r.revenue_gross or 0)
+    revenue_type_breakdown = sorted(
+        [
+            {
+                "type": rtype,
+                "revenue": round(amt, 0),
+                "pct": round(amt / ttm_total * 100, 1) if ttm_total > 0 else 0.0,
+                "recurring": rtype in ("RECURRING", "SUBSCRIPTION"),
+            }
+            for rtype, amt in type_totals.items()
+        ],
+        key=lambda x: x["revenue"],
+        reverse=True,
+    )
+
     return RevenueQualityScore(
         company_id=company_id,
         composite=round(composite, 1),
@@ -348,4 +375,5 @@ def compute_revenue_quality(company_id: int, db: Session) -> RevenueQualityScore
         revenue_cv_pct=cv_pct,
         estimated_nrr=nrr,
         data_confidence=confidence,
+        revenue_type_breakdown=revenue_type_breakdown,
     )
