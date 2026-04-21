@@ -66,7 +66,7 @@ class LineageMixin:
     source_file:      Mapped[Optional[str]] = mapped_column(String(512))
     ingestion_id:     Mapped[Optional[str]] = mapped_column(String(128))
     confidence_level: Mapped[ConfidenceLevel] = mapped_column(String(16), default=ConfidenceLevel.MEDIUM)
-    ingested_at:      Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    ingested_at:      Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, server_default=func.now())
     reviewer_sign_off: Mapped[Optional[str]] = mapped_column(String(128))
 
 
