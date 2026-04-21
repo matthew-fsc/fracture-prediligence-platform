@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { usePageTitle } from '../hooks/usePageTitle'
-import { useCompanyId } from '../context/CompanyContext'
+import { useCompany, useCompanyId } from '../context/CompanyContext'
 import { apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
 import { cn } from '../lib/utils'
@@ -189,12 +189,14 @@ const numInputCls = 'text-sm bg-muted/60 border border-border rounded-lg px-3 py
 
 export default function EngagementIntake() {
   usePageTitle('Client Profile')
+  const { setCompanyId } = useCompany()
   const companyId = useCompanyId()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { pathname } = useLocation()
 
   const [loading, setLoading] = useState(true)
+  const [hydratingCompany, setHydratingCompany] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -239,6 +241,20 @@ export default function EngagementIntake() {
   const ready = companyId != null && companyId > 0
   const setQ = useCallback((k, v) => { setQual(f => ({ ...f, [k]: v })); setSaved(false) }, [])
   const markDirty = useCallback(() => setSaved(false), [])
+
+  // Recover from missing company context by hydrating from the first accessible company.
+  useEffect(() => {
+    if (ready || hydratingCompany) return
+    setHydratingCompany(true)
+    apiClient.get('/api/companies')
+      .then((rows) => {
+        if (Array.isArray(rows) && rows.length > 0 && rows[0]?.id) {
+          setCompanyId(rows[0].id)
+        }
+      })
+      .catch(() => {})
+      .finally(() => setHydratingCompany(false))
+  }, [ready, hydratingCompany, setCompanyId])
 
   // Load data from three endpoints in parallel
   useEffect(() => {
@@ -390,8 +406,14 @@ export default function EngagementIntake() {
         <SectionHeader title="Client Profile" subtitle="All advisor-sourced context that financial data cannot capture." />
         <div className="rounded-xl border border-border bg-card p-8 text-center">
           <NotebookPen className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-sm font-medium text-foreground">No client selected</p>
-          <p className="text-xs text-muted-foreground mt-1">Select or create a client in the header to begin intake.</p>
+          <p className="text-sm font-medium text-foreground">
+            {hydratingCompany ? 'Loading client context...' : 'No client selected'}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {hydratingCompany
+              ? 'Finding your first available client.'
+              : 'Select or create a client in the header to begin intake.'}
+          </p>
         </div>
       </div>
     )
