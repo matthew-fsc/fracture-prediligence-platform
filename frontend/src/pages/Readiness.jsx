@@ -446,6 +446,10 @@ export default function Readiness() {
   const [refresh, setRefresh] = useState(0)
   const [methodologyOpen, setMethodologyOpen] = useState(false)
   const [snapshots, setSnapshots] = useState([])
+  const [compareSnap1, setCompareSnap1] = useState('')
+  const [compareSnap2, setCompareSnap2] = useState('')
+  const [compareResult, setCompareResult] = useState(null)
+  const [compareLoading, setCompareLoading] = useState(false)
   const [buyerProfile, setBuyerProfile] = useState(null) // null | 'pe' | 'strategic' | 'financial'
 
   const reload = () => {
@@ -980,6 +984,117 @@ export default function Readiness() {
             <span className="flex items-center gap-1"><span className="inline-block w-4 h-px bg-emerald-500/60" /> 85 · Institutional Grade</span>
             <span className="flex items-center gap-1"><span className="inline-block w-4 h-px bg-amber-500/60" /> 70 · Investment Grade</span>
           </div>
+        </div>
+      )}
+
+      {/* Snapshot Compare */}
+      {snapshots.length >= 2 && (
+        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Compare Snapshots</p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Baseline</label>
+              <select
+                className="rounded-lg border border-border bg-muted/30 px-2 py-1.5 text-xs text-foreground"
+                value={compareSnap1}
+                onChange={e => { setCompareSnap1(e.target.value); setCompareResult(null) }}
+              >
+                <option value="">— select —</option>
+                {snapshots.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {new Date(s.created_at).toLocaleDateString()} · DRS {s.drs_score?.toFixed(1)} ({s.trigger})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Comparison</label>
+              <select
+                className="rounded-lg border border-border bg-muted/30 px-2 py-1.5 text-xs text-foreground"
+                value={compareSnap2}
+                onChange={e => { setCompareSnap2(e.target.value); setCompareResult(null) }}
+              >
+                <option value="">— select —</option>
+                {snapshots.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {new Date(s.created_at).toLocaleDateString()} · DRS {s.drs_score?.toFixed(1)} ({s.trigger})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              disabled={!compareSnap1 || !compareSnap2 || compareSnap1 === compareSnap2 || compareLoading}
+              className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-40"
+              onClick={() => {
+                setCompareLoading(true)
+                apiClient.get(`/api/analytics/scores/${companyId}/compare?snap1=${compareSnap1}&snap2=${compareSnap2}`)
+                  .then(r => setCompareResult(r))
+                  .catch(() => {})
+                  .finally(() => setCompareLoading(false))
+              }}
+            >
+              {compareLoading ? 'Loading…' : 'Compare →'}
+            </button>
+          </div>
+
+          {compareResult && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-3">
+                {[
+                  { label: 'DRS Change', value: compareResult.drs_delta, suffix: 'pts', colored: true },
+                  { label: 'EV Change', value: compareResult.ev_delta != null ? compareResult.ev_delta.toFixed(0) : null, suffix: '$K', colored: true },
+                  { label: 'Days Elapsed', value: compareResult.days_elapsed, suffix: 'd', colored: false },
+                ].map(({ label, value, suffix, colored }) => (
+                  <div key={label} className="rounded-lg border border-border bg-muted/20 px-4 py-2 text-center min-w-[100px]">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{label}</p>
+                    {value != null ? (
+                      <p className={cn(
+                        'text-base font-bold',
+                        colored && value > 0 ? 'text-emerald-400' : colored && value < 0 ? 'text-rose-400' : 'text-foreground'
+                      )}>
+                        {colored && value > 0 ? '+' : ''}{value}{suffix}
+                      </p>
+                    ) : <p className="text-base font-bold text-muted-foreground">—</p>}
+                  </div>
+                ))}
+              </div>
+
+              {Object.keys(compareResult.category_deltas ?? {}).length > 0 && (
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/20">
+                        <th className="text-left px-3 py-2 font-medium text-muted-foreground">Category</th>
+                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Baseline</th>
+                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Now</th>
+                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Delta</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(compareResult.category_deltas).map(([cat, delta]) => {
+                        const baseline = compareResult.snapshot_1?.category_scores?.[cat]
+                        const current = compareResult.snapshot_2?.category_scores?.[cat]
+                        const label = DEFAULT_CATEGORY_META[cat]?.label ?? cat
+                        return (
+                          <tr key={cat} className="border-b border-border/40 last:border-0 hover:bg-muted/10">
+                            <td className="px-3 py-1.5 text-foreground">{label}</td>
+                            <td className="px-3 py-1.5 text-right text-muted-foreground">{baseline?.toFixed(1) ?? '—'}</td>
+                            <td className="px-3 py-1.5 text-right text-muted-foreground">{current?.toFixed(1) ?? '—'}</td>
+                            <td className={cn(
+                              'px-3 py-1.5 text-right font-semibold',
+                              delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-rose-400' : 'text-muted-foreground'
+                            )}>
+                              {delta > 0 ? '+' : ''}{delta.toFixed(1)}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

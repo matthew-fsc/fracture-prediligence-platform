@@ -703,11 +703,93 @@ def capture_score_snapshot(company: CompanyScoped, db: Session = Depends(get_db)
         basis = ebitda_basis_for_company(company.id, db)
         ebitda = float(basis.get("ebitda_normalized_ttm") or basis.get("ebitda_proxy_ttm") or 0)
         ev_val = round(ebitda * 4.5, 2) if ebitda > 0 else None
-        db.add(ScoreSnapshot(company_id=company.id, drs_score=drs_val, ev_estimate=ev_val, trigger="manual"))
+        db.add(ScoreSnapshot(
+            company_id=company.id, drs_score=drs_val, ev_estimate=ev_val,
+            trigger="manual", category_scores_json=json.dumps(cat),
+        ))
         db.commit()
         return {"company_id": company.id, "drs_score": drs_val, "ev_estimate": ev_val}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/scores/{company_id}/compare")
+def compare_snapshots(
+    company: CompanyScoped,
+    snap1: int = Query(..., description="ID of the earlier snapshot"),
+    snap2: int = Query(..., description="ID of the later snapshot"),
+    db: Session = Depends(get_db),
+):
+    """Return a side-by-side diff of two score snapshots with DRS/EV/category deltas."""
+    from sqlalchemy import desc as _desc
+
+    def _load(snap_id: int) -> ScoreSnapshot:
+        row = db.query(ScoreSnapshot).filter(
+            ScoreSnapshot.id == snap_id,
+            ScoreSnapshot.company_id == company.id,
+        ).first()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Snapshot {snap_id} not found")
+        return row
+
+    s1, s2 = _load(snap1), _load(snap2)
+    # Ensure s1 is the earlier one
+    if s1.created_at and s2.created_at and s1.created_at > s2.created_at:
+        s1, s2 = s2, s1
+
+    def _snap_dict(s: ScoreSnapshot) -> dict:
+        return {
+            "id": s.id,
+            "drs_score": float(s.drs_score),
+            "ev_estimate": float(s.ev_estimate) if s.ev_estimate is not None else None,
+            "trigger": s.trigger,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+            "category_scores": json.loads(s.category_scores_json) if s.category_scores_json else {},
+        }
+
+    d1, d2 = _snap_dict(s1), _snap_dict(s2)
+
+    from datetime import timezone
+    dt1 = s1.created_at
+    dt2 = s2.created_at
+    days_elapsed = None
+    if dt1 and dt2:
+        days_elapsed = max(0, (dt2 - dt1).days)
+
+    cat_deltas = {}
+    cats = set(d1["category_scores"]) | set(d2["category_scores"])
+    for cat in cats:
+        v1 = d1["category_scores"].get(cat)
+        v2 = d2["category_scores"].get(cat)
+        if v1 is not None and v2 is not None:
+            cat_deltas[cat] = round(float(v2) - float(v1), 2)
+
+    drs_delta = round(d2["drs_score"] - d1["drs_score"], 2)
+    ev_delta = None
+    if d1["ev_estimate"] is not None and d2["ev_estimate"] is not None:
+        ev_delta = round(d2["ev_estimate"] - d1["ev_estimate"], 2)
+
+    return {
+        "company_id": company.id,
+        "snapshot_1": d1,
+        "snapshot_2": d2,
+        "days_elapsed": days_elapsed,
+        "drs_delta": drs_delta,
+        "ev_delta": ev_delta,
+        "category_deltas": cat_deltas,
+    }
+
+
+@router.get("/buyer-universe/{company_id}")
+def get_buyer_universe(
+    company: CompanyScoped,
+    buyer_type: Optional[str] = Query(None, description="Filter by buyer_type: pe, strategic, financial"),
+    max_results: int = Query(15, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    """Return ranked active acquirer matches for the company."""
+    from app.analytics.buyer_universe import resolve_buyer_universe
+    return resolve_buyer_universe(db, company.id, buyer_type_filter=buyer_type, max_results=max_results)
 
 
 @router.get("/revenue-quality/{company_id}")
@@ -1593,7 +1675,10 @@ def upsert_override(
         basis_s = _ev_basis(company.id, db)
         ebitda_s = float(basis_s.get("ebitda_normalized_ttm") or basis_s.get("ebitda_proxy_ttm") or 0)
         ev_s = round(ebitda_s * 4.5, 2) if ebitda_s > 0 else None
-        db.add(ScoreSnapshot(company_id=company.id, drs_score=drs_s, ev_estimate=ev_s, trigger="override"))
+        db.add(ScoreSnapshot(
+            company_id=company.id, drs_score=drs_s, ev_estimate=ev_s,
+            trigger="override", category_scores_json=json.dumps(cat_s),
+        ))
         db.commit()
     except Exception:
         pass  # snapshot failure must not break the override save

@@ -79,6 +79,12 @@ def _bootstrap_db():
             db.commit()
         except Exception:
             logger.exception('Advisory library seed failed — table may not exist yet; will retry on next startup.')
+        try:
+            from app.analytics.buyer_universe import seed_buyer_universe_if_empty
+            seed_buyer_universe_if_empty(db)
+            db.commit()
+        except Exception:
+            logger.exception('Buyer universe seed failed — table may not exist yet; will retry on next startup.')
     finally:
         db.close()
 
