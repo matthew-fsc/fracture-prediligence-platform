@@ -161,6 +161,39 @@ class OverrideRequest(BaseModel):
     adjustment: float  # -20 to +20
     rationale: str
 
+
+class ScenarioRequest(BaseModel):
+    """What-if inputs for the DRS scenario engine. All fields optional."""
+    recurring_pct: Optional[float] = None        # 0–100: target recurring revenue %
+    top_customer_pct: Optional[float] = None     # 0–100: top customer concentration %
+    owner_hours_per_week: Optional[float] = None # 0–80: owner hours in operations
+    sop_pct: Optional[float] = None              # 0–100: % of processes documented
+    ebitda_override: Optional[float] = None      # absolute $ EBITDA override for EV
+    buyer_profile: Optional[str] = None          # pe|strategic|financial
+
+
+class BuyerQuestionAIRequest(BaseModel):
+    buyer_type: Optional[str] = None   # pe|strategic|financial (None = all)
+    max_questions: int = 12
+
+
+# ── Scenario scoring band helpers (mirrors module scoring bands) ──────────────
+
+def _s_recurring(recurring_pct: float) -> float:
+    p = recurring_pct / 100.0
+    if p >= 0.90: return min(100.0, 95 + (p - 0.90) / 0.10 * 5)
+    if p >= 0.75: return 80 + (p - 0.75) / 0.15 * 15
+    if p >= 0.50: return 60 + (p - 0.50) / 0.25 * 20
+    return p / 0.50 * 60
+
+
+def _s_top_customer(top_pct: float) -> float:
+    if top_pct >= 50: return max(0.0, 10 - (top_pct - 50) / 50 * 10)
+    if top_pct >= 30: return 40 + (50 - top_pct) / 20 * 30
+    if top_pct >= 20: return 70 + (30 - top_pct) / 10 * 20
+    if top_pct >= 10: return 85 + (20 - top_pct) / 10 * 15
+    return 100.0
+
 class QualitativeRequest(BaseModel):
     owner_hours_per_week: Optional[float] = None
     sop_pct: Optional[float] = None
@@ -1931,3 +1964,290 @@ def patch_engagement_profile(
     db.commit()
     db.refresh(row)
     return _engagement_profile_dict(row)
+
+
+# ---------------------------------------------------------------------------
+# Scenario engine — what-if DRS + EV (Gap 1 / Sprint 2)
+# ---------------------------------------------------------------------------
+
+@router.post("/scores/{company_id}/scenario")
+def run_scenario(
+    company: CompanyScoped,
+    body: ScenarioRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Run a what-if scenario against the live DRS engine.
+    Accepts metric overrides and returns baseline vs scenario DRS / EV
+    with per-category deltas. No DB writes — read-only.
+    """
+    try:
+        buyer_weights = BUYER_WEIGHT_PROFILES.get(body.buyer_profile) if body.buyer_profile else None
+        modules = compute_category_modules(company.id, db)
+        rev   = modules["revenue_quality"]
+        ops   = modules["operational_independence"]
+        cust  = modules["customer_risk"]
+        mgmt  = modules["management_team"]
+        growth = modules["growth_drivers"]
+        fin   = modules["financial_integrity"]
+
+        # Baseline ops score — apply qual inputs when present (mirrors get_all_scores)
+        qual = db.query(QualitativeInputs).filter(QualitativeInputs.company_id == company.id).first()
+        ops_baseline = ops.composite
+        qual_hours   = None
+        qual_sop     = None
+        qual_auto    = None
+        qual_mgmt_q  = None
+        qual_mgmt_t  = None
+        if qual and all(v is not None for v in [qual.owner_hours_per_week, qual.sop_pct,
+                                                qual.automation_pct, qual.mgmt_qualified,
+                                                qual.mgmt_total_functions]):
+            qual_hours  = float(qual.owner_hours_per_week)
+            qual_sop    = float(qual.sop_pct)
+            qual_auto   = float(qual.automation_pct)
+            qual_mgmt_q = int(qual.mgmt_qualified)
+            qual_mgmt_t = int(qual.mgmt_total_functions)
+            s_h = _qual_owner_hours_score(qual_hours)
+            s_s = _qual_sop_score(qual_sop)
+            s_a = _qual_automation_score(qual_auto)
+            s_m = _qual_mgmt_depth_score(qual_mgmt_q, qual_mgmt_t)
+            ops_baseline = round(s_h * 0.35 + s_s * 0.30 + s_a * 0.15 + s_m * 0.20, 1)
+
+        baseline_scores = {
+            "revenue_quality":          rev.composite,
+            "financial_integrity":      fin.composite,
+            "operational_independence": ops_baseline,
+            "customer_risk":            cust.composite,
+            "management_team":          mgmt.composite,
+            "growth_drivers":           growth.composite,
+        }
+
+        from decimal import Decimal as _D
+        basis = _ebitda_basis(company.id, db)
+        ebitda_baseline = _D(str(round(basis["ebitda_normalized_ttm"], 2)))
+        mctx_base = get_market_multiple_context(db, company.id, float(ebitda_baseline))
+        cat_base = CategoryScores(**baseline_scores)
+        drs_base = compute_drs(cat_base, weights=buyer_weights)
+        ev_base  = compute_enterprise_value(ebitda_baseline, drs_base.tier, market_context=mctx_base)
+
+        # ── Apply overrides ────────────────────────────────────────────────
+        scenario_scores  = dict(baseline_scores)
+        overrides_applied: list[dict] = []
+
+        if body.recurring_pct is not None:
+            new_s_rec = round(_s_recurring(body.recurring_pct), 1)
+            new_rev_composite = round(
+                new_s_rec            * 0.30
+                + rev.concentration_score * 0.25
+                + rev.durability_score    * 0.20
+                + rev.consistency_score   * 0.15
+                + rev.nrr_score           * 0.10, 1)
+            overrides_applied.append({
+                "param": "recurring_pct",
+                "from": rev.recurring_pct,
+                "to": body.recurring_pct,
+                "category": "revenue_quality",
+                "sub_score_delta": round(new_s_rec - rev.recurring_rate_score, 1),
+                "category_score_delta": round(new_rev_composite - rev.composite, 1),
+            })
+            scenario_scores["revenue_quality"] = new_rev_composite
+
+        if body.top_customer_pct is not None:
+            new_s_conc = round(_s_top_customer(body.top_customer_pct), 1)
+            new_cust_composite = round(
+                new_s_conc              * 0.35
+                + cust.diversification_score * 0.25
+                + cust.churn_score           * 0.25
+                + cust.tenure_score          * 0.15, 1)
+            overrides_applied.append({
+                "param": "top_customer_pct",
+                "from": cust.top_customer_pct,
+                "to": body.top_customer_pct,
+                "category": "customer_risk",
+                "sub_score_delta": round(new_s_conc - cust.concentration_score, 1),
+                "category_score_delta": round(new_cust_composite - cust.composite, 1),
+            })
+            scenario_scores["customer_risk"] = new_cust_composite
+
+        if body.owner_hours_per_week is not None or body.sop_pct is not None:
+            if qual_hours is not None:
+                eff_hours = body.owner_hours_per_week if body.owner_hours_per_week is not None else qual_hours
+                eff_sop   = body.sop_pct if body.sop_pct is not None else qual_sop
+                new_s_h = _qual_owner_hours_score(eff_hours)
+                new_s_s = _qual_sop_score(eff_sop)
+                new_s_a = _qual_automation_score(qual_auto)
+                new_s_m = _qual_mgmt_depth_score(qual_mgmt_q, qual_mgmt_t)
+                new_ops = round(new_s_h * 0.35 + new_s_s * 0.30 + new_s_a * 0.15 + new_s_m * 0.20, 1)
+                if body.owner_hours_per_week is not None:
+                    overrides_applied.append({
+                        "param": "owner_hours_per_week",
+                        "from": qual_hours,
+                        "to": body.owner_hours_per_week,
+                        "category": "operational_independence",
+                        "sub_score_delta": round(new_s_h - _qual_owner_hours_score(qual_hours), 1),
+                        "category_score_delta": round(new_ops - ops_baseline, 1),
+                    })
+                if body.sop_pct is not None:
+                    overrides_applied.append({
+                        "param": "sop_pct",
+                        "from": qual_sop,
+                        "to": body.sop_pct,
+                        "category": "operational_independence",
+                        "sub_score_delta": round(new_s_s - _qual_sop_score(qual_sop), 1),
+                        "category_score_delta": round(new_ops - ops_baseline, 1),
+                    })
+                scenario_scores["operational_independence"] = new_ops
+            # If no qual inputs exist, ops score is data-driven and can't be overridden via hours/sop
+
+        ebitda_scenario = _D(str(body.ebitda_override)) if body.ebitda_override is not None else ebitda_baseline
+        if body.ebitda_override is not None:
+            overrides_applied.append({
+                "param": "ebitda_override",
+                "from": float(ebitda_baseline),
+                "to": body.ebitda_override,
+                "category": "enterprise_value",
+                "sub_score_delta": 0,
+                "category_score_delta": 0,
+            })
+
+        cat_scen = CategoryScores(**{k: round(v, 1) for k, v in scenario_scores.items()})
+        mctx_scen = get_market_multiple_context(db, company.id, float(ebitda_scenario))
+        drs_scen = compute_drs(cat_scen, weights=buyer_weights)
+        ev_scen  = compute_enterprise_value(ebitda_scenario, drs_scen.tier, market_context=mctx_scen)
+
+        return {
+            "company_id": company.id,
+            "buyer_profile": body.buyer_profile,
+            "baseline": {
+                "drs": drs_base.base_drs,
+                "tier": drs_base.tier.value,
+                "category_scores": {k: round(v, 1) for k, v in baseline_scores.items()},
+                "enterprise_value": {
+                    "floor": float(ev_base.ev_floor),
+                    "midpoint": float(ev_base.ev_midpoint),
+                    "ceiling": float(ev_base.ev_ceiling),
+                    "ebitda_base": float(ebitda_baseline),
+                    "multiple_floor": ev_base.multiple_floor,
+                    "multiple_ceiling": ev_base.multiple_ceiling,
+                },
+            },
+            "scenario": {
+                "drs": drs_scen.base_drs,
+                "tier": drs_scen.tier.value,
+                "category_scores": {k: round(v, 1) for k, v in scenario_scores.items()},
+                "enterprise_value": {
+                    "floor": float(ev_scen.ev_floor),
+                    "midpoint": float(ev_scen.ev_midpoint),
+                    "ceiling": float(ev_scen.ev_ceiling),
+                    "ebitda_base": float(ebitda_scenario),
+                    "multiple_floor": ev_scen.multiple_floor,
+                    "multiple_ceiling": ev_scen.multiple_ceiling,
+                },
+                "overrides_applied": overrides_applied,
+            },
+            "drs_delta": round(drs_scen.base_drs - drs_base.base_drs, 1),
+            "ev_midpoint_delta": round(float(ev_scen.ev_midpoint) - float(ev_base.ev_midpoint), 0),
+            "tier_changed": drs_base.tier != drs_scen.tier,
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# AI-generated buyer questions (Gap 8 / Sprint 2)
+# ---------------------------------------------------------------------------
+
+@router.post("/buyer-questions/{company_id}/generate-ai")
+async def generate_ai_buyer_questions(
+    company: CompanyScoped,
+    body: BuyerQuestionAIRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Generate company-specific buyer due diligence questions via Claude.
+    Questions are grounded in the actual DRS scores and financial data of this company.
+    Falls back to the template library when ANTHROPIC_API_KEY is not configured.
+    """
+    from app.core.config import settings as _cfg
+    from app.api.routes.copilot import _build_context
+
+    try:
+        from app.services.analytics_service import compute_category_modules as _ccm
+        modules = _ccm(company.id, db)
+        cat_scores = {k: round(modules[k].composite, 1) for k in modules}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Analytics error: {exc}")
+
+    def _template_fallback(reason: str = "template"):
+        qs = generate_buyer_questions(cat_scores, max_questions=body.max_questions)
+        return {
+            "company_id": company.id,
+            "source": reason,
+            "buyer_type": body.buyer_type,
+            "questions": [q.to_dict() for q in qs],
+        }
+
+    if not _cfg.ANTHROPIC_API_KEY:
+        return _template_fallback()
+
+    try:
+        import anthropic as _ant
+    except ImportError:
+        return _template_fallback()
+
+    context = _build_context(company.id, db)
+    buyer_label = {
+        "pe": "Private Equity buyer",
+        "strategic": "Strategic Acquirer",
+        "financial": "Financial Buyer",
+    }.get(body.buyer_type or "", "sophisticated M&A buyer")
+
+    weakest = sorted(cat_scores.items(), key=lambda x: x[1])[:3]
+    weak_str = ", ".join(f"{k.replace('_', ' ')} ({v:.0f}/100)" for k, v in weakest)
+
+    prompt = (
+        f"You are preparing a {buyer_label} for a due diligence site visit.\n\n"
+        f"Generate {body.max_questions} specific, data-grounded due diligence questions "
+        f"based on the company data below. Prioritize the three weakest DRS dimensions: {weak_str}.\n\n"
+        f"Each question must:\n"
+        f"1. Reference specific numbers visible in the company data\n"
+        f"2. Identify a concrete verification need or risk\n"
+        f"3. Specify exactly what documents/data the seller must provide\n\n"
+        f'Return a JSON array only. Each element: {{"category":"<DRS_category>","severity":"CRITICAL|HIGH|MEDIUM",'
+        f'"question":"<question text>","data_needed":"<exact docs needed>"}}\n\n'
+        f"Company data:\n{context}"
+    )
+
+    try:
+        client = _ant.Anthropic(api_key=_cfg.ANTHROPIC_API_KEY, timeout=30.0)
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=2048,
+            system="You are an M&A pre-diligence advisor. Respond with valid JSON only — no prose.",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = (response.content[0].text if response.content else "[]").strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        ai_qs = json.loads(raw)
+        questions = [
+            {
+                "id": i,
+                "category": q.get("category", "general"),
+                "severity": q.get("severity", "HIGH"),
+                "buyer_type": body.buyer_type or "All",
+                "question": q.get("question", ""),
+                "data_needed": q.get("data_needed", ""),
+                "source": "ai",
+            }
+            for i, q in enumerate(ai_qs[: body.max_questions], start=1)
+        ]
+        return {
+            "company_id": company.id,
+            "source": "ai",
+            "buyer_type": body.buyer_type,
+            "questions": questions,
+        }
+    except Exception:
+        return _template_fallback("template_fallback")

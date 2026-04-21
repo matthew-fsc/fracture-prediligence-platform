@@ -22,15 +22,57 @@ from app.services.market_data.pitchbook_client import fetch_pitchbook_segment_hi
 
 # Keyword order: first match wins (more specific slugs first)
 _INDUSTRY_SLUG_RULES: list[tuple[str, tuple[str, ...]]] = [
-    ("field_services", ("traffic", "field service", "transportation", "fleet", "logistics")),
-    ("professional_services", ("legal", "accounting", "cpa", "consulting", "professional")),
-    ("business_services", ("business service", "services", "b2b")),
+    ("managed_it",           ("managed it", "msp", "managed service", "it service", "cloud service", "tech support", "information technology")),
+    ("healthcare_services",  ("health", "medical", "dental", "clinic", "therapy", "nursing", "home health", "physician")),
+    ("home_services",        ("hvac", "plumbing", "electrical", "pest control", "pest", "landscaping", "cleaning", "home service", "home repair")),
+    ("construction_specialty", ("construction", "contracting", "contractor", "remodel", "renovation", "specialty trade")),
+    ("staffing_hr",          ("staffing", "recruiting", "workforce", "hr services", "human resource", "peo", "payroll service")),
+    ("field_services",       ("traffic", "field service", "transportation", "fleet", "logistics", "delivery", "courier")),
+    ("professional_services", ("legal", "accounting", "cpa", "consulting", "advisory", "audit", "tax", "engineering", "architect", "professional")),
+    ("business_services",    ("business service", "services", "b2b", "outsourc")),
 ]
+
+# NAICS prefix → slug (longest prefix wins; checked before keyword rules)
+_NAICS_SLUG_MAP: dict[str, str] = {
+    # Managed IT / technology services
+    "518": "managed_it", "519": "managed_it",
+    "541511": "managed_it", "541512": "managed_it", "541513": "managed_it", "541519": "managed_it",
+    # Healthcare
+    "621": "healthcare_services", "622": "healthcare_services", "623": "healthcare_services",
+    # Home services (specialty trade contractors + repair & maintenance)
+    "811": "home_services",
+    "2382": "home_services", "23821": "home_services", "23822": "home_services",
+    "56171": "home_services",
+    # Construction / specialty contracting
+    "236": "construction_specialty", "237": "construction_specialty", "238": "construction_specialty",
+    # Staffing / HR
+    "5613": "staffing_hr",
+    # Field services / transportation
+    "484": "field_services", "485": "field_services", "488": "field_services",
+    # Professional services (Scientific & Technical)
+    "541": "professional_services",
+    # Administrative & business support
+    "561": "business_services", "562": "business_services",
+}
 
 _DEFAULT_SLUG = "business_services"
 
 
-def resolve_industry_slug(industry: Optional[str]) -> str:
+def _naics_to_slug(naics_code: str) -> Optional[str]:
+    """Try 6→5→4→3 digit prefix lookups against _NAICS_SLUG_MAP."""
+    code = naics_code.strip().replace("-", "")
+    for length in (6, 5, 4, 3):
+        prefix = code[:length]
+        if prefix in _NAICS_SLUG_MAP:
+            return _NAICS_SLUG_MAP[prefix]
+    return None
+
+
+def resolve_industry_slug(industry: Optional[str], naics_code: Optional[str] = None) -> str:
+    if naics_code and naics_code.strip():
+        slug = _naics_to_slug(naics_code)
+        if slug:
+            return slug
     if not industry or not str(industry).strip():
         return _DEFAULT_SLUG
     low = industry.lower()
@@ -104,7 +146,10 @@ def resolve_segment_for_company(
         return None, None, "none"
 
     company = db.query(Company).filter(Company.id == company_id).first()
-    slug = resolve_industry_slug(company.industry if company else None)
+    slug = resolve_industry_slug(
+        company.industry if company else None,
+        naics_code=company.naics_code if company else None,
+    )
 
     def _try(s: str) -> Optional[MarketSegmentMetric]:
         rows = _segments_for_slug(db, release.id, s)
@@ -260,6 +305,8 @@ def build_benchmarks_payload(
         pc = peer_count
         source_line = f"Source: {src_name}" + (f" · {pc} peer firms" if pc else "")
 
+    company = db.query(Company).filter(Company.id == company_id).first()
+
     return {
         "company_id": company_id,
         "segment_label": segment_label,
@@ -272,6 +319,9 @@ def build_benchmarks_payload(
         "sources": sources,
         "benchmarks": benchmark_rows,
         "pitchbook_hint": pitch,
+        "wacc_estimate_pct": float(seg.wacc_estimate_pct) if seg and seg.wacc_estimate_pct is not None else None,
+        "naics_code": company.naics_code if company else None,
+        "sic_code": company.sic_code if company else None,
     }
 
 
@@ -312,6 +362,8 @@ def seed_curated_benchmarks_if_empty(db: Session) -> None:
                 top_customer_conc_median_pct=row.get("top_customer_conc_median_pct"),
                 market_ebitda_multiple_floor=row.get("market_ebitda_multiple_floor"),
                 market_ebitda_multiple_ceiling=row.get("market_ebitda_multiple_ceiling"),
+                wacc_estimate_pct=row.get("wacc_estimate_pct"),
+                naics_codes=row.get("naics_codes"),
             )
         )
     db.flush()

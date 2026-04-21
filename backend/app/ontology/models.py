@@ -95,6 +95,9 @@ class Company(Base):
     interest_expense_ttm: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
     income_tax_expense_ttm: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
 
+    naics_code: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)   # e.g. "541511"
+    sic_code:   Mapped[Optional[str]] = mapped_column(String(4), nullable=True)   # e.g. "7372"
+
     report_firm_name: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
     report_cover_blurb: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     report_logo_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
@@ -515,6 +518,8 @@ class MarketSegmentMetric(Base):
     top_customer_conc_median_pct:   Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
     market_ebitda_multiple_floor:  Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
     market_ebitda_multiple_ceiling: Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    wacc_estimate_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    naics_codes:       Mapped[Optional[str]]   = mapped_column(String(256), nullable=True)  # comma-separated NAICS prefixes
 
 
 class MarketBenchmarkCache(Base):
