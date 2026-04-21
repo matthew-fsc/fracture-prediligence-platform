@@ -13,7 +13,7 @@ DRS weight: Customer Risk = 15% of composite score.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Optional
 
@@ -37,6 +37,8 @@ class CustomerRiskScore:
     avg_tenure_years: float
     industry_count: int
     data_confidence: str
+    # Top-5 customers by TTM revenue — source rows for drill-down
+    top_customers_detail: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -45,10 +47,27 @@ class CustomerRiskScore:
             "top_customer_name": self.top_customer_name,
             "top_customer_pct":  self.top_customer_pct,
             "sub_scores": {
-                "concentration":    {"score": self.concentration_score,   "value": self.top_customer_pct,     "label": f"Top customer {self.top_customer_pct:.0f}% of revenue"},
-                "diversification":  {"score": self.diversification_score, "value": self.active_customer_count, "label": f"{self.active_customer_count} active customers, {self.industry_count} industries"},
-                "churn":            {"score": self.churn_score,           "value": self.inactive_pct,          "label": f"{self.inactive_pct:.0f}% inactive"},
-                "tenure":           {"score": self.tenure_score,          "value": self.avg_tenure_years,      "label": f"Avg tenure {self.avg_tenure_years:.1f} yrs"},
+                "concentration": {
+                    "score": self.concentration_score,
+                    "value": self.top_customer_pct,
+                    "label": f"Top customer {self.top_customer_pct:.0f}% of revenue",
+                    "source_rows": self.top_customers_detail,
+                },
+                "diversification": {
+                    "score": self.diversification_score,
+                    "value": self.active_customer_count,
+                    "label": f"{self.active_customer_count} active customers, {self.industry_count} industries",
+                },
+                "churn": {
+                    "score": self.churn_score,
+                    "value": self.inactive_pct,
+                    "label": f"{self.inactive_pct:.0f}% inactive",
+                },
+                "tenure": {
+                    "score": self.tenure_score,
+                    "value": self.avg_tenure_years,
+                    "label": f"Avg tenure {self.avg_tenure_years:.1f} yrs",
+                },
             },
             "data_confidence": self.data_confidence,
         }
@@ -75,6 +94,7 @@ def compute_customer_risk(company_id: int, db: Session) -> CustomerRiskScore:
             active_customer_count=0, inactive_pct=0.0,
             avg_tenure_years=0.0, industry_count=0,
             data_confidence="LOW",
+            top_customers_detail=[],
         )
 
     active = [c for c in customers if c.is_active]
@@ -177,6 +197,18 @@ def compute_customer_risk(company_id: int, db: Session) -> CustomerRiskScore:
 
     confidence = "HIGH" if len(customers) >= 20 else "MEDIUM" if len(customers) >= 5 else "LOW"
 
+    # Build top-5 customer drill-down rows for source_rows disclosure
+    cust_id_to_name = {c.id: c.name for c in customers}
+    sorted_custs = sorted(cust_rev.items(), key=lambda kv: kv[1], reverse=True)
+    top_customers_detail = [
+        {
+            "name": cust_id_to_name.get(cid, f"Customer #{cid}"),
+            "revenue": round(rev_amt, 0),
+            "pct": round(rev_amt / total_rev * 100, 1) if total_rev > 0 else 0.0,
+        }
+        for cid, rev_amt in sorted_custs[:5]
+    ]
+
     return CustomerRiskScore(
         company_id=company_id,
         composite=round(composite, 1),
@@ -191,4 +223,5 @@ def compute_customer_risk(company_id: int, db: Session) -> CustomerRiskScore:
         avg_tenure_years=round(avg_tenure, 2),
         industry_count=n_industries,
         data_confidence=confidence,
+        top_customers_detail=top_customers_detail,
     )

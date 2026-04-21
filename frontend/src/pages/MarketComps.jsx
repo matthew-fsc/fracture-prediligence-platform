@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
-import { TrendingUp, Filter, ArrowUpRight, Info, BarChart2, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react'
+import { TrendingUp, Filter, ArrowUpRight, Info, BarChart2, ChevronDown, ChevronRight, AlertTriangle, Users, Building2, Briefcase } from 'lucide-react'
 import { useCompanyId } from '../context/CompanyContext'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../lib/apiClient'
@@ -376,10 +376,27 @@ function LeverCard({ lever, comps }) {
   )
 }
 
+const BUYER_TYPE_ICONS = { pe: Briefcase, strategic: Building2, financial: Users }
+const BUYER_TYPE_COLORS = { pe: 'text-violet-400', strategic: 'text-blue-400', financial: 'text-emerald-400' }
+const BUYER_TYPE_LABELS = { pe: 'Private Equity', strategic: 'Strategic', financial: 'Financial / Family Office' }
+
+function FitScoreBar({ score }) {
+  const color = score >= 75 ? 'bg-emerald-500' : score >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative h-1.5 rounded flex-1 bg-muted/40 overflow-hidden min-w-[60px]">
+        <div className={cn('absolute left-0 top-0 h-full rounded transition-all', color)} style={{ width: `${score}%` }} />
+      </div>
+      <span className="text-[11px] font-bold tabular-nums w-6 text-right">{score}</span>
+    </div>
+  )
+}
+
 export default function MarketComps() {
   const companyId = useCompanyId()
   const [segment, setSegment] = useState('field_services_traffic')
   const [evRange, setEvRange] = useState('all')
+  const [buyerTypeFilter, setBuyerTypeFilter] = useState('all')
 
   // Live company data for context panel
   const { data: liveData } = useQuery({
@@ -391,6 +408,15 @@ export default function MarketComps() {
     queryKey: ['analytics-value-gap', companyId],
     queryFn: () => apiClient.get(`/api/analytics/value-gap/${companyId}`),
     enabled: companyId != null && companyId > 0,
+  })
+  const { data: buyerUniverse, isLoading: buyerLoading } = useQuery({
+    queryKey: ['buyer-universe', companyId, buyerTypeFilter],
+    queryFn: () => {
+      const params = buyerTypeFilter !== 'all' ? `?buyer_type=${buyerTypeFilter}` : ''
+      return apiClient.get(`/api/analytics/buyer-universe/${companyId}${params}`)
+    },
+    enabled: companyId != null && companyId > 0,
+    staleTime: 60_000,
   })
 
   const filtered = useMemo(() => {
@@ -684,6 +710,112 @@ export default function MarketComps() {
         <span className="font-semibold text-card-foreground">Data Sources:</span> PitchBook M&A transaction database,
         IBBA Market Pulse (Q1 2021–Q3 2024), DealStats private transaction comps. Transactions anonymized per data
         provider agreement. Multiples shown as EV / EBITDA (TTM). Segment classification is advisor-curated.
+      </div>
+
+      {/* Active Acquirers */}
+      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Active Acquirers</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Curated buyer universe — matched to your industry, EBITDA, and EV</p>
+          </div>
+          <div className="flex gap-1.5">
+            {['all', 'pe', 'strategic', 'financial'].map(t => (
+              <button
+                key={t}
+                onClick={() => setBuyerTypeFilter(t)}
+                className={cn(
+                  'px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors',
+                  buyerTypeFilter === t
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-muted/20 text-muted-foreground border-border hover:border-muted-foreground/50'
+                )}
+              >
+                {t === 'all' ? 'All' : BUYER_TYPE_LABELS[t]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {buyerLoading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-lg border border-border bg-muted/20 p-4 space-y-2 animate-pulse">
+                <div className="h-3 bg-muted/50 rounded w-3/4" />
+                <div className="h-2 bg-muted/40 rounded w-1/2" />
+                <div className="h-1.5 bg-muted/30 rounded" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!buyerLoading && buyerUniverse && (
+          <>
+            {buyerUniverse.acquirers?.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No matching acquirers found for current filters.</p>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                  <span>Showing <strong className="text-foreground">{buyerUniverse.total_matched}</strong> of <strong className="text-foreground">{buyerUniverse.total_universe}</strong> active acquirers</span>
+                  {buyerUniverse.industry_slug && <span>· Industry: <span className="text-foreground font-medium">{buyerUniverse.industry_slug.replace(/_/g, ' ')}</span></span>}
+                  {buyerUniverse.ebitda_m != null && <span>· EBITDA: <span className="text-foreground font-medium">${buyerUniverse.ebitda_m.toFixed(2)}M</span></span>}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {buyerUniverse.acquirers.map(acq => {
+                    const Icon = BUYER_TYPE_ICONS[acq.buyer_type] ?? Users
+                    const typeColor = BUYER_TYPE_COLORS[acq.buyer_type] ?? 'text-muted-foreground'
+                    return (
+                      <div key={acq.id} className="rounded-lg border border-border bg-muted/10 p-4 space-y-2.5 hover:border-muted-foreground/40 transition-colors">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-semibold text-foreground leading-tight">{acq.name}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <Icon className={cn('w-3 h-3', typeColor)} />
+                              <span className={cn('text-[10px] font-medium', typeColor)}>{acq.buyer_type_label}</span>
+                              {acq.hq_state && <span className="text-[10px] text-muted-foreground">· {acq.hq_state}</span>}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-[10px] text-muted-foreground">Fit Score</p>
+                            <FitScoreBar score={acq.fit_score} />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+                          <span>EBITDA: <span className="text-foreground">{acq.ebitda_range}</span></span>
+                          <span>EV: <span className="text-foreground">{acq.ev_range}</span></span>
+                          {acq.hold_period_years && <span>Hold: <span className="text-foreground">{acq.hold_period_years}yr</span></span>}
+                          {acq.portfolio_count != null && <span>Portfolio: <span className="text-foreground">{acq.portfolio_count}</span></span>}
+                        </div>
+
+                        {acq.fit_reasons?.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {acq.fit_reasons.map((r, i) => (
+                              <span key={i} className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px]">{r}</span>
+                            ))}
+                          </div>
+                        )}
+
+                        {acq.investment_thesis && (
+                          <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2">{acq.investment_thesis}</p>
+                        )}
+
+                        {acq.source_note && (
+                          <p className="text-[9px] text-muted-foreground/50 italic">{acq.source_note}</p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+            {buyerUniverse.as_of_date && (
+              <p className="text-[10px] text-muted-foreground/50 text-right">
+                {buyerUniverse.release_label} · As of {buyerUniverse.as_of_date}
+              </p>
+            )}
+          </>
+        )}
       </div>
     </div>
   )

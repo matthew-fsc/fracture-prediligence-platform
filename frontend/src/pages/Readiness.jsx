@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import SectionHeader from '../components/ui/SectionHeader'
-import { cn } from '../lib/utils'
-import { ChevronDown, ChevronRight, Edit2, Check, X, Info, Shield, AlertTriangle } from 'lucide-react'
+import { cn, fmtM } from '../lib/utils'
+import { ChevronDown, ChevronRight, Edit2, Check, X, Info, Shield, AlertTriangle, Users } from 'lucide-react'
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine,
@@ -92,11 +92,106 @@ function tierLabel(s) {
   return       { label: 'Pre-Diligence Required',        color: 'red' }
 }
 
+// ── Source rows drill-down ───────────────────────────────────────────────────
+function SourceRowsDisclosure({ rows, subKey }) {
+  const [open, setOpen] = useState(false)
+  if (!rows || rows.length === 0) return null
+
+  const isCustomers = rows[0] && 'pct' in rows[0] && 'name' in rows[0]
+  const isRevenueTypes = rows[0] && 'type' in rows[0]
+  const isAddbacks = rows[0] && 'category' in rows[0] && 'description' in rows[0]
+
+  return (
+    <div className="mt-1.5">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1 text-[11px] text-primary/70 hover:text-primary transition-colors"
+      >
+        {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        {open ? 'Hide' : 'Show'} source data ({rows.length} rows)
+      </button>
+      {open && (
+        <div className="mt-1.5 rounded-lg border border-border/60 bg-muted/20 overflow-hidden">
+          {isCustomers && (
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="border-b border-border/40 text-muted-foreground">
+                  <th className="text-left px-3 py-1.5 font-semibold">Customer</th>
+                  <th className="text-right px-3 py-1.5 font-semibold">TTM Revenue</th>
+                  <th className="text-right px-3 py-1.5 font-semibold">% of Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} className="border-b border-border/20 last:border-0">
+                    <td className="px-3 py-1.5 text-foreground font-medium truncate max-w-[160px]">{r.name}</td>
+                    <td className="px-3 py-1.5 text-right text-foreground font-mono">{fmtM(r.revenue)}</td>
+                    <td className={cn('px-3 py-1.5 text-right font-bold tabular-nums', r.pct >= 30 ? 'text-red-400' : r.pct >= 20 ? 'text-amber-400' : 'text-emerald-400')}>
+                      {r.pct.toFixed(1)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {isRevenueTypes && (
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="border-b border-border/40 text-muted-foreground">
+                  <th className="text-left px-3 py-1.5 font-semibold">Revenue Type</th>
+                  <th className="text-right px-3 py-1.5 font-semibold">TTM Revenue</th>
+                  <th className="text-right px-3 py-1.5 font-semibold">% of Total</th>
+                  <th className="text-right px-3 py-1.5 font-semibold">Recurring?</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} className="border-b border-border/20 last:border-0">
+                    <td className="px-3 py-1.5 text-foreground font-medium">{r.type}</td>
+                    <td className="px-3 py-1.5 text-right text-foreground font-mono">{fmtM(r.revenue)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{r.pct.toFixed(1)}%</td>
+                    <td className="px-3 py-1.5 text-right">
+                      <span className={cn('font-bold text-[10px] px-1 py-0.5 rounded', r.recurring ? 'text-emerald-400 bg-emerald-500/10' : 'text-muted-foreground bg-muted/30')}>
+                        {r.recurring ? 'Yes' : 'No'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {isAddbacks && (
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="border-b border-border/40 text-muted-foreground">
+                  <th className="text-left px-3 py-1.5 font-semibold">Description</th>
+                  <th className="text-left px-3 py-1.5 font-semibold">Category</th>
+                  <th className="text-right px-3 py-1.5 font-semibold">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} className="border-b border-border/20 last:border-0">
+                    <td className="px-3 py-1.5 text-foreground truncate max-w-[160px]">{r.description}</td>
+                    <td className="px-3 py-1.5 text-amber-400 font-medium uppercase text-[10px]">{r.category}</td>
+                    <td className="px-3 py-1.5 text-right font-mono text-foreground">{fmtM(r.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Sub-score breakdown card ─────────────────────────────────────────────────
 function SubScoreRow({ subKey, sub, meta }) {
   const weight = meta?.weight ?? 0
   const pts = ((sub.score ?? 0) * weight / 100).toFixed(1)
   const source = sub.source ?? 'financial_data'
+  const sourceRows = sub.source_rows ?? []
   return (
     <div className="flex items-start gap-3 py-2 border-b border-border/30 last:border-0 text-[11px]">
       <div className="w-4 h-4 flex-shrink-0 mt-0.5">
@@ -119,6 +214,7 @@ function SubScoreRow({ subKey, sub, meta }) {
             <span className="text-muted-foreground/80"> — index {Number(sub.value).toLocaleString()}</span>
           )}
         </p>
+        <SourceRowsDisclosure rows={sourceRows} subKey={subKey} />
       </div>
       <div className="text-right flex-shrink-0 ml-2">
         <p className={cn('font-bold', scoreColor(sub.score ?? 0))}>{(sub.score ?? 0).toFixed(0)}</p>
@@ -335,6 +431,13 @@ function CategoryCard({ item, catData, override, onOverrideSaved }) {
   )
 }
 
+const BUYER_PROFILES = [
+  { key: null,         label: 'Default',    abbr: 'Default'  },
+  { key: 'pe',        label: 'Private Equity', abbr: 'PE'  },
+  { key: 'strategic', label: 'Strategic',   abbr: 'Strategic' },
+  { key: 'financial', label: 'Financial',   abbr: 'Financial' },
+]
+
 export default function Readiness() {
   const companyId = useCompanyId()
   const queryClient = useQueryClient()
@@ -343,6 +446,11 @@ export default function Readiness() {
   const [refresh, setRefresh] = useState(0)
   const [methodologyOpen, setMethodologyOpen] = useState(false)
   const [snapshots, setSnapshots] = useState([])
+  const [compareSnap1, setCompareSnap1] = useState('')
+  const [compareSnap2, setCompareSnap2] = useState('')
+  const [compareResult, setCompareResult] = useState(null)
+  const [compareLoading, setCompareLoading] = useState(false)
+  const [buyerProfile, setBuyerProfile] = useState(null) // null | 'pe' | 'strategic' | 'financial'
 
   const reload = () => {
     setRefresh(r => r + 1)
@@ -355,7 +463,8 @@ export default function Readiness() {
   }
 
   useEffect(() => {
-    apiClient.get(`/api/analytics/scores/${companyId}`)
+    const profileParam = buyerProfile ? `?buyer_profile=${buyerProfile}` : ''
+    apiClient.get(`/api/analytics/scores/${companyId}${profileParam}`)
       .then(setData)
       .catch(() => {})
     apiClient.get(`/api/analytics/overrides/${companyId}`)
@@ -369,7 +478,7 @@ export default function Readiness() {
     apiClient.get(`/api/analytics/scores/${companyId}/history`)
       .then(d => setSnapshots(d.snapshots ?? []))
       .catch(() => {})
-  }, [refresh, companyId])
+  }, [refresh, companyId, buyerProfile])
 
   if (data === null) {
     return (
@@ -440,7 +549,25 @@ export default function Readiness() {
         title="Diligence Readiness Score"
         subtitle="Weighted scoring framework — Revenue Quality · Financial Integrity · Operational Independence · Customer Risk · Management · Growth"
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Buyer lens toggle */}
+            <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/20 p-0.5">
+              <Users className="w-3 h-3 text-muted-foreground ml-1.5" />
+              {BUYER_PROFILES.map(p => (
+                <button
+                  key={p.key ?? 'default'}
+                  onClick={() => setBuyerProfile(p.key)}
+                  className={cn(
+                    'text-[11px] px-2 py-0.5 rounded font-semibold transition-all',
+                    buyerProfile === p.key
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {p.abbr}
+                </button>
+              ))}
+            </div>
             {hasOverrides && (
               <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400">
                 Advisor Adjustments Active
@@ -462,6 +589,38 @@ export default function Readiness() {
           </div>
         }
       />
+
+      {/* Buyer profile active banner */}
+      {buyerProfile && data?.buyer_profile && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex items-start gap-3">
+          <Users className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-foreground mb-0.5">
+              Viewing DRS as a <span className="text-primary">{data.buyer_profile.label}</span> would weight it
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">{data.buyer_profile.rationale}</p>
+            {Object.keys(data.buyer_profile.weight_deltas ?? {}).length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {Object.entries(data.buyer_profile.weight_deltas).map(([cat, delta]) => {
+                  if (delta === 0) return null
+                  const label = DEFAULT_CATEGORY_META[cat]?.label ?? cat
+                  return (
+                    <span key={cat} className={cn(
+                      'text-[10px] font-semibold px-1.5 py-0.5 rounded border',
+                      delta > 0 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-red-500/30 bg-red-500/10 text-red-400',
+                    )}>
+                      {label} {delta > 0 ? '+' : ''}{delta}pp
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+          <button onClick={() => setBuyerProfile(null)} className="text-muted-foreground hover:text-foreground flex-shrink-0">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <button
@@ -825,6 +984,117 @@ export default function Readiness() {
             <span className="flex items-center gap-1"><span className="inline-block w-4 h-px bg-emerald-500/60" /> 85 · Institutional Grade</span>
             <span className="flex items-center gap-1"><span className="inline-block w-4 h-px bg-amber-500/60" /> 70 · Investment Grade</span>
           </div>
+        </div>
+      )}
+
+      {/* Snapshot Compare */}
+      {snapshots.length >= 2 && (
+        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Compare Snapshots</p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Baseline</label>
+              <select
+                className="rounded-lg border border-border bg-muted/30 px-2 py-1.5 text-xs text-foreground"
+                value={compareSnap1}
+                onChange={e => { setCompareSnap1(e.target.value); setCompareResult(null) }}
+              >
+                <option value="">— select —</option>
+                {snapshots.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {new Date(s.created_at).toLocaleDateString()} · DRS {s.drs_score?.toFixed(1)} ({s.trigger})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Comparison</label>
+              <select
+                className="rounded-lg border border-border bg-muted/30 px-2 py-1.5 text-xs text-foreground"
+                value={compareSnap2}
+                onChange={e => { setCompareSnap2(e.target.value); setCompareResult(null) }}
+              >
+                <option value="">— select —</option>
+                {snapshots.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {new Date(s.created_at).toLocaleDateString()} · DRS {s.drs_score?.toFixed(1)} ({s.trigger})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              disabled={!compareSnap1 || !compareSnap2 || compareSnap1 === compareSnap2 || compareLoading}
+              className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-40"
+              onClick={() => {
+                setCompareLoading(true)
+                apiClient.get(`/api/analytics/scores/${companyId}/compare?snap1=${compareSnap1}&snap2=${compareSnap2}`)
+                  .then(r => setCompareResult(r))
+                  .catch(() => {})
+                  .finally(() => setCompareLoading(false))
+              }}
+            >
+              {compareLoading ? 'Loading…' : 'Compare →'}
+            </button>
+          </div>
+
+          {compareResult && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-3">
+                {[
+                  { label: 'DRS Change', value: compareResult.drs_delta, suffix: 'pts', colored: true },
+                  { label: 'EV Change', value: compareResult.ev_delta != null ? compareResult.ev_delta.toFixed(0) : null, suffix: '$K', colored: true },
+                  { label: 'Days Elapsed', value: compareResult.days_elapsed, suffix: 'd', colored: false },
+                ].map(({ label, value, suffix, colored }) => (
+                  <div key={label} className="rounded-lg border border-border bg-muted/20 px-4 py-2 text-center min-w-[100px]">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{label}</p>
+                    {value != null ? (
+                      <p className={cn(
+                        'text-base font-bold',
+                        colored && value > 0 ? 'text-emerald-400' : colored && value < 0 ? 'text-rose-400' : 'text-foreground'
+                      )}>
+                        {colored && value > 0 ? '+' : ''}{value}{suffix}
+                      </p>
+                    ) : <p className="text-base font-bold text-muted-foreground">—</p>}
+                  </div>
+                ))}
+              </div>
+
+              {Object.keys(compareResult.category_deltas ?? {}).length > 0 && (
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/20">
+                        <th className="text-left px-3 py-2 font-medium text-muted-foreground">Category</th>
+                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Baseline</th>
+                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Now</th>
+                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Delta</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(compareResult.category_deltas).map(([cat, delta]) => {
+                        const baseline = compareResult.snapshot_1?.category_scores?.[cat]
+                        const current = compareResult.snapshot_2?.category_scores?.[cat]
+                        const label = DEFAULT_CATEGORY_META[cat]?.label ?? cat
+                        return (
+                          <tr key={cat} className="border-b border-border/40 last:border-0 hover:bg-muted/10">
+                            <td className="px-3 py-1.5 text-foreground">{label}</td>
+                            <td className="px-3 py-1.5 text-right text-muted-foreground">{baseline?.toFixed(1) ?? '—'}</td>
+                            <td className="px-3 py-1.5 text-right text-muted-foreground">{current?.toFixed(1) ?? '—'}</td>
+                            <td className={cn(
+                              'px-3 py-1.5 text-right font-semibold',
+                              delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-rose-400' : 'text-muted-foreground'
+                            )}>
+                              {delta > 0 ? '+' : ''}{delta.toFixed(1)}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

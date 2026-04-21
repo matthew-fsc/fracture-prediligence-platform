@@ -73,8 +73,8 @@ class DRSResult:
     category_contributions: dict[str, float]
 
 
-def _weighted_sum(scores: dict[str, float]) -> float:
-    return sum(scores[k] * WEIGHTS[k] for k in WEIGHTS)
+def _weighted_sum(scores: dict[str, float], weights: dict[str, float]) -> float:
+    return sum(scores[k] * weights[k] for k in weights)
 
 
 def _classify_tier(drs: float) -> DRSTier:
@@ -84,7 +84,18 @@ def _classify_tier(drs: float) -> DRSTier:
     return DRSTier.PRE_DILIGENCE
 
 
-def compute_drs(scores: CategoryScores) -> DRSResult:
+def compute_drs(
+    scores: CategoryScores,
+    weights: dict[str, float] | None = None,
+) -> DRSResult:
+    """
+    Compute the DRS composite.
+
+    Pass ``weights`` to apply a buyer-type profile (e.g. BUYER_WEIGHT_PROFILES["pe"]).
+    When omitted, the default SCORING_RULES.category_weights are used.
+    """
+    w = weights if weights is not None else WEIGHTS
+
     base_scores = {
         "revenue_quality":          scores.revenue_quality,
         "financial_integrity":      scores.financial_integrity,
@@ -110,11 +121,11 @@ def compute_drs(scores: CategoryScores) -> DRSResult:
         "growth_drivers":           scores.growth_drivers_optimistic,
     }
 
-    base_drs         = _weighted_sum(base_scores)
-    conservative_drs = _weighted_sum(conservative_scores)
-    optimistic_drs   = _weighted_sum(optimistic_scores)
+    base_drs         = _weighted_sum(base_scores, w)
+    conservative_drs = _weighted_sum(conservative_scores, w)
+    optimistic_drs   = _weighted_sum(optimistic_scores, w)
 
-    contributions = {k: base_scores[k] * WEIGHTS[k] for k in WEIGHTS}
+    contributions = {k: base_scores[k] * w[k] for k in w}
 
     return DRSResult(
         base_drs=round(base_drs, 1),

@@ -95,6 +95,9 @@ class Company(Base):
     interest_expense_ttm: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
     income_tax_expense_ttm: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2), nullable=True)
 
+    naics_code: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)   # e.g. "541511"
+    sic_code:   Mapped[Optional[str]] = mapped_column(String(4), nullable=True)   # e.g. "7372"
+
     report_firm_name: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
     report_cover_blurb: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     report_logo_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
@@ -430,12 +433,13 @@ class ScoreSnapshot(Base):
     """Point-in-time DRS and EV capture for a company. Written on DRS fetch and override changes."""
     __tablename__ = "score_snapshots"
 
-    id:          Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
-    company_id:  Mapped[int]            = mapped_column(ForeignKey("companies.id"), index=True)
-    drs_score:   Mapped[float]          = mapped_column(Numeric(6, 2), nullable=False)
-    ev_estimate: Mapped[Optional[float]] = mapped_column(Numeric(16, 2), nullable=True)
-    trigger:     Mapped[Optional[str]]  = mapped_column(String(64), nullable=True)  # 'manual', 'override', 'report'
-    created_at:  Mapped[datetime]       = mapped_column(DateTime, server_default=func.now(), index=True)
+    id:                   Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:           Mapped[int]            = mapped_column(ForeignKey("companies.id"), index=True)
+    drs_score:            Mapped[float]          = mapped_column(Numeric(6, 2), nullable=False)
+    ev_estimate:          Mapped[Optional[float]] = mapped_column(Numeric(16, 2), nullable=True)
+    trigger:              Mapped[Optional[str]]  = mapped_column(String(64), nullable=True)  # 'manual', 'override', 'report'
+    category_scores_json: Mapped[Optional[str]]  = mapped_column(Text, nullable=True)  # JSON dict of category→score
+    created_at:           Mapped[datetime]       = mapped_column(DateTime, server_default=func.now(), index=True)
 
     company: Mapped[Company] = relationship("Company")
 
@@ -515,6 +519,8 @@ class MarketSegmentMetric(Base):
     top_customer_conc_median_pct:   Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
     market_ebitda_multiple_floor:  Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
     market_ebitda_multiple_ceiling: Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    wacc_estimate_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    naics_codes:       Mapped[Optional[str]]   = mapped_column(String(256), nullable=True)  # comma-separated NAICS prefixes
 
 
 class MarketBenchmarkCache(Base):
@@ -527,6 +533,45 @@ class MarketBenchmarkCache(Base):
     payload_json: Mapped[str]          = mapped_column(Text)
     expires_at: Mapped[datetime]       = mapped_column(DateTime, index=True)
     created_at: Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Buyer Universe — curated active acquirer database
+# ---------------------------------------------------------------------------
+
+class BuyerUniverseRelease(Base):
+    """Versioned snapshot of the curated active acquirer list."""
+
+    __tablename__ = "buyer_universe_releases"
+
+    id:          Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source_type: Mapped[str]            = mapped_column(String(32))   # curated | pitchbook
+    label:       Mapped[str]            = mapped_column(String(256))
+    as_of_date:  Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    created_at:  Mapped[datetime]       = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ActiveAcquirer(Base):
+    """One active acquirer profile linked to a BuyerUniverseRelease."""
+
+    __tablename__ = "active_acquirers"
+
+    id:                    Mapped[int]            = mapped_column(Integer, primary_key=True, autoincrement=True)
+    release_id:            Mapped[int]            = mapped_column(ForeignKey("buyer_universe_releases.id"), index=True)
+    name:                  Mapped[str]            = mapped_column(String(256))
+    buyer_type:            Mapped[str]            = mapped_column(String(16), index=True)  # pe | strategic | financial
+    hq_state:              Mapped[Optional[str]]  = mapped_column(String(2), nullable=True)
+    preferred_industries:  Mapped[str]            = mapped_column(String(512))   # comma-sep industry slugs
+    ebitda_min_m:          Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)   # $ millions
+    ebitda_max_m:          Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
+    ev_min_m:              Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
+    ev_max_m:              Mapped[Optional[float]] = mapped_column(Numeric(8, 2), nullable=True)
+    investment_thesis:     Mapped[Optional[str]]  = mapped_column(Text, nullable=True)
+    hold_period_years:     Mapped[Optional[str]]  = mapped_column(String(16), nullable=True)   # "3-5"
+    portfolio_count:       Mapped[Optional[int]]  = mapped_column(Integer, nullable=True)
+    notable_platforms:     Mapped[Optional[str]]  = mapped_column(Text, nullable=True)
+    source_note:           Mapped[Optional[str]]  = mapped_column(String(256), nullable=True)
+    is_active:             Mapped[bool]           = mapped_column(Boolean, default=True)
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
-import { TrendingDown, TrendingUp, Activity, UserMinus, Shield, User } from 'lucide-react'
+import { TrendingDown, TrendingUp, Activity, UserMinus, Shield, User, Zap, ChevronRight } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { apiClient } from '../lib/apiClient'
 import { useCompanyId } from '../context/CompanyContext'
@@ -20,9 +20,21 @@ const sevColor = {
 export default function ScenarioSimulator() {
   const companyId = useCompanyId()
   const [base, setBase] = useState(null)
+  const [scores, setScores] = useState(null)
   const [topCustomer, setTopCustomer] = useState({ name: 'Top Customer', pct: 22 })
   const [ownerHours, setOwnerHours] = useState(40)
   const [activeScenario, setActiveScenario] = useState('top_customer_loss')
+
+  // Improvement scenario state
+  const [improvParams, setImprovParams] = useState({
+    recurring_pct: 65,
+    top_customer_pct: 20,
+    owner_hours_per_week: 20,
+    sop_pct: 70,
+  })
+  const [improvResult, setImprovResult] = useState(null)
+  const [improvLoading, setImprovLoading] = useState(false)
+  const [activeImprov, setActiveImprov] = useState('recurring_pct')
 
   // Per-scenario param state
   const [params, setParams] = useState({
@@ -43,9 +55,9 @@ export default function ScenarioSimulator() {
     Promise.all([
       apiClient.get(`/api/analytics/metrics/${companyId}`),
       apiClient.get(`/api/analytics/scores/${companyId}`),
-    ]).then(([metrics, scores]) => {
-      if (!metrics || !scores) return
-      const ev = scores.enterprise_value
+    ]).then(([metrics, scoresData]) => {
+      if (!metrics || !scoresData) return
+      const ev = scoresData.enterprise_value
       const midMultiple = ev?.midpoint && metrics.ebitda_ttm > 0
         ? ev.midpoint / metrics.ebitda_ttm : 6.0
       setBase({
@@ -54,21 +66,49 @@ export default function ScenarioSimulator() {
         multiple: parseFloat(midMultiple.toFixed(1)),
         ev:       ev?.midpoint ?? 0,
       })
+      setScores(scoresData)
       // Top customer from customer_risk
-      const cr = scores.category_scores?.customer_risk
+      const cr = scoresData.category_scores?.customer_risk
       if (cr?.top_customer_name && cr?.top_customer_pct != null) {
         setTopCustomer({ name: cr.top_customer_name, pct: cr.top_customer_pct })
         setParams(p => ({ ...p, top_customer_loss_revenue_pct: Math.round(cr.top_customer_pct) }))
+        setImprovParams(p => ({ ...p, top_customer_pct: Math.min(30, Math.max(10, Math.round(cr.top_customer_pct * 0.7))) }))
       }
       // Owner hours from qualitative if available (default 40)
-      const opsSubs = scores.category_scores?.operational_independence?.sub_scores ?? {}
+      const opsSubs = scoresData.category_scores?.operational_independence?.sub_scores ?? {}
       if (opsSubs.owner_hours?.value != null) {
         const h = Number(opsSubs.owner_hours.value)
         setOwnerHours(h)
         setParams(p => ({ ...p, owner_departure_reduced_hours: Math.max(0, Math.round(h * 0.25)) }))
+        setImprovParams(p => ({ ...p, owner_hours_per_week: Math.max(5, Math.round(h * 0.5)) }))
+      }
+      // Seed recurring_pct from current score
+      const revSub = scoresData.category_scores?.revenue_quality?.sub_scores?.recurring_rate
+      if (revSub?.value != null) {
+        const cur = Number(revSub.value)
+        setImprovParams(p => ({ ...p, recurring_pct: Math.min(90, Math.round(cur + 20)) }))
       }
     }).catch(() => {})
   }, [companyId])
+
+  const runImprovScenario = useCallback(async (paramKey, value) => {
+    setImprovLoading(true)
+    try {
+      const body = { [paramKey]: value }
+      const result = await apiClient.post(`/api/analytics/scores/${companyId}/scenario`, body)
+      setImprovResult(result)
+    } catch (_) {
+      setImprovResult(null)
+    } finally {
+      setImprovLoading(false)
+    }
+  }, [companyId])
+
+  useEffect(() => {
+    if (base) {
+      runImprovScenario(activeImprov, improvParams[activeImprov])
+    }
+  }, [activeImprov, improvParams, base, runImprovScenario])
 
   const liveBase = base ?? { revenue: 0, ebitda: 0, multiple: 6.0, ev: 0 }
   const p = params
@@ -356,6 +396,153 @@ export default function ScenarioSimulator() {
           <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
             <p className="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-1">Advisory Risk Scenarios — Not a Forecast</p>
             <p className="text-[11px] text-muted-foreground leading-relaxed">These scenarios are modeling tools for advisor-client conversations, not predictions. Multiple adjustments reflect market convention, not guaranteed outcomes.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Improvement Scenarios (real engine) ────────────────────────── */}
+      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/3 p-4 space-y-4">
+        <div className="flex items-center gap-2">
+          <Zap className="w-4 h-4 text-emerald-400" />
+          <p className="text-sm font-semibold text-foreground">Improvement Scenarios</p>
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 ml-auto">
+            Powered by DRS Engine
+          </span>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Adjust a target metric below. The DRS engine recomputes your score and enterprise value in real time using the actual scoring model — no heuristics.
+        </p>
+
+        {/* Metric selector + slider */}
+        <div className="grid grid-cols-12 gap-4">
+          <div className="col-span-12 lg:col-span-3 space-y-1">
+            {[
+              { key: 'recurring_pct', label: 'Recurring Revenue %', unit: '%', min: 0, max: 95, step: 5 },
+              { key: 'top_customer_pct', label: 'Top Customer Concentration', unit: '%', min: 5, max: 60, step: 5 },
+              { key: 'owner_hours_per_week', label: 'Owner Hrs/Week in Ops', unit: 'hrs', min: 0, max: 60, step: 5 },
+              { key: 'sop_pct', label: 'SOP Documentation %', unit: '%', min: 10, max: 100, step: 5 },
+            ].map(m => (
+              <button key={m.key} onClick={() => setActiveImprov(m.key)}
+                className={cn('w-full text-left rounded-lg border p-2.5 transition-all text-[11px]',
+                  activeImprov === m.key
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                    : 'border-border bg-card hover:bg-muted/30 text-muted-foreground')}>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">{m.label}</span>
+                  <ChevronRight className={cn('w-3 h-3', activeImprov === m.key ? 'text-emerald-400' : 'opacity-0')} />
+                </div>
+                <span className="font-bold text-foreground">{improvParams[m.key]}{m.unit}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="col-span-12 lg:col-span-5 space-y-4">
+            {[
+              { key: 'recurring_pct', label: 'Target Recurring Revenue', unit: '%', min: 0, max: 95, step: 5 },
+              { key: 'top_customer_pct', label: 'Target Top Customer Share', unit: '%', min: 5, max: 60, step: 5 },
+              { key: 'owner_hours_per_week', label: 'Target Owner Hours/Week', unit: 'hrs', min: 0, max: 60, step: 5 },
+              { key: 'sop_pct', label: 'Target SOP Documentation', unit: '%', min: 10, max: 100, step: 5 },
+            ].filter(m => m.key === activeImprov).map(m => (
+              <div key={m.key} className="rounded-xl border border-border bg-card p-4">
+                <div className="flex items-center justify-between text-xs mb-4">
+                  <span className="text-muted-foreground font-semibold">{m.label}</span>
+                  <span className="font-bold text-emerald-400 text-base">{improvParams[m.key]}{m.unit}</span>
+                </div>
+                <input type="range" min={m.min} max={m.max} step={m.step}
+                  value={improvParams[m.key]}
+                  onChange={e => setImprovParams(p => ({ ...p, [m.key]: Number(e.target.value) }))}
+                  className="w-full h-1.5 bg-muted rounded-full appearance-none cursor-pointer accent-emerald-500" />
+                <div className="flex justify-between text-[11px] text-muted-foreground mt-1">
+                  <span>{m.min}{m.unit}</span><span>{m.max}{m.unit}</span>
+                </div>
+                {improvResult?.scenario?.overrides_applied?.find(o => o.param === m.key) && (
+                  <div className="mt-3 p-2 rounded-lg bg-secondary/50 text-[11px] text-muted-foreground">
+                    {(() => {
+                      const o = improvResult.scenario.overrides_applied.find(ov => ov.param === m.key)
+                      return (
+                        <>
+                          <span>Category score delta: </span>
+                          <span className={cn('font-bold', o.category_score_delta >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                            {o.category_score_delta >= 0 ? '+' : ''}{o.category_score_delta} pts
+                          </span>
+                          <span className="mx-2 text-border">|</span>
+                          <span>Category: </span>
+                          <span className="font-semibold text-foreground">{o.category.replace(/_/g, ' ')}</span>
+                        </>
+                      )
+                    })()}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* DRS + EV comparison */}
+            {improvResult && (
+              <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+                <p className="text-xs font-semibold text-foreground">DRS Engine Output</p>
+                {improvLoading && <p className="text-[11px] text-muted-foreground animate-pulse">Recomputing…</p>}
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: 'Baseline DRS', val: improvResult.baseline.drs, fmt: v => `${v.toFixed(1)}` },
+                    { label: 'Scenario DRS', val: improvResult.scenario.drs, fmt: v => `${v.toFixed(1)}`, highlight: true },
+                    { label: 'DRS Delta', val: improvResult.drs_delta, fmt: v => `${v >= 0 ? '+' : ''}${v.toFixed(1)} pts`, isPos: improvResult.drs_delta >= 0 },
+                    { label: 'Tier', val: improvResult.scenario.tier, fmt: v => v, small: true },
+                  ].map(c => (
+                    <div key={c.label} className={cn('p-2.5 rounded-lg border border-border',
+                      c.highlight ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-secondary/30')}>
+                      <p className="text-[11px] text-muted-foreground mb-0.5">{c.label}</p>
+                      <p className={cn('font-bold', c.small ? 'text-xs' : 'text-sm',
+                        c.isPos === true ? 'text-emerald-400' : c.isPos === false ? 'text-red-400' : 'text-foreground')}>
+                        {c.fmt(c.val)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-border pt-3 flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">EV Midpoint Delta</span>
+                  <span className={cn('font-bold text-sm', improvResult.ev_midpoint_delta >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                    {improvResult.ev_midpoint_delta >= 0 ? '+' : ''}{fmtM(Math.abs(improvResult.ev_midpoint_delta))}
+                  </span>
+                </div>
+                {improvResult.tier_changed && (
+                  <div className="p-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-400 font-semibold">
+                    Tier upgrade: {improvResult.baseline.tier} → {improvResult.scenario.tier}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Category score comparison */}
+          <div className="col-span-12 lg:col-span-4">
+            {improvResult && (
+              <div className="rounded-xl border border-border bg-card p-4">
+                <p className="text-xs font-semibold text-foreground mb-3">Category Score Comparison</p>
+                <div className="space-y-2">
+                  {Object.entries(improvResult.baseline.category_scores).map(([k, baseVal]) => {
+                    const scenVal = improvResult.scenario.category_scores[k]
+                    const delta = scenVal - baseVal
+                    const isChanged = Math.abs(delta) >= 0.1
+                    return (
+                      <div key={k} className={cn('flex items-center gap-2 p-2 rounded-lg text-[11px] transition-colors',
+                        isChanged ? 'bg-emerald-500/8 border border-emerald-500/20' : 'border border-transparent')}>
+                        <span className="flex-1 text-muted-foreground capitalize">{k.replace(/_/g, ' ')}</span>
+                        <span className="text-muted-foreground/60 w-8 text-right">{baseVal.toFixed(0)}</span>
+                        <span className="text-muted-foreground/40">→</span>
+                        <span className={cn('font-bold w-8 text-right', isChanged ? 'text-emerald-400' : 'text-foreground')}>
+                          {scenVal.toFixed(0)}
+                        </span>
+                        {isChanged && (
+                          <span className={cn('text-[10px] font-bold w-10 text-right', delta >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+                            {delta >= 0 ? '+' : ''}{delta.toFixed(1)}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
