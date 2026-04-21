@@ -18,7 +18,7 @@ buildArgs = ["VITE_CLERK_PUBLISHABLE_KEY", "VITE_API_BASE_URL"]
 # and GET /health returns 200 during the deploy healthcheck. Set service variable RUN_MIGRATIONS=false
 # so the entrypoint does not run alembic again before uvicorn (duplicate + delayed listen).
 # Railway schema allows at most one element (single shell command).
-preDeployCommand = ["/bin/sh -c \"cd /app/backend && alembic upgrade head\""]
+preDeployCommand = "cd /app/backend && alembic upgrade head"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
