@@ -135,7 +135,7 @@ function UserSection() {
   const meToastOnce = useRef(false)
   const meQuery = useQuery({
     queryKey: ['me'],
-    queryFn: () => apiClient.get('/api/me'),
+    queryFn: () => apiClient.get('/api/user/subscription'),
     enabled: !!PUBLISHABLE_KEY,
     retry: false,
     meta: { suppressErrorToast: true },
@@ -151,7 +151,7 @@ function UserSection() {
     toast.error(meQuery.error.message || 'Could not load account')
   }, [meQuery.isError, meQuery.error])
 
-  const sub = meQuery.data?.subscription
+  const sub = meQuery.data
 
   if (!PUBLISHABLE_KEY) return <StaticUserSection />
   return <ClerkUserSection sub={sub} />

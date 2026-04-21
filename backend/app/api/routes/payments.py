@@ -192,12 +192,12 @@ async def add_engagement(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/me")
-def get_me(
+@router.get("/billing/me")
+def get_billing_me(
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Current user id plus subscription summary for the dashboard header."""
+    """Current user id plus subscription summary for billing-related UIs."""
     sub = get_user_subscription(db, user.user_id)
     return {"user_id": user.user_id, "subscription": sub}
 
