@@ -241,7 +241,14 @@ if FRONTEND_DIST.exists():
     def logo():
         return FileResponse(FRONTEND_DIST / "logo.png")
 
-    # SPA catch-all: serve index.html for every non-API route
+    # SPA catch-all: serve index.html for every non-API route.
+    # API paths without trailing slash would otherwise be swallowed by this
+    # catch-all before FastAPI's redirect_slashes can fire, so redirect them.
     @app.get("/{full_path:path}")
-    def spa_fallback(full_path: str):
+    def spa_fallback(full_path: str, request: Request):
+        from fastapi.responses import RedirectResponse
+        if full_path.startswith("api/") or full_path == "api":
+            # Preserve query string and redirect to the same path with trailing slash
+            qs = f"?{request.url.query}" if request.url.query else ""
+            return RedirectResponse(url=f"/{full_path}/{qs}", status_code=307)
         return FileResponse(FRONTEND_DIST / "index.html")
