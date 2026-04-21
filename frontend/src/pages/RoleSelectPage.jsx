@@ -11,6 +11,7 @@ import { apiClient } from '../lib/apiClient'
 import { useUserRole } from '../context/UserRoleContext'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { cn } from '../lib/utils'
+import { marketingColors } from '../theme/marketingColors'
 
 export default function RoleSelectPage() {
   usePageTitle('Welcome - Select Your Role')
@@ -37,8 +38,8 @@ export default function RoleSelectPage() {
   return (
     <div className="min-h-screen bg-background dark flex flex-col items-center justify-center p-6">
       <div className="flex items-center gap-3 mb-10">
-        <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-          <span className="text-primary-foreground font-bold text-lg">F</span>
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: marketingColors.gold }}>
+          <span className="font-bold text-lg" style={{ color: marketingColors.bg }}>F</span>
         </div>
         <div>
           <p className="text-sm font-semibold text-foreground">Pre-Diligence Platform</p>
@@ -88,9 +89,10 @@ export default function RoleSelectPage() {
         className={cn(
           'inline-flex items-center justify-center gap-2 min-w-[180px] rounded-lg px-8 py-3 text-sm font-semibold transition-colors',
           selected && !saving
-            ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+            ? 'text-black'
             : 'bg-muted text-muted-foreground cursor-not-allowed',
         )}
+        style={selected && !saving ? { background: marketingColors.gold } : undefined}
       >
         {saving ? (
           <>
@@ -117,23 +119,24 @@ function RoleCard({ icon, title, description, bullets, selected, onSelect }) {
         'relative text-left rounded-xl border p-6 transition-all bg-card',
         selected ? 'border-primary/40 bg-primary/10 ring-1 ring-primary/25' : 'border-border hover:bg-muted/20',
       )}
+      style={selected ? { borderColor: `${marketingColors.gold}66`, background: 'rgba(201, 151, 58, 0.10)' } : undefined}
     >
       {selected && (
-        <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+        <div className="absolute top-3 right-3 w-5 h-5 rounded-full flex items-center justify-center" style={{ background: marketingColors.gold }}>
           <svg width="11" height="8" viewBox="0 0 11 8" fill="none">
-            <path d="M1 4L4 7L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M1 4L4 7L10 1" stroke={marketingColors.bg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
       )}
 
-      <div className={cn('mb-4', selected ? 'text-primary' : 'text-muted-foreground')}>{icon}</div>
+      <div className="mb-4" style={{ color: selected ? marketingColors.gold : undefined }}>{icon}</div>
       <h3 className="text-xl font-semibold text-foreground mb-2">{title}</h3>
       <p className="text-sm text-muted-foreground leading-relaxed mb-5">{description}</p>
 
       <ul className="m-0 p-0 list-none space-y-1.5">
         {bullets.map((b) => (
           <li key={b} className={cn('flex items-start gap-2 text-xs', selected ? 'text-foreground/85' : 'text-muted-foreground')}>
-            <span className={cn('mt-[2px]', selected ? 'text-primary' : 'text-muted-foreground/60')}>•</span>
+            <span className={cn('mt-[2px]', selected ? '' : 'text-muted-foreground/60')} style={selected ? { color: marketingColors.gold } : undefined}>•</span>
             {b}
           </li>
         ))}

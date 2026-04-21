@@ -13,11 +13,15 @@
 import { useAuth } from '@clerk/react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useUserRole } from '../../context/UserRoleContext'
+import { marketingColors } from '../../theme/marketingColors'
 
 function LoadingShell() {
   return (
     <div className="min-h-screen bg-background dark flex items-center justify-center">
-      <div className="w-9 h-9 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      <div
+        className="w-9 h-9 rounded-full border-2 animate-spin"
+        style={{ borderColor: marketingColors.gold, borderTopColor: 'transparent' }}
+      />
     </div>
   )
 }

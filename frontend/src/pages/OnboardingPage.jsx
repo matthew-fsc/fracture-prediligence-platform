@@ -5,6 +5,7 @@ import { useCompany, useCompanyId } from '../context/CompanyContext'
 import { apiUrl, apiClient } from '../lib/apiClient'
 import { withCompanyQuery } from '../lib/navLinks'
 import { marketingColors as COLORS } from '../theme/marketingColors'
+import { toast } from '../lib/notify'
 
 const ONBOARDING_STORAGE_KEY = 'fracture_onboarding_v1'
 
@@ -422,6 +423,11 @@ function Step3({ onNext, onSkip }) {
   }, [form])
 
   const handleSave = async () => {
+    if (!companyId || companyId === 1) {
+      toast.message('Finish setup on your own client company before saving interview inputs.')
+      onNext()
+      return
+    }
     setSaving(true)
     try {
       await apiClient.post(`/api/analytics/qualitative/${companyId}`, {
