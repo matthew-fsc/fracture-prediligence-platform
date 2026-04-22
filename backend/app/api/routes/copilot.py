@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -14,6 +14,7 @@ from app.api.deps import get_company_scope
 from app.core.analytics_events import track
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.rate_limiting import limiter
 from app.middleware.auth import CurrentUser, get_current_user
 from app.ontology.models import AICopilotUsage, Company, QualitativeInputs, EngagementProfile, UserSubscription
 
@@ -178,9 +179,9 @@ def _build_context(company_id: int, db: Session) -> str:
                     if motivations:
                         lines.append(f"  Owner motivations: {', '.join(motivations)}")
                 except Exception:
-                    logger.debug("Failed to parse owner_motivations_json", exc_info=True)
+                    logger.debug("Could not parse owner_motivations_json for company_id=%s", company_id)
     except Exception:
-        logger.warning("Failed to load engagement profile for copilot context", exc_info=True)
+        logger.warning("Engagement profile context build failed for company_id=%s", company_id, exc_info=True)
 
     # --- Qualitative inputs ---
     try:
@@ -201,7 +202,7 @@ def _build_context(company_id: int, db: Session) -> str:
             if qi.market_positioning:
                 lines.append(f"  Market positioning: {qi.market_positioning}")
     except Exception:
-        logger.warning("Failed to load qualitative inputs for copilot context", exc_info=True)
+        logger.warning("Qualitative inputs context build failed for company_id=%s", company_id, exc_info=True)
 
     return "\n".join(lines) if lines else "No company data available yet."
 
@@ -233,7 +234,9 @@ CURRENT COMPANY DATA:
 # ---------------------------------------------------------------------------
 
 @router.post("/chat/{company_id}")
+@limiter.limit("100/hour")
 async def copilot_chat(
+    request: Request,
     company: CompanyScoped,
     body: CopilotRequest,
     user: CurrentUser = Depends(get_current_user),
@@ -283,8 +286,7 @@ async def copilot_chat(
     start_ms = int(time.time() * 1000)
 
     try:
-        # PERF-2: 30s timeout prevents hung requests if the Anthropic API is slow
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=30.0)
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=1024,

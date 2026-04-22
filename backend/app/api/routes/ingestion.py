@@ -3,13 +3,14 @@
 import hashlib
 from typing import Annotated
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_company_scope
 from app.core.analytics_events import track
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.rate_limiting import limiter
 from app.ontology.models import Company
 from app.ingestion.pipeline import run_pipeline, rerun_pipeline_job, resume_pipeline_after_mapping_review
 from app.ontology.ingestion_models import IngestionJob, PhaseStatus
@@ -20,7 +21,9 @@ CompanyScoped = Annotated[Company, Depends(get_company_scope)]
 
 
 @router.post("/upload/{company_id}")
+@limiter.limit("10/hour")
 async def upload_file(
+    request: Request,
     company: CompanyScoped,
     file: UploadFile = File(...),
     source_type: str = Form(default="unknown"),

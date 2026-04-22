@@ -3,7 +3,7 @@
 import json
 import mimetypes
 from datetime import datetime
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
@@ -31,13 +31,7 @@ from app.analytics.ebitda_basis import ebitda_basis_for_company
 from app.analytics.a13_buyer_questions import generate_buyer_questions
 from app.analytics.owner_readiness import compute_owner_readiness
 from app.core.config import settings
-from app.core.scoring_rules import (
-    BUYER_PROFILE_LABELS,
-    BUYER_PROFILE_RATIONALE,
-    BUYER_WEIGHT_PROFILES,
-    SCORING_RULES,
-    SCORING_RULES_VERSION,
-)
+from app.core.scoring_rules import SCORING_RULES, SCORING_RULES_VERSION
 from app.core.confidence import band_multiplier, build_confidence_summary
 from app.ontology.models import (
     AdvisorOverride,
@@ -160,39 +154,6 @@ def _qual_key_person_score(key_person_pct: float) -> float:
 class OverrideRequest(BaseModel):
     adjustment: float  # -20 to +20
     rationale: str
-
-
-class ScenarioRequest(BaseModel):
-    """What-if inputs for the DRS scenario engine. All fields optional."""
-    recurring_pct: Optional[float] = None        # 0–100: target recurring revenue %
-    top_customer_pct: Optional[float] = None     # 0–100: top customer concentration %
-    owner_hours_per_week: Optional[float] = None # 0–80: owner hours in operations
-    sop_pct: Optional[float] = None              # 0–100: % of processes documented
-    ebitda_override: Optional[float] = None      # absolute $ EBITDA override for EV
-    buyer_profile: Optional[str] = None          # pe|strategic|financial
-
-
-class BuyerQuestionAIRequest(BaseModel):
-    buyer_type: Optional[str] = None   # pe|strategic|financial (None = all)
-    max_questions: int = 12
-
-
-# ── Scenario scoring band helpers (mirrors module scoring bands) ──────────────
-
-def _s_recurring(recurring_pct: float) -> float:
-    p = recurring_pct / 100.0
-    if p >= 0.90: return min(100.0, 95 + (p - 0.90) / 0.10 * 5)
-    if p >= 0.75: return 80 + (p - 0.75) / 0.15 * 15
-    if p >= 0.50: return 60 + (p - 0.50) / 0.25 * 20
-    return p / 0.50 * 60
-
-
-def _s_top_customer(top_pct: float) -> float:
-    if top_pct >= 50: return max(0.0, 10 - (top_pct - 50) / 50 * 10)
-    if top_pct >= 30: return 40 + (50 - top_pct) / 20 * 30
-    if top_pct >= 20: return 70 + (30 - top_pct) / 10 * 20
-    if top_pct >= 10: return 85 + (20 - top_pct) / 10 * 15
-    return 100.0
 
 class QualitativeRequest(BaseModel):
     owner_hours_per_week: Optional[float] = None
@@ -318,26 +279,13 @@ def get_market_benchmarks(company: CompanyScoped, db: Session = Depends(get_db))
 
 
 @router.get("/scores/{company_id}")
-def get_all_scores(
-    company: CompanyScoped,
-    db: Session = Depends(get_db),
-    buyer_profile: Optional[str] = Query(
-        None,
-        description="Optional buyer-type weight profile: 'pe', 'strategic', or 'financial'. "
-                    "Reweights DRS categories to reflect what each buyer type prioritizes.",
-        pattern="^(pe|strategic|financial)$",
-    ),
-):
+def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
     """
     A3–A8: Compute all six DRS category scores from the ontology.
     Applies advisor overrides (P1) and qualitative inputs (P2) when present.
     Returns raw scores, adjusted scores, DRS composite (A9), and enterprise value (A10).
-
-    Pass ?buyer_profile=pe|strategic|financial to reweight the DRS composite
-    for a specific buyer archetype without altering any stored scores.
     """
     try:
-        buyer_weights = BUYER_WEIGHT_PROFILES.get(buyer_profile) if buyer_profile else None
         modules = compute_category_modules(company.id, db)
         rev = modules["revenue_quality"]
         ops = modules["operational_independence"]
@@ -521,7 +469,7 @@ def get_all_scores(
             management_team_optimistic=min(100, adj_scores["management_team"] * band_multiplier(mgmt.data_confidence, "optimistic")),
             growth_drivers_optimistic=min(100, adj_scores["growth_drivers"] * band_multiplier(growth.data_confidence, "optimistic")),
         )
-        drs = compute_drs(cat, weights=buyer_weights)
+        drs = compute_drs(cat)
 
         from decimal import Decimal as _Decimal
         basis = _ebitda_basis(company.id, db)
@@ -559,7 +507,7 @@ def get_all_scores(
                 automation_pct=float(qual.automation_pct) if qual and qual.automation_pct is not None else None,
             )
         except Exception:
-            logger.warning("owner_readiness computation skipped", exc_info=True)
+            logger.warning("Owner readiness score computation failed for company_id=%s", company.id, exc_info=True)
 
         _conf_summary = build_confidence_summary(
             category_scores={
@@ -625,22 +573,7 @@ def get_all_scores(
                     for d in pre_result.dimensions
                 ],
             } if pre_result else None,
-            "rules": {
-                "version": SCORING_RULES_VERSION,
-                "category_weights": buyer_weights or dict(SCORING_RULES.category_weights),
-                "default_category_weights": dict(SCORING_RULES.category_weights),
-            },
-            "buyer_profile": {
-                "key": buyer_profile,
-                "label": BUYER_PROFILE_LABELS.get(buyer_profile, "Default"),
-                "weights": buyer_weights,
-                "rationale": BUYER_PROFILE_RATIONALE.get(buyer_profile, ""),
-                "default_weights": dict(SCORING_RULES.category_weights),
-                "weight_deltas": {
-                    k: round((buyer_weights[k] - SCORING_RULES.category_weights[k]) * 100, 1)
-                    for k in SCORING_RULES.category_weights
-                } if buyer_weights else {},
-            } if buyer_profile else None,
+            "rules": {"version": SCORING_RULES_VERSION, "category_weights": SCORING_RULES.category_weights},
             "methodology": {
                 "version": SCORING_RULES_VERSION,
                 "summary": (
@@ -648,7 +581,7 @@ def get_all_scores(
                     "Each category is computed from financial ontology data and optional qualitative inputs."
                 ),
                 "category_weights_percent": {
-                    k: round(v * 100, 1) for k, v in (buyer_weights or SCORING_RULES.category_weights).items()
+                    k: round(v * 100, 1) for k, v in SCORING_RULES.category_weights.items()
                 },
                 "tiers": [{"min_drs": lo, "tier": name} for lo, name in SCORING_RULES.drs_tier_thresholds],
                 "value_gap_target_score": SCORING_RULES.value_gap_target_score,
@@ -703,93 +636,11 @@ def capture_score_snapshot(company: CompanyScoped, db: Session = Depends(get_db)
         basis = ebitda_basis_for_company(company.id, db)
         ebitda = float(basis.get("ebitda_normalized_ttm") or basis.get("ebitda_proxy_ttm") or 0)
         ev_val = round(ebitda * 4.5, 2) if ebitda > 0 else None
-        db.add(ScoreSnapshot(
-            company_id=company.id, drs_score=drs_val, ev_estimate=ev_val,
-            trigger="manual", category_scores_json=json.dumps(cat),
-        ))
+        db.add(ScoreSnapshot(company_id=company.id, drs_score=drs_val, ev_estimate=ev_val, trigger="manual"))
         db.commit()
         return {"company_id": company.id, "drs_score": drs_val, "ev_estimate": ev_val}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/scores/{company_id}/compare")
-def compare_snapshots(
-    company: CompanyScoped,
-    snap1: int = Query(..., description="ID of the earlier snapshot"),
-    snap2: int = Query(..., description="ID of the later snapshot"),
-    db: Session = Depends(get_db),
-):
-    """Return a side-by-side diff of two score snapshots with DRS/EV/category deltas."""
-    from sqlalchemy import desc as _desc
-
-    def _load(snap_id: int) -> ScoreSnapshot:
-        row = db.query(ScoreSnapshot).filter(
-            ScoreSnapshot.id == snap_id,
-            ScoreSnapshot.company_id == company.id,
-        ).first()
-        if not row:
-            raise HTTPException(status_code=404, detail=f"Snapshot {snap_id} not found")
-        return row
-
-    s1, s2 = _load(snap1), _load(snap2)
-    # Ensure s1 is the earlier one
-    if s1.created_at and s2.created_at and s1.created_at > s2.created_at:
-        s1, s2 = s2, s1
-
-    def _snap_dict(s: ScoreSnapshot) -> dict:
-        return {
-            "id": s.id,
-            "drs_score": float(s.drs_score),
-            "ev_estimate": float(s.ev_estimate) if s.ev_estimate is not None else None,
-            "trigger": s.trigger,
-            "created_at": s.created_at.isoformat() if s.created_at else None,
-            "category_scores": json.loads(s.category_scores_json) if s.category_scores_json else {},
-        }
-
-    d1, d2 = _snap_dict(s1), _snap_dict(s2)
-
-    from datetime import timezone
-    dt1 = s1.created_at
-    dt2 = s2.created_at
-    days_elapsed = None
-    if dt1 and dt2:
-        days_elapsed = max(0, (dt2 - dt1).days)
-
-    cat_deltas = {}
-    cats = set(d1["category_scores"]) | set(d2["category_scores"])
-    for cat in cats:
-        v1 = d1["category_scores"].get(cat)
-        v2 = d2["category_scores"].get(cat)
-        if v1 is not None and v2 is not None:
-            cat_deltas[cat] = round(float(v2) - float(v1), 2)
-
-    drs_delta = round(d2["drs_score"] - d1["drs_score"], 2)
-    ev_delta = None
-    if d1["ev_estimate"] is not None and d2["ev_estimate"] is not None:
-        ev_delta = round(d2["ev_estimate"] - d1["ev_estimate"], 2)
-
-    return {
-        "company_id": company.id,
-        "snapshot_1": d1,
-        "snapshot_2": d2,
-        "days_elapsed": days_elapsed,
-        "drs_delta": drs_delta,
-        "ev_delta": ev_delta,
-        "category_deltas": cat_deltas,
-    }
-
-
-@router.get("/buyer-universe/{company_id}")
-def get_buyer_universe(
-    company: CompanyScoped,
-    buyer_type: Optional[str] = Query(None, description="Filter by buyer_type: pe, strategic, financial"),
-    max_results: int = Query(15, ge=1, le=50),
-    db: Session = Depends(get_db),
-):
-    """Return ranked active acquirer matches for the company."""
-    from app.analytics.buyer_universe import resolve_buyer_universe
-    return resolve_buyer_universe(db, company.id, buyer_type_filter=buyer_type, max_results=max_results)
 
 
 @router.get("/revenue-quality/{company_id}")
@@ -1265,44 +1116,14 @@ async def generate_buyer_question_draft(
     }
 
 
-_VALID_INITIATIVE_STATUSES = {"planned", "in_progress", "complete"}
-
-
 class InitiativeCreate(BaseModel):
     title: str
     category: Optional[str] = None
-    status: str = "planned"
     timeline: Optional[str] = None
     cost_estimate: Optional[float] = None
     ev_impact_estimate: Optional[float] = None
     advisor_ev_override: Optional[float] = None
     depends_on_initiative_id: Optional[int] = None
-
-
-class InitiativeUpdate(BaseModel):
-    title: Optional[str] = None
-    category: Optional[str] = None
-    status: Optional[str] = None
-    timeline: Optional[str] = None
-    cost_estimate: Optional[float] = None
-    ev_impact_estimate: Optional[float] = None
-    advisor_ev_override: Optional[float] = None
-    depends_on_initiative_id: Optional[int] = None
-
-
-def _initiative_dict(r: "CompanyInitiative") -> dict:
-    return {
-        "id": r.id,
-        "title": r.title,
-        "category": r.category,
-        "status": getattr(r, "status", "planned"),
-        "timeline": r.timeline,
-        "cost_estimate": float(r.cost_estimate) if r.cost_estimate is not None else None,
-        "ev_impact_estimate": float(r.ev_impact_estimate) if r.ev_impact_estimate is not None else None,
-        "advisor_ev_override": float(r.advisor_ev_override) if r.advisor_ev_override is not None else None,
-        "depends_on_initiative_id": r.depends_on_initiative_id,
-        "source": r.source,
-    }
 
 
 @router.get("/initiatives/{company_id}")
@@ -1315,7 +1136,20 @@ def list_initiatives(company: CompanyScoped, db: Session = Depends(get_db)):
     )
     return {
         "company_id": company.id,
-        "initiatives": [_initiative_dict(r) for r in rows],
+        "initiatives": [
+            {
+                "id": r.id,
+                "title": r.title,
+                "category": r.category,
+                "timeline": r.timeline,
+                "cost_estimate": float(r.cost_estimate) if r.cost_estimate is not None else None,
+                "ev_impact_estimate": float(r.ev_impact_estimate) if r.ev_impact_estimate is not None else None,
+                "advisor_ev_override": float(r.advisor_ev_override) if r.advisor_ev_override is not None else None,
+                "depends_on_initiative_id": r.depends_on_initiative_id,
+                "source": r.source,
+            }
+            for r in rows
+        ],
     }
 
 
@@ -1325,12 +1159,10 @@ def create_initiative(
     body: InitiativeCreate,
     db: Session = Depends(get_db),
 ):
-    status = body.status if body.status in _VALID_INITIATIVE_STATUSES else "planned"
     row = CompanyInitiative(
         company_id=company.id,
         title=body.title,
         category=body.category,
-        status=status,
         timeline=body.timeline,
         cost_estimate=body.cost_estimate,
         ev_impact_estimate=body.ev_impact_estimate,
@@ -1341,59 +1173,17 @@ def create_initiative(
     db.add(row)
     db.commit()
     db.refresh(row)
-    return _initiative_dict(row)
-
-
-@router.patch("/initiatives/{company_id}/{initiative_id}")
-def update_initiative(
-    company: CompanyScoped,
-    initiative_id: int,
-    body: InitiativeUpdate,
-    db: Session = Depends(get_db),
-):
-    row = (
-        db.query(CompanyInitiative)
-        .filter(CompanyInitiative.id == initiative_id, CompanyInitiative.company_id == company.id)
-        .first()
-    )
-    if not row:
-        raise HTTPException(status_code=404, detail="Initiative not found.")
-    if body.title is not None:
-        row.title = body.title
-    if body.category is not None:
-        row.category = body.category
-    if body.status is not None and body.status in _VALID_INITIATIVE_STATUSES:
-        row.status = body.status
-    if body.timeline is not None:
-        row.timeline = body.timeline
-    if body.cost_estimate is not None:
-        row.cost_estimate = body.cost_estimate
-    if body.ev_impact_estimate is not None:
-        row.ev_impact_estimate = body.ev_impact_estimate
-    if body.advisor_ev_override is not None:
-        row.advisor_ev_override = body.advisor_ev_override
-    if body.depends_on_initiative_id is not None:
-        row.depends_on_initiative_id = body.depends_on_initiative_id
-    db.commit()
-    db.refresh(row)
-    return _initiative_dict(row)
-
-
-@router.delete("/initiatives/{company_id}/{initiative_id}", status_code=204)
-def delete_initiative(
-    company: CompanyScoped,
-    initiative_id: int,
-    db: Session = Depends(get_db),
-):
-    row = (
-        db.query(CompanyInitiative)
-        .filter(CompanyInitiative.id == initiative_id, CompanyInitiative.company_id == company.id)
-        .first()
-    )
-    if not row:
-        raise HTTPException(status_code=404, detail="Initiative not found.")
-    db.delete(row)
-    db.commit()
+    return {
+        "id": row.id,
+        "title": row.title,
+        "category": row.category,
+        "timeline": row.timeline,
+        "cost_estimate": float(row.cost_estimate) if row.cost_estimate is not None else None,
+        "ev_impact_estimate": float(row.ev_impact_estimate) if row.ev_impact_estimate is not None else None,
+        "advisor_ev_override": float(row.advisor_ev_override) if row.advisor_ev_override is not None else None,
+        "depends_on_initiative_id": row.depends_on_initiative_id,
+        "source": row.source,
+    }
 
 
 def _build_recast_payload(company_id: int, db: Session) -> dict:
@@ -1675,10 +1465,7 @@ def upsert_override(
         basis_s = _ev_basis(company.id, db)
         ebitda_s = float(basis_s.get("ebitda_normalized_ttm") or basis_s.get("ebitda_proxy_ttm") or 0)
         ev_s = round(ebitda_s * 4.5, 2) if ebitda_s > 0 else None
-        db.add(ScoreSnapshot(
-            company_id=company.id, drs_score=drs_s, ev_estimate=ev_s,
-            trigger="override", category_scores_json=json.dumps(cat_s),
-        ))
+        db.add(ScoreSnapshot(company_id=company.id, drs_score=drs_s, ev_estimate=ev_s, trigger="override"))
         db.commit()
     except Exception:
         pass  # snapshot failure must not break the override save
@@ -2049,290 +1836,3 @@ def patch_engagement_profile(
     db.commit()
     db.refresh(row)
     return _engagement_profile_dict(row)
-
-
-# ---------------------------------------------------------------------------
-# Scenario engine — what-if DRS + EV (Gap 1 / Sprint 2)
-# ---------------------------------------------------------------------------
-
-@router.post("/scores/{company_id}/scenario")
-def run_scenario(
-    company: CompanyScoped,
-    body: ScenarioRequest,
-    db: Session = Depends(get_db),
-):
-    """
-    Run a what-if scenario against the live DRS engine.
-    Accepts metric overrides and returns baseline vs scenario DRS / EV
-    with per-category deltas. No DB writes — read-only.
-    """
-    try:
-        buyer_weights = BUYER_WEIGHT_PROFILES.get(body.buyer_profile) if body.buyer_profile else None
-        modules = compute_category_modules(company.id, db)
-        rev   = modules["revenue_quality"]
-        ops   = modules["operational_independence"]
-        cust  = modules["customer_risk"]
-        mgmt  = modules["management_team"]
-        growth = modules["growth_drivers"]
-        fin   = modules["financial_integrity"]
-
-        # Baseline ops score — apply qual inputs when present (mirrors get_all_scores)
-        qual = db.query(QualitativeInputs).filter(QualitativeInputs.company_id == company.id).first()
-        ops_baseline = ops.composite
-        qual_hours   = None
-        qual_sop     = None
-        qual_auto    = None
-        qual_mgmt_q  = None
-        qual_mgmt_t  = None
-        if qual and all(v is not None for v in [qual.owner_hours_per_week, qual.sop_pct,
-                                                qual.automation_pct, qual.mgmt_qualified,
-                                                qual.mgmt_total_functions]):
-            qual_hours  = float(qual.owner_hours_per_week)
-            qual_sop    = float(qual.sop_pct)
-            qual_auto   = float(qual.automation_pct)
-            qual_mgmt_q = int(qual.mgmt_qualified)
-            qual_mgmt_t = int(qual.mgmt_total_functions)
-            s_h = _qual_owner_hours_score(qual_hours)
-            s_s = _qual_sop_score(qual_sop)
-            s_a = _qual_automation_score(qual_auto)
-            s_m = _qual_mgmt_depth_score(qual_mgmt_q, qual_mgmt_t)
-            ops_baseline = round(s_h * 0.35 + s_s * 0.30 + s_a * 0.15 + s_m * 0.20, 1)
-
-        baseline_scores = {
-            "revenue_quality":          rev.composite,
-            "financial_integrity":      fin.composite,
-            "operational_independence": ops_baseline,
-            "customer_risk":            cust.composite,
-            "management_team":          mgmt.composite,
-            "growth_drivers":           growth.composite,
-        }
-
-        from decimal import Decimal as _D
-        basis = _ebitda_basis(company.id, db)
-        ebitda_baseline = _D(str(round(basis["ebitda_normalized_ttm"], 2)))
-        mctx_base = get_market_multiple_context(db, company.id, float(ebitda_baseline))
-        cat_base = CategoryScores(**baseline_scores)
-        drs_base = compute_drs(cat_base, weights=buyer_weights)
-        ev_base  = compute_enterprise_value(ebitda_baseline, drs_base.tier, market_context=mctx_base)
-
-        # ── Apply overrides ────────────────────────────────────────────────
-        scenario_scores  = dict(baseline_scores)
-        overrides_applied: list[dict] = []
-
-        if body.recurring_pct is not None:
-            new_s_rec = round(_s_recurring(body.recurring_pct), 1)
-            new_rev_composite = round(
-                new_s_rec            * 0.30
-                + rev.concentration_score * 0.25
-                + rev.durability_score    * 0.20
-                + rev.consistency_score   * 0.15
-                + rev.nrr_score           * 0.10, 1)
-            overrides_applied.append({
-                "param": "recurring_pct",
-                "from": rev.recurring_pct,
-                "to": body.recurring_pct,
-                "category": "revenue_quality",
-                "sub_score_delta": round(new_s_rec - rev.recurring_rate_score, 1),
-                "category_score_delta": round(new_rev_composite - rev.composite, 1),
-            })
-            scenario_scores["revenue_quality"] = new_rev_composite
-
-        if body.top_customer_pct is not None:
-            new_s_conc = round(_s_top_customer(body.top_customer_pct), 1)
-            new_cust_composite = round(
-                new_s_conc              * 0.35
-                + cust.diversification_score * 0.25
-                + cust.churn_score           * 0.25
-                + cust.tenure_score          * 0.15, 1)
-            overrides_applied.append({
-                "param": "top_customer_pct",
-                "from": cust.top_customer_pct,
-                "to": body.top_customer_pct,
-                "category": "customer_risk",
-                "sub_score_delta": round(new_s_conc - cust.concentration_score, 1),
-                "category_score_delta": round(new_cust_composite - cust.composite, 1),
-            })
-            scenario_scores["customer_risk"] = new_cust_composite
-
-        if body.owner_hours_per_week is not None or body.sop_pct is not None:
-            if qual_hours is not None:
-                eff_hours = body.owner_hours_per_week if body.owner_hours_per_week is not None else qual_hours
-                eff_sop   = body.sop_pct if body.sop_pct is not None else qual_sop
-                new_s_h = _qual_owner_hours_score(eff_hours)
-                new_s_s = _qual_sop_score(eff_sop)
-                new_s_a = _qual_automation_score(qual_auto)
-                new_s_m = _qual_mgmt_depth_score(qual_mgmt_q, qual_mgmt_t)
-                new_ops = round(new_s_h * 0.35 + new_s_s * 0.30 + new_s_a * 0.15 + new_s_m * 0.20, 1)
-                if body.owner_hours_per_week is not None:
-                    overrides_applied.append({
-                        "param": "owner_hours_per_week",
-                        "from": qual_hours,
-                        "to": body.owner_hours_per_week,
-                        "category": "operational_independence",
-                        "sub_score_delta": round(new_s_h - _qual_owner_hours_score(qual_hours), 1),
-                        "category_score_delta": round(new_ops - ops_baseline, 1),
-                    })
-                if body.sop_pct is not None:
-                    overrides_applied.append({
-                        "param": "sop_pct",
-                        "from": qual_sop,
-                        "to": body.sop_pct,
-                        "category": "operational_independence",
-                        "sub_score_delta": round(new_s_s - _qual_sop_score(qual_sop), 1),
-                        "category_score_delta": round(new_ops - ops_baseline, 1),
-                    })
-                scenario_scores["operational_independence"] = new_ops
-            # If no qual inputs exist, ops score is data-driven and can't be overridden via hours/sop
-
-        ebitda_scenario = _D(str(body.ebitda_override)) if body.ebitda_override is not None else ebitda_baseline
-        if body.ebitda_override is not None:
-            overrides_applied.append({
-                "param": "ebitda_override",
-                "from": float(ebitda_baseline),
-                "to": body.ebitda_override,
-                "category": "enterprise_value",
-                "sub_score_delta": 0,
-                "category_score_delta": 0,
-            })
-
-        cat_scen = CategoryScores(**{k: round(v, 1) for k, v in scenario_scores.items()})
-        mctx_scen = get_market_multiple_context(db, company.id, float(ebitda_scenario))
-        drs_scen = compute_drs(cat_scen, weights=buyer_weights)
-        ev_scen  = compute_enterprise_value(ebitda_scenario, drs_scen.tier, market_context=mctx_scen)
-
-        return {
-            "company_id": company.id,
-            "buyer_profile": body.buyer_profile,
-            "baseline": {
-                "drs": drs_base.base_drs,
-                "tier": drs_base.tier.value,
-                "category_scores": {k: round(v, 1) for k, v in baseline_scores.items()},
-                "enterprise_value": {
-                    "floor": float(ev_base.ev_floor),
-                    "midpoint": float(ev_base.ev_midpoint),
-                    "ceiling": float(ev_base.ev_ceiling),
-                    "ebitda_base": float(ebitda_baseline),
-                    "multiple_floor": ev_base.multiple_floor,
-                    "multiple_ceiling": ev_base.multiple_ceiling,
-                },
-            },
-            "scenario": {
-                "drs": drs_scen.base_drs,
-                "tier": drs_scen.tier.value,
-                "category_scores": {k: round(v, 1) for k, v in scenario_scores.items()},
-                "enterprise_value": {
-                    "floor": float(ev_scen.ev_floor),
-                    "midpoint": float(ev_scen.ev_midpoint),
-                    "ceiling": float(ev_scen.ev_ceiling),
-                    "ebitda_base": float(ebitda_scenario),
-                    "multiple_floor": ev_scen.multiple_floor,
-                    "multiple_ceiling": ev_scen.multiple_ceiling,
-                },
-                "overrides_applied": overrides_applied,
-            },
-            "drs_delta": round(drs_scen.base_drs - drs_base.base_drs, 1),
-            "ev_midpoint_delta": round(float(ev_scen.ev_midpoint) - float(ev_base.ev_midpoint), 0),
-            "tier_changed": drs_base.tier != drs_scen.tier,
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ---------------------------------------------------------------------------
-# AI-generated buyer questions (Gap 8 / Sprint 2)
-# ---------------------------------------------------------------------------
-
-@router.post("/buyer-questions/{company_id}/generate-ai")
-async def generate_ai_buyer_questions(
-    company: CompanyScoped,
-    body: BuyerQuestionAIRequest,
-    db: Session = Depends(get_db),
-):
-    """
-    Generate company-specific buyer due diligence questions via Claude.
-    Questions are grounded in the actual DRS scores and financial data of this company.
-    Falls back to the template library when ANTHROPIC_API_KEY is not configured.
-    """
-    from app.core.config import settings as _cfg
-    from app.api.routes.copilot import _build_context
-
-    try:
-        from app.services.analytics_service import compute_category_modules as _ccm
-        modules = _ccm(company.id, db)
-        cat_scores = {k: round(modules[k].composite, 1) for k in modules}
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Analytics error: {exc}")
-
-    def _template_fallback(reason: str = "template"):
-        qs = generate_buyer_questions(cat_scores, max_questions=body.max_questions)
-        return {
-            "company_id": company.id,
-            "source": reason,
-            "buyer_type": body.buyer_type,
-            "questions": [q.to_dict() for q in qs],
-        }
-
-    if not _cfg.ANTHROPIC_API_KEY:
-        return _template_fallback()
-
-    try:
-        import anthropic as _ant
-    except ImportError:
-        return _template_fallback()
-
-    context = _build_context(company.id, db)
-    buyer_label = {
-        "pe": "Private Equity buyer",
-        "strategic": "Strategic Acquirer",
-        "financial": "Financial Buyer",
-    }.get(body.buyer_type or "", "sophisticated M&A buyer")
-
-    weakest = sorted(cat_scores.items(), key=lambda x: x[1])[:3]
-    weak_str = ", ".join(f"{k.replace('_', ' ')} ({v:.0f}/100)" for k, v in weakest)
-
-    prompt = (
-        f"You are preparing a {buyer_label} for a due diligence site visit.\n\n"
-        f"Generate {body.max_questions} specific, data-grounded due diligence questions "
-        f"based on the company data below. Prioritize the three weakest DRS dimensions: {weak_str}.\n\n"
-        f"Each question must:\n"
-        f"1. Reference specific numbers visible in the company data\n"
-        f"2. Identify a concrete verification need or risk\n"
-        f"3. Specify exactly what documents/data the seller must provide\n\n"
-        f'Return a JSON array only. Each element: {{"category":"<DRS_category>","severity":"CRITICAL|HIGH|MEDIUM",'
-        f'"question":"<question text>","data_needed":"<exact docs needed>"}}\n\n'
-        f"Company data:\n{context}"
-    )
-
-    try:
-        client = _ant.Anthropic(api_key=_cfg.ANTHROPIC_API_KEY, timeout=30.0)
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=2048,
-            system="You are an M&A pre-diligence advisor. Respond with valid JSON only — no prose.",
-            messages=[{"role": "user", "content": prompt}],
-        )
-        raw = (response.content[0].text if response.content else "[]").strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-        ai_qs = json.loads(raw)
-        questions = [
-            {
-                "id": i,
-                "category": q.get("category", "general"),
-                "severity": q.get("severity", "HIGH"),
-                "buyer_type": body.buyer_type or "All",
-                "question": q.get("question", ""),
-                "data_needed": q.get("data_needed", ""),
-                "source": "ai",
-            }
-            for i, q in enumerate(ai_qs[: body.max_questions], start=1)
-        ]
-        return {
-            "company_id": company.id,
-            "source": "ai",
-            "buyer_type": body.buyer_type,
-            "questions": questions,
-        }
-    except Exception:
-        return _template_fallback("template_fallback")

@@ -220,7 +220,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                     "has_ref_code": bool(ref_code),
                 })
             except Exception:
-                pass
+                logger.warning("PostHog analytics event failed for user_id=%s (non-fatal)", user_id, exc_info=True)
 
     # -----------------------------------------------------------------------
     # customer.subscription.updated → plan / status / interval changes

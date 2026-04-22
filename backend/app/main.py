@@ -8,6 +8,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 
 from app.api.routes import ingestion, analytics, companies, reports, demo, library
@@ -28,9 +30,6 @@ def _bootstrap_db():
     # Import all models so Base knows about them (UserProfile, ClientAccess included)
     import app.ontology.models           # noqa: F401
     import app.ontology.ingestion_models  # noqa: F401
-
-    # DB-2: create_all() removed — all schema changes must go through Alembic migrations.
-    # Run `alembic upgrade head` before starting the app (or set RUN_MIGRATIONS=true in Docker).
 
     db = SessionLocal()
     try:
@@ -169,6 +168,9 @@ async def lifespan(app: FastAPI):
     yield
 
 
+from app.core.rate_limiting import limiter
+from app.core.startup_checks import run_production_startup_checks
+
 app = FastAPI(
     title="Pre-Diligence Platform API",
     description="Fracture Systems — Blueprint I & II backend",
@@ -176,12 +178,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # SEC-5: Restrict CORS to explicit methods and headers instead of wildcard
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["content-type", "authorization", "x-admin-key", "x-request-id"],
 )
 
