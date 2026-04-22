@@ -252,18 +252,24 @@ export default function EngagementIntake() {
   const markDirty = useCallback(() => setSaved(false), [])
 
   // Recover from missing company context by hydrating from the first accessible company.
+  // Note: hydratingCompany is intentionally excluded from deps — it is a mutex flag
+  // managed inside this effect. Including it would cause an infinite retry loop when
+  // the API call fails (false → true → API fails → false → re-run → ...).
   useEffect(() => {
-    if (ready || hydratingCompany) return
+    if (ready) return
+    let cancelled = false
     setHydratingCompany(true)
     apiClient.get('/api/companies')
       .then((rows) => {
-        if (Array.isArray(rows) && rows.length > 0 && rows[0]?.id) {
+        if (!cancelled && Array.isArray(rows) && rows.length > 0 && rows[0]?.id) {
           setCompanyId(rows[0].id)
         }
       })
       .catch(() => {})
-      .finally(() => setHydratingCompany(false))
-  }, [ready, hydratingCompany, setCompanyId])
+      .finally(() => { if (!cancelled) setHydratingCompany(false) })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, setCompanyId])
 
   // Load data from three endpoints in parallel
   useEffect(() => {

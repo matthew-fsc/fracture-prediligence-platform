@@ -20,7 +20,7 @@ function LoadingShell() {
     <div className="min-h-screen bg-background dark flex items-center justify-center">
       <div
         className="w-9 h-9 rounded-full border-2 animate-spin"
-        style={{ borderColor: marketingColors.gold, borderTopColor: 'transparent' }}
+        style={{ borderColor: 'hsl(var(--primary))', borderTopColor: 'transparent' }}
       />
     </div>
   )
@@ -31,7 +31,7 @@ function NoClerkNotice() {
     <div
       style={{
         minHeight: '100vh',
-        background: COLORS.bg,
+        background: marketingColors.bg,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -42,7 +42,7 @@ function NoClerkNotice() {
     >
       <div
         style={{
-          background: COLORS.gold,
+          background: marketingColors.gold,
           borderRadius: 6,
           width: 40,
           height: 40,
@@ -52,7 +52,7 @@ function NoClerkNotice() {
           marginBottom: 24,
         }}
       >
-        <span style={{ color: COLORS.bg, fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 20 }}>F</span>
+        <span style={{ color: marketingColors.bg, fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 20 }}>F</span>
       </div>
       <h2
         style={{
@@ -67,7 +67,7 @@ function NoClerkNotice() {
       </h2>
       <p
         style={{
-          color: COLORS.muted,
+          color: marketingColors.muted,
           fontFamily: "'DM Sans', sans-serif",
           fontSize: 14,
           lineHeight: 1.6,
@@ -75,18 +75,18 @@ function NoClerkNotice() {
           margin: '0 0 24px 0',
         }}
       >
-        Set <code style={{ color: COLORS.gold }}>VITE_CLERK_PUBLISHABLE_KEY</code> for the production Clerk
-        instance at build time (e.g. in your hosting provider env or <code style={{ color: COLORS.gold }}>frontend/.env</code>{' '}
+        Set <code style={{ color: marketingColors.gold }}>VITE_CLERK_PUBLISHABLE_KEY</code> for the production Clerk
+        instance at build time (e.g. in your hosting provider env or <code style={{ color: marketingColors.gold }}>frontend/.env</code>{' '}
         locally), then rebuild the SPA.
       </p>
       <Link
         to="/request-demo"
         style={{
-          color: COLORS.gold,
+          color: marketingColors.gold,
           fontFamily: "'DM Sans', sans-serif",
           fontSize: 14,
           textDecoration: 'none',
-          border: `1px solid ${COLORS.gold}`,
+          border: `1px solid ${marketingColors.gold}`,
           borderRadius: 6,
           padding: '8px 20px',
         }}
