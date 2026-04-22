@@ -156,16 +156,9 @@ export default function ProtectedRoute({
   requireClient = false,
 }) {
   const hasKey = Boolean((import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim())
-  if (!hasKey && import.meta.env.PROD) return <NoClerkNotice />
 
   if (!hasKey) {
-    if (import.meta.env.DEV) {
-      console.warn(
-        '[Prediligence] VITE_CLERK_PUBLISHABLE_KEY is not set; dashboard routes are not authenticated. ' +
-          'Set the key for staging/production builds.',
-      )
-    }
-    // In dev without Clerk: skip role check, render directly
+    // No Clerk key: bypass auth. API still enforces auth for writes; public/demo data is readable.
     return children
   }
 

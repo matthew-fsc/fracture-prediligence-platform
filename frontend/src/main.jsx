@@ -11,6 +11,20 @@ import './index.css'
 import { ApiError } from './lib/apiClient'
 import { toast } from './lib/notify'
 
+// Catch any JS errors before React mounts and write them visibly to the page.
+window.addEventListener('error', (e) => {
+  const root = document.getElementById('root')
+  if (root && !root.children.length) {
+    root.innerHTML = `<pre style="color:red;background:#fff;padding:20px;font-size:13px;white-space:pre-wrap">[JS Error] ${e.message}\n\n${e.error?.stack || ''}</pre>`
+  }
+})
+window.addEventListener('unhandledrejection', (e) => {
+  const root = document.getElementById('root')
+  if (root && !root.children.length) {
+    root.innerHTML = `<pre style="color:red;background:#fff;padding:20px;font-size:13px;white-space:pre-wrap">[Unhandled Promise] ${e.reason?.message || e.reason}\n\n${e.reason?.stack || ''}</pre>`
+  }
+})
+
 // PostHog — initialises only when VITE_POSTHOG_KEY is set; no-op otherwise.
 const _PH_KEY  = (import.meta.env.VITE_POSTHOG_KEY  || '').trim()
 const _PH_HOST = (import.meta.env.VITE_POSTHOG_HOST || 'https://app.posthog.com').trim()
