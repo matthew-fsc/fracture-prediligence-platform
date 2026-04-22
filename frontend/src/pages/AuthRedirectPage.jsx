@@ -53,26 +53,11 @@ export default function AuthRedirectPage() {
   }, [role, loading, navigate, companies, companiesLoading])
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#0A1628',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
+    <div className="min-h-screen bg-background dark flex items-center justify-center">
       <div
-        style={{
-          width: 36,
-          height: 36,
-          border: '3px solid #C9973A',
-          borderTopColor: 'transparent',
-          borderRadius: '50%',
-          animation: 'spin 0.8s linear infinite',
-        }}
+        className="w-9 h-9 rounded-full border-2 animate-spin"
+        style={{ borderColor: 'hsl(var(--primary))', borderTopColor: 'transparent' }}
       />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

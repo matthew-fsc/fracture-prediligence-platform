@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cloud, CheckCircle, Circle } from 'lucide-react'
+import { Cloud, CheckCircle, Circle, CheckCircle2 } from 'lucide-react'
 import { useCompany, useCompanyId } from '../context/CompanyContext'
 import { apiUrl, apiClient } from '../lib/apiClient'
 import { withCompanyQuery } from '../lib/navLinks'
@@ -588,7 +588,9 @@ function Step3({ onNext, onSkip }) {
 function Success({ toIntake }) {
   return (
     <div style={{ textAlign: 'center', padding: '40px 0' }}>
-      <div style={{ fontSize: 48, marginBottom: 20 }}>OK</div>
+      <CheckCircle2
+        style={{ color: 'hsl(160, 84%, 39%)', width: 52, height: 52, margin: '0 auto 20px' }}
+      />
       <h2
         style={{
           color: COLORS.offWhite,
@@ -609,7 +611,7 @@ function Success({ toIntake }) {
         style={{
           width: 40,
           height: 40,
-          border: `3px solid ${COLORS.gold}`,
+          border: '3px solid hsl(160, 84%, 39%)',
           borderTopColor: 'transparent',
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite',
