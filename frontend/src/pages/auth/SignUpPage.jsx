@@ -19,7 +19,7 @@ export default function SignUpPage() {
       <SignUp
         routing="hash"
         signInUrl="/sign-in"
-        fallbackRedirectUrl="/dashboard/onboarding"
+        fallbackRedirectUrl="/role-select"
         appearance={clerkMarketingAppearance()}
       />
 
