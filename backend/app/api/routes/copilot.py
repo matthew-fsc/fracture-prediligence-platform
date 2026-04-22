@@ -286,7 +286,7 @@ async def copilot_chat(
     start_ms = int(time.time() * 1000)
 
     try:
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=30.0)
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=1024,
