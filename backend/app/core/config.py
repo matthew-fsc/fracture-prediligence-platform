@@ -88,6 +88,12 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_REGION: str = "us-east-1"
 
+    # QuickBooks OAuth integration
+    QB_CLIENT_ID: str = ""
+    QB_CLIENT_SECRET: str = ""
+    QB_REDIRECT_URI: str = "http://localhost:8000/api/qb/callback"
+    QB_ENVIRONMENT: str = "sandbox"   # "sandbox" | "production"
+
     # Referral program — credit (in cents) applied to referrer on each conversion
     REFERRAL_CREDIT_CENTS: int = 2990   # $29.90 ≈ one month Pro
 

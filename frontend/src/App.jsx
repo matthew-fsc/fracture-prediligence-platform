@@ -70,6 +70,7 @@ import EBITDATimeline from './pages/EBITDATimeline'
 import MarketComps from './pages/MarketComps'
 import EngagementIntake from './pages/EngagementIntake'
 import AdvisoryLibrary from './pages/AdvisoryLibrary'
+import EngagementView from './pages/EngagementView'
 
 // Client portal pages
 import ClientDashboard from './pages/client/ClientDashboard'
@@ -168,6 +169,7 @@ export default function App() {
             <Route path="/buyerlens" element={<Navigate to="/BuyerLens" replace />} />
             <Route path="/engagement-intake" element={<Navigate to="/EngagementIntake" replace />} />
             <Route path="/engagementintake" element={<Navigate to="/EngagementIntake" replace />} />
+            <Route path="/engagementview" element={<Navigate to="/EngagementView" replace />} />
             <Route path="/aicopilot" element={<Navigate to="/AICopilot" replace />} />
             <Route path="/advisorylibrary" element={<Navigate to="/AdvisoryLibrary" replace />} />
             <Route path="/advisory-library" element={<Navigate to="/AdvisoryLibrary" replace />} />
@@ -298,6 +300,7 @@ export default function App() {
               <Route path="/MarketComps"       element={<MarketComps />} />
               <Route path="/EngagementIntake"  element={<EngagementIntake />} />
               <Route path="/AdvisoryLibrary"   element={<AdvisoryLibrary />} />
+              <Route path="/EngagementView"    element={<EngagementView />} />
             </Route>
 
             {/* ---------------------------------------------------------------- */}

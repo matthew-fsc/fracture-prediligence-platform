@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
-import { CheckCircle, Circle, Save, ClipboardList, ChevronDown, ChevronRight, History } from 'lucide-react'
+import { CheckCircle, Circle, Save, ClipboardList, ChevronDown, ChevronRight, History, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { useCompanyId } from '../context/CompanyContext'
 import { apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
@@ -27,12 +27,18 @@ export default function QualitativeInputs() {
     contract_pct: null,
     customer_contract_type: '',
     key_person_revenue_pct: null,
+    // A6 management fields
+    has_crm_pipeline: null,
+    non_compete_pct: '',
+    voluntary_turnover: '',
+    comp_vs_market: '',
   })
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [auditOpen, setAuditOpen] = useState(false)
   const [auditEntries, setAuditEntries] = useState([])
+  const [drsDiff, setDrsDiff] = useState(null)  // {baseline, current, advisory_delta, category_scores}
 
   useEffect(() => {
     apiClient.get(`/api/analytics/qualitative/${companyId}`)
@@ -50,6 +56,10 @@ export default function QualitativeInputs() {
             contract_pct:           d.inputs.contract_pct ?? null,
             customer_contract_type: d.inputs.customer_contract_type ?? '',
             key_person_revenue_pct: d.inputs.key_person_revenue_pct ?? null,
+            has_crm_pipeline:       d.inputs.has_crm_pipeline ?? null,
+            non_compete_pct:        d.inputs.non_compete_pct ?? '',
+            voluntary_turnover:     d.inputs.voluntary_turnover ?? '',
+            comp_vs_market:         d.inputs.comp_vs_market ?? '',
           })
         }
         setLoaded(true)
@@ -70,7 +80,8 @@ export default function QualitativeInputs() {
   const a4Complete = form.owner_hours_per_week !== '' && form.sop_pct !== null && form.automation_pct !== null
   const a3Complete = form.customer_contract_type !== '' && form.contract_pct !== null && form.key_person_revenue_pct !== null
   const a7Complete = form.pipeline_value !== '' && form.market_positioning !== '' && form.repeatability_pct !== null
-  const allComplete = a4Complete && a3Complete && a7Complete
+  const a6Complete = form.non_compete_pct !== '' && form.voluntary_turnover !== '' && form.comp_vs_market !== ''
+  const allComplete = a4Complete && a3Complete && a7Complete && a6Complete
 
   const handleSave = async () => {
     setSaving(true)
@@ -87,9 +98,25 @@ export default function QualitativeInputs() {
         contract_pct:           form.contract_pct !== null ? Number(form.contract_pct) : null,
         customer_contract_type: form.customer_contract_type || null,
         key_person_revenue_pct: form.key_person_revenue_pct !== null ? Number(form.key_person_revenue_pct) : null,
+        has_crm_pipeline:       form.has_crm_pipeline,
+        non_compete_pct:        form.non_compete_pct || null,
+        voluntary_turnover:     form.voluntary_turnover || null,
+        comp_vs_market:         form.comp_vs_market || null,
       }
       await apiClient.post(`/api/analytics/qualitative/${companyId}`, payload)
       setSaved(true)
+      // Fetch the new DRS to display the before/after diff
+      try {
+        const scores = await apiClient.get(`/api/analytics/scores/${companyId}`)
+        if (scores?.drs) {
+          setDrsDiff({
+            baseline:        scores.drs.baseline,
+            current:         { base: scores.drs.base, conservative: scores.drs.conservative, optimistic: scores.drs.optimistic, tier: scores.drs.tier },
+            advisory_delta:  scores.drs.advisory_delta,
+            category_scores: scores.category_scores,
+          })
+        }
+      } catch { /* non-critical */ }
     } catch (e) {
       toast.error(e?.message || 'Save failed')
     } finally { setSaving(false) }
@@ -112,11 +139,12 @@ export default function QualitativeInputs() {
     <div className="space-y-6 max-w-[900px]">
       <SectionHeader
         title="Qualitative Inputs"
-        subtitle="Advisor-sourced data for sub-scores that financial data cannot capture. These inputs feed directly into Operational Independence and Growth Drivers scoring."
+        subtitle="Advisor-sourced data for sub-scores that financial data cannot capture. These inputs feed directly into A4, A6, and A7 scoring."
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge complete={a3Complete} label="Rev Contracts" categoryKey="revenue_quality" />
             <StatusBadge complete={a4Complete} label="Ops Independence" categoryKey="operational_independence" />
+            <StatusBadge complete={a6Complete} label="Management" categoryKey="management_team" />
             <StatusBadge complete={a7Complete} label="Growth Drivers" categoryKey="growth_drivers" />
           </div>
         }
@@ -459,6 +487,141 @@ export default function QualitativeInputs() {
         </div>
       </div>
 
+      {/* Section D: Management & Team */}
+      <div className={cn('rounded-xl border border-border bg-card p-5 space-y-5 border-l-2', getDrsCategoryStyle('management_team').accentLine)}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-foreground uppercase tracking-wider">Management &amp; Team</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Maps to DRS category weight: 10% · Blended 60% financial / 40% qualitative when all inputs provided</p>
+          </div>
+          <div className={cn('flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border',
+            a6Complete
+              ? cn(getDrsCategoryStyle('management_team').border, getDrsCategoryStyle('management_team').bg, getDrsCategoryStyle('management_team').text)
+              : 'border-amber-500/30 bg-amber-500/10 text-amber-400')}>
+            {a6Complete ? <CheckCircle className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
+            {a6Complete ? 'Complete' : 'Incomplete'}
+          </div>
+        </div>
+
+        {/* Q8: Non-compete coverage */}
+        <div>
+          <label className="block text-xs font-semibold text-foreground mb-1">
+            Key Person Non-Compete Coverage <span className="text-muted-foreground font-normal">(15% of A6 sub-weight)</span>
+          </label>
+          <p className="text-[11px] text-muted-foreground mb-2">
+            What percentage of key employees (those who would materially impact revenue or operations if they left) have signed non-compete or non-solicitation agreements?
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {[
+              { value: '0',     label: '0%',       sub: 'No protection' },
+              { value: '1-50',  label: '1–50%',    sub: 'Partial coverage' },
+              { value: '51-75', label: '51–75%',   sub: 'Moderate' },
+              { value: '76-99', label: '76–99%',   sub: 'Strong coverage' },
+              { value: '100',   label: '100%',     sub: 'Fully protected' },
+            ].map(opt => (
+              <button key={opt.value} onClick={() => set('non_compete_pct', opt.value)}
+                className={cn('text-left rounded-lg border p-2.5 transition-all',
+                  form.non_compete_pct === opt.value
+                    ? 'border-primary/30 bg-primary/5'
+                    : 'border-border bg-muted/20 hover:bg-muted/40')}>
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  {form.non_compete_pct === opt.value
+                    ? <CheckCircle className="w-3 h-3 text-primary flex-shrink-0" />
+                    : <Circle className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" />}
+                  <span className="text-xs font-semibold text-foreground">{opt.label}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground pl-4.5">{opt.sub}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Q9: Voluntary turnover */}
+        <div>
+          <label className="block text-xs font-semibold text-foreground mb-1">
+            Annual Voluntary Turnover Rate <span className="text-muted-foreground font-normal">(15% of A6 sub-weight)</span>
+          </label>
+          <p className="text-[11px] text-muted-foreground mb-2">
+            Over the last 12 months, what was the annual voluntary turnover rate for non-owner employees? (voluntary departures ÷ average headcount)
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { value: '<10',   label: 'Under 10%',   sub: 'Excellent retention', color: 'emerald' },
+              { value: '10-15', label: '10–15%',       sub: 'Industry average', color: 'blue' },
+              { value: '15-25', label: '15–25%',       sub: 'Elevated — investigate', color: 'amber' },
+              { value: '>25',   label: 'Over 25%',    sub: 'High risk signal', color: 'red' },
+            ].map(opt => (
+              <button key={opt.value} onClick={() => set('voluntary_turnover', opt.value)}
+                className={cn('text-left rounded-lg border p-3 transition-all',
+                  form.voluntary_turnover === opt.value
+                    ? 'border-primary/30 bg-primary/5'
+                    : 'border-border bg-muted/20 hover:bg-muted/40')}>
+                <div className="flex items-center gap-2 mb-0.5">
+                  {form.voluntary_turnover === opt.value
+                    ? <CheckCircle className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                    : <Circle className="w-3.5 h-3.5 text-muted-foreground/40 flex-shrink-0" />}
+                  <span className="text-xs font-semibold text-foreground">{opt.label}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground pl-5">{opt.sub}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Q10: Comp vs. market */}
+        <div>
+          <label className="block text-xs font-semibold text-foreground mb-1">
+            Total Compensation vs. Market <span className="text-muted-foreground font-normal">(10% of A6 sub-weight)</span>
+          </label>
+          <p className="text-[11px] text-muted-foreground mb-2">
+            How does total compensation (salary + benefits + incentives) for key roles compare to market rates in the company's geography and industry?
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { value: 'below_25',  label: '>25% below market',  sub: 'High flight risk' },
+              { value: 'below_15',  label: '15–25% below',       sub: 'Moderate risk' },
+              { value: 'within_15', label: 'Within ±15%',        sub: 'Competitive — retentive' },
+              { value: 'above',     label: 'Above market',       sub: 'Strong retention signal' },
+            ].map(opt => (
+              <button key={opt.value} onClick={() => set('comp_vs_market', opt.value)}
+                className={cn('text-left rounded-lg border p-3 transition-all',
+                  form.comp_vs_market === opt.value
+                    ? 'border-primary/30 bg-primary/5'
+                    : 'border-border bg-muted/20 hover:bg-muted/40')}>
+                <div className="flex items-center gap-2 mb-0.5">
+                  {form.comp_vs_market === opt.value
+                    ? <CheckCircle className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                    : <Circle className="w-3.5 h-3.5 text-muted-foreground/40 flex-shrink-0" />}
+                  <span className="text-xs font-semibold text-foreground">{opt.label}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground pl-5">{opt.sub}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Optional: CRM pipeline toggle */}
+        <div>
+          <label className="block text-xs font-semibold text-foreground mb-1">
+            Active CRM Pipeline <span className="text-muted-foreground font-normal">(optional — enriches growth signal)</span>
+          </label>
+          <p className="text-[11px] text-muted-foreground mb-2">
+            Does the sales team actively maintain a CRM pipeline with deal stages, estimated values, and expected close dates?
+          </p>
+          <div className="flex gap-2">
+            {[{ v: true, label: 'Yes' }, { v: false, label: 'No' }, { v: null, label: 'Unknown' }].map(opt => (
+              <button key={String(opt.v)} onClick={() => set('has_crm_pipeline', opt.v)}
+                className={cn('px-4 py-1.5 rounded-lg border text-xs font-semibold transition-all',
+                  form.has_crm_pipeline === opt.v
+                    ? 'border-primary/40 bg-primary/10 text-primary'
+                    : 'border-border bg-muted/20 text-muted-foreground hover:bg-muted/40')}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Save button */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">
@@ -470,17 +633,103 @@ export default function QualitativeInputs() {
           {saved && (
             <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-semibold">
               <CheckCircle className="w-4 h-4" />
-              Saved — DRS will recompute on next page load
+              Saved — DRS recomputed
             </div>
           )}
         </div>
         {!allComplete && (
           <p className="text-[11px] text-muted-foreground">
-            {[!a3Complete && 'Revenue Contracts', !a4Complete && 'Operational Independence', !a7Complete && 'Growth Drivers']
+            {[!a3Complete && 'Revenue Contracts', !a4Complete && 'Ops Independence', !a6Complete && 'Management & Team', !a7Complete && 'Growth Drivers']
               .filter(Boolean).join(' · ')} incomplete — finish to activate full qualitative scoring
           </p>
         )}
       </div>
+
+      {/* DRS Diff Panel — shown after save when advisory_delta is available */}
+      {drsDiff && (
+        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            <p className="text-sm font-bold text-foreground">Advisory Input Impact on DRS</p>
+            <span className="text-[11px] text-muted-foreground ml-auto">After vs. before qualitative inputs</span>
+          </div>
+
+          {/* Headline DRS comparison */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'Financial-Only Baseline', drs: drsDiff.baseline, variant: 'muted' },
+              { label: 'With Qualitative Inputs', drs: drsDiff.current, variant: 'primary' },
+            ].map((col, i) => (
+              <div key={i} className={cn('col-span-1 rounded-lg border p-3 text-center',
+                col.variant === 'primary' ? 'border-primary/30 bg-primary/5' : 'border-border bg-muted/20')}>
+                <p className="text-[11px] text-muted-foreground mb-1">{col.label}</p>
+                <p className={cn('text-2xl font-black', col.variant === 'primary' ? 'text-primary' : 'text-muted-foreground')}>
+                  {col.drs?.base ?? '—'}
+                </p>
+                {col.drs?.conservative != null && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {col.drs.conservative}–{col.drs.optimistic} range
+                  </p>
+                )}
+                {col.drs?.tier && (
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{col.drs.tier}</span>
+                )}
+              </div>
+            ))}
+            {/* Net delta */}
+            <div className="col-span-1 rounded-lg border border-dashed border-border p-3 text-center flex flex-col items-center justify-center">
+              {(() => {
+                const delta = (drsDiff.current?.base ?? 0) - (drsDiff.baseline?.base ?? 0)
+                const positive = delta > 0
+                const neutral = delta === 0
+                return (
+                  <>
+                    {positive ? <TrendingUp className="w-5 h-5 text-emerald-400 mb-1" />
+                      : neutral ? <Minus className="w-5 h-5 text-muted-foreground mb-1" />
+                      : <TrendingDown className="w-5 h-5 text-red-400 mb-1" />}
+                    <p className={cn('text-xl font-black', positive ? 'text-emerald-400' : neutral ? 'text-muted-foreground' : 'text-red-400')}>
+                      {delta > 0 ? '+' : ''}{delta}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">Net DRS Lift</p>
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+
+          {/* Per-category delta */}
+          {drsDiff.advisory_delta && Object.keys(drsDiff.advisory_delta).length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Category deltas</p>
+              <div className="space-y-1.5">
+                {Object.entries(drsDiff.advisory_delta)
+                  .filter(([, v]) => v !== 0)
+                  .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+                  .map(([key, delta]) => {
+                    const style = getDrsCategoryStyle(key)
+                    const positive = delta > 0
+                    return (
+                      <div key={key} className="flex items-center gap-2">
+                        <div className={cn('w-2 h-2 rounded-full flex-shrink-0', style.dot)} />
+                        <span className="text-[11px] text-foreground capitalize flex-1">
+                          {key.replace(/_/g, ' ')}
+                        </span>
+                        <span className={cn('text-[11px] font-bold tabular-nums',
+                          positive ? 'text-emerald-400' : 'text-red-400')}>
+                          {positive ? '+' : ''}{delta.toFixed(1)} pts
+                        </span>
+                        <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className={cn('h-full rounded-full', positive ? 'bg-emerald-500' : 'bg-red-500')}
+                            style={{ width: `${Math.min(Math.abs(delta) * 5, 100)}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <button

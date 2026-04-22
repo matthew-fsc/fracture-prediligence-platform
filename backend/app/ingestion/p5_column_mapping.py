@@ -29,7 +29,9 @@ ONTOLOGY_REGISTRY: dict[str, tuple[str, str, list[str]]] = {
         "revenue_stream", "numeric",
         ["sales", "revenue", "net sales", "gross revenue", "billing", "invoiced amount",
          "total revenue", "gross sales", "billings", "fees", "service revenue",
-         "consulting fees", "project revenue", "total income", "net revenue"],
+         "consulting fees", "project revenue", "total income", "net revenue",
+         # QuickBooks synonyms
+         "totalamount", "totalamt", "total amount", "total amt"],
     ),
     "REVENUE_TYPE": (
         "revenue_stream", "categorical",
@@ -45,12 +47,16 @@ ONTOLOGY_REGISTRY: dict[str, tuple[str, str, list[str]]] = {
         "revenue_stream", "date",
         ["period", "month", "year", "date", "invoice date", "billing period",
          "fiscal period", "service period", "transaction date", "posting date",
-         "close date", "bill date", "as of"],
+         "close date", "bill date", "as of",
+         # QuickBooks synonyms
+         "txndate", "txn date", "transaction date"],
     ),
     "REVENUE_CUSTOMER_ID": (
         "revenue_stream", "text",
         ["customer", "client", "account", "customer name", "client name", "account name",
-         "bill to", "sold to", "customer id", "client id", "account id", "contact"],
+         "bill to", "sold to", "customer id", "client id", "account id", "contact",
+         # QuickBooks synonyms — CustomerRef.name on invoice rows
+         "customerref.name", "customerrefname", "customerref name"],
     ),
     "REVENUE_DESCRIPTION": (
         "revenue_stream", "text",
@@ -62,7 +68,9 @@ ONTOLOGY_REGISTRY: dict[str, tuple[str, str, list[str]]] = {
     "CUSTOMER_NAME": (
         "customer", "text",
         ["customer name", "client name", "account name", "company name", "client",
-         "customer", "account", "name", "business name", "organization"],
+         "customer", "account", "name", "business name", "organization",
+         # QuickBooks synonyms
+         "fullyqualifiedname", "fully qualified name", "customerrefname", "customerref name"],
     ),
     "CUSTOMER_TENURE_START": (
         "customer", "date",

@@ -232,6 +232,51 @@ export default function Home() {
         )}
       </div>
 
+      {/* Data quality indicator */}
+      {liveData?.drs?.confidence_summary?.category_levels && (() => {
+        const levels = liveData.drs.confidence_summary.category_levels
+        const all = Object.values(levels)
+        const highCount = all.filter(v => v === 'HIGH').length
+        const mediumCount = all.filter(v => v === 'MEDIUM').length
+        const lowCount = all.filter(v => v === 'LOW').length
+        const total = all.length
+        const overallLevel = liveData.drs.confidence_summary.overall_level
+        const overallColor = overallLevel === 'HIGH' ? 'emerald' : overallLevel === 'MEDIUM' ? 'amber' : 'red'
+        return (
+          <div className={cn('rounded-xl border p-4', colorCfg[overallColor])}>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5" />
+              Data Quality
+              <span className={cn('ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full border', colorCfg[overallColor])}>
+                {overallLevel}
+              </span>
+            </p>
+            <div className="h-2 rounded-full overflow-hidden bg-muted/30 flex mb-3">
+              {highCount > 0   && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${highCount   / total * 100}%` }} />}
+              {mediumCount > 0 && <div className="bg-amber-500  h-full transition-all" style={{ width: `${mediumCount / total * 100}%` }} />}
+              {lowCount > 0    && <div className="bg-red-500    h-full transition-all" style={{ width: `${lowCount    / total * 100}%` }} />}
+            </div>
+            <div className="flex gap-4 text-[11px] mb-2 flex-wrap">
+              {[
+                { label: 'High confidence',   count: highCount,   color: 'text-emerald-400' },
+                { label: 'Med confidence',    count: mediumCount, color: 'text-amber-400'   },
+                { label: 'Low confidence',    count: lowCount,    color: 'text-red-400'     },
+              ].map(({ label, count, color }) => count > 0 && (
+                <span key={label} className="flex items-center gap-1">
+                  <span className={cn('font-bold tabular-nums', color)}>{count}</span>
+                  <span className="text-muted-foreground">{label}</span>
+                </span>
+              ))}
+            </div>
+            {liveData.drs.confidence_summary.factors?.[0] && (
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                {liveData.drs.confidence_summary.factors[0]}
+              </p>
+            )}
+          </div>
+        )
+      })()}
+
       {/* Owner financial gap */}
       {(() => {
         const ownerTarget = engProfile?.target_valuation != null ? Number(engProfile.target_valuation) : null
