@@ -70,9 +70,9 @@ Before ending any session Claude will:
 |----|--------|------|------|
 | KI-005 | **RESOLVED** | DB | `create_all()` removed from lifespan; Alembic is sole schema authority |
 | KI-006 | **RESOLVED** | Security | `slowapi` rate limiter wired in `main.py`; nginx still recommended for public traffic |
-| KI-007 | Open | AI | Anthropic API calls in copilot/buyer-Q have no request timeout — wrap with `timeout=30` and try/except |
+| KI-007 | **RESOLVED** | AI | `timeout=30.0` added to `anthropic.Anthropic(...)` in `copilot.py` and `analytics.py` |
 | KI-008 | Open | Demo | Demo seed idempotency checks only revenue count; partial ingests can block ABC fixture — reseed with `seed_abc_company.py` |
-| KI-009 | Open | Branches | `claude/qb-integration-advisory-forms-ACHz7` contains QB OAuth + management-team analytics + engagement kanban. Its Alembic migrations (0013–0015) conflict with existing migrations of the same numbers in `main`. Needs renumbering to 0016+ before merge. Do not delete this branch. |
+| KI-009 | **RESOLVED** | Branches | QB OAuth + advisory form ext + engagement kanban merged to `main` as migrations 0016–0018 |
 
 ---
 
