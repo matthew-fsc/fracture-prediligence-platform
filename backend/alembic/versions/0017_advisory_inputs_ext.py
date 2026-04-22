@@ -1,7 +1,7 @@
 """Extend qualitative_inputs with A6 advisory form fields.
 
-Revision ID: 0014
-Revises: 0013
+Revision ID: 0017
+Revises: 0016
 Create Date: 2026-04-14
 
 Changes (all nullable — safe to add to existing rows):
@@ -14,8 +14,8 @@ Changes (all nullable — safe to add to existing rows):
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0014"
-down_revision = "0013"
+revision = "0017"
+down_revision = "0016"
 branch_labels = None
 depends_on = None
 

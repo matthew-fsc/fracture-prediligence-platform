@@ -1,7 +1,7 @@
 """Add qb_tokens table for QuickBooks OAuth integration.
 
-Revision ID: 0013
-Revises: 0012
+Revision ID: 0016
+Revises: 0015
 Create Date: 2026-04-14
 
 Changes:
@@ -13,8 +13,8 @@ Changes:
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0013"
-down_revision = "0012"
+revision = "0016"
+down_revision = "0015"
 branch_labels = None
 depends_on = None
 

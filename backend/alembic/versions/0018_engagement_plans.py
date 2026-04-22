@@ -1,7 +1,7 @@
 """Add engagement_plans table and extend company_initiatives.
 
-Revision ID: 0015
-Revises: 0014
+Revision ID: 0018
+Revises: 0017
 Create Date: 2026-04-14
 
 Changes:
@@ -19,8 +19,8 @@ Changes:
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0015"
-down_revision = "0014"
+revision = "0018"
+down_revision = "0017"
 branch_labels = None
 depends_on = None
 
