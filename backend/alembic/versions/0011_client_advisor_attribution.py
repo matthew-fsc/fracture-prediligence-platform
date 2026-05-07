@@ -19,14 +19,22 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "qualitative_input_audits",
-        sa.Column("advisor_id", sa.String(256), nullable=True),
-    )
-    op.add_column(
-        "engagement_profiles",
-        sa.Column("advisor_id", sa.String(256), nullable=True),
-    )
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+
+    audit_cols = {c["name"] for c in inspector.get_columns("qualitative_input_audits")}
+    if "advisor_id" not in audit_cols:
+        op.add_column(
+            "qualitative_input_audits",
+            sa.Column("advisor_id", sa.String(256), nullable=True),
+        )
+
+    profile_cols = {c["name"] for c in inspector.get_columns("engagement_profiles")}
+    if "advisor_id" not in profile_cols:
+        op.add_column(
+            "engagement_profiles",
+            sa.Column("advisor_id", sa.String(256), nullable=True),
+        )
 
 
 def downgrade() -> None:
