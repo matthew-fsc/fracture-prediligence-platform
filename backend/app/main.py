@@ -251,7 +251,7 @@ def health_ready(request: Request):
 
 # ── Serve React SPA ──────────────────────────────────────────────────────────
 # Mount static assets (JS, CSS, images) — must come after all API routes
-if FRONTEND_DIST.exists():
+if (FRONTEND_DIST / "assets").exists():
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 
     @app.get("/favicon.svg")
