@@ -158,23 +158,25 @@ export default function App() {
               }
             />
 
-            {/* Lowercase aliases → dashboard routes */}
-            <Route path="/home" element={<Navigate to="/auth-redirect" replace />} />
-            <Route path="/companyworkspace" element={<Navigate to="/CompanyWorkspace" replace />} />
-            <Route path="/connectors" element={<Navigate to="/Connectors" replace />} />
-            <Route path="/datamapping" element={<Navigate to="/DataMapping" replace />} />
-            <Route path="/dataquality" element={<Navigate to="/DataQuality" replace />} />
-            <Route path="/valuation" element={<Navigate to="/Valuation" replace />} />
-            <Route path="/valuegap" element={<Navigate to="/ValueGap" replace />} />
-            <Route path="/buyerlens" element={<Navigate to="/BuyerLens" replace />} />
-            <Route path="/engagement-intake" element={<Navigate to="/EngagementIntake" replace />} />
-            <Route path="/engagementintake" element={<Navigate to="/EngagementIntake" replace />} />
-            <Route path="/engagementview" element={<Navigate to="/EngagementView" replace />} />
-            <Route path="/aicopilot" element={<Navigate to="/AICopilot" replace />} />
-            <Route path="/advisorylibrary" element={<Navigate to="/AdvisoryLibrary" replace />} />
-            <Route path="/advisory-library" element={<Navigate to="/AdvisoryLibrary" replace />} />
-            <Route path="/QualitativeInputs" element={<Navigate to="/EngagementIntake" replace />} />
-            <Route path="/qualitativeinputs" element={<Navigate to="/EngagementIntake" replace />} />
+            {/* Lowercase aliases → dashboard routes. caseSensitive prevents these from
+                shadow-matching the correctly-cased routes (React Router defaults to
+                case-insensitive matching which caused an infinite redirect loop). */}
+            <Route caseSensitive path="/home" element={<Navigate to="/auth-redirect" replace />} />
+            <Route caseSensitive path="/companyworkspace" element={<Navigate to="/CompanyWorkspace" replace />} />
+            <Route caseSensitive path="/connectors" element={<Navigate to="/Connectors" replace />} />
+            <Route caseSensitive path="/datamapping" element={<Navigate to="/DataMapping" replace />} />
+            <Route caseSensitive path="/dataquality" element={<Navigate to="/DataQuality" replace />} />
+            <Route caseSensitive path="/valuation" element={<Navigate to="/Valuation" replace />} />
+            <Route caseSensitive path="/valuegap" element={<Navigate to="/ValueGap" replace />} />
+            <Route caseSensitive path="/buyerlens" element={<Navigate to="/BuyerLens" replace />} />
+            <Route caseSensitive path="/engagement-intake" element={<Navigate to="/EngagementIntake" replace />} />
+            <Route caseSensitive path="/engagementintake" element={<Navigate to="/EngagementIntake" replace />} />
+            <Route caseSensitive path="/engagementview" element={<Navigate to="/EngagementView" replace />} />
+            <Route caseSensitive path="/aicopilot" element={<Navigate to="/AICopilot" replace />} />
+            <Route caseSensitive path="/advisorylibrary" element={<Navigate to="/AdvisoryLibrary" replace />} />
+            <Route caseSensitive path="/advisory-library" element={<Navigate to="/AdvisoryLibrary" replace />} />
+            <Route caseSensitive path="/QualitativeInputs" element={<Navigate to="/EngagementIntake" replace />} />
+            <Route caseSensitive path="/qualitativeinputs" element={<Navigate to="/EngagementIntake" replace />} />
 
             {/* ---------------------------------------------------------------- */}
             {/* Post-payment onboarding (auth required, no role check)            */}

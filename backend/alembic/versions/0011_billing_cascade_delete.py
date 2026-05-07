@@ -19,7 +19,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Drop the existing FK, then recreate it with ondelete="CASCADE".
+    # company_engagement_billing is created in 0015 on fresh installs (with CASCADE already set).
+    # This migration only applies on databases that had the table before 0015 was added.
+    conn = op.get_bind()
+    if "company_engagement_billing" not in sa.inspect(conn).get_table_names():
+        return
     with op.batch_alter_table("company_engagement_billing") as batch_op:
         batch_op.drop_constraint(
             "company_engagement_billing_company_id_fkey",

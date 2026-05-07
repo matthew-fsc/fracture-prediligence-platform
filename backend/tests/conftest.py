@@ -171,17 +171,20 @@ except ImportError:
 # sub-modules that have import-time side effects.
 # ---------------------------------------------------------------------------
 
-# app.ingestion.pipeline imports pandas, chardet and a full chain of heavy
-# modules at the top level.  Stub the leaf so that route modules importing
-# run_pipeline don't drag in the whole ingestion stack during collection.
-_pipeline_stub = types.ModuleType("app.ingestion.pipeline")
-_pipeline_stub.run_pipeline = MagicMock()
-sys.modules["app.ingestion.pipeline"] = _pipeline_stub
-
 # app.core.database calls create_engine() at module level — register a stub
 # so that `from app.core.database import ...` succeeds without hitting the DB.
 # We must NOT override sys.modules["app"] or sys.modules["app.core"] as those
 # are real packages on disk; only the leaf module is stubbed.
+#
+# NOTE: app.ingestion.pipeline is NOT stubbed here — all ingestion dependencies
+# (pandas, chardet, p2–p11 phases) are installed and import cleanly.  A stub
+# would hide private helpers like _load_dataframe that ingestion tests need.
+
+_SQLA_DESCRIPTOR_NAMES = frozenset({
+    "MappedColumn", "RelationshipProperty", "column_property",
+    "InstrumentedAttribute", "QueryableAttribute", "AssociationProxyInstance",
+})
+
 class _StubBase:
     """Plain-Python stub for SQLAlchemy declarative Base.
     Must be a real class (not a MagicMock instance) so that model classes can
@@ -189,10 +192,18 @@ class _StubBase:
 
     The __init__ accepts arbitrary kwargs and sets them as instance attributes,
     mimicking the generated __init__ that SQLAlchemy's declarative machinery
-    would normally produce."""
+    would normally produce.  Unset mapped columns are initialised to None so
+    that accessing them on a new instance returns None rather than the raw
+    MappedColumn descriptor object."""
     __abstract__ = True
 
     def __init__(self, **kwargs):
+        # Pre-initialise any SQLAlchemy column/relationship descriptors to None
+        # so that unset attributes on new instances return None rather than the
+        # raw descriptor object (which is what real SQLAlchemy ORM does).
+        for name, val in type(self).__dict__.items():
+            if not name.startswith("_") and type(val).__name__ in _SQLA_DESCRIPTOR_NAMES:
+                object.__setattr__(self, name, None)
         for k, v in kwargs.items():
             setattr(self, k, v)
 

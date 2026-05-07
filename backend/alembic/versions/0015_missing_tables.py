@@ -119,7 +119,7 @@ def upgrade() -> None:
         op.create_table(
             "company_engagement_billing",
             sa.Column("id",                          sa.Integer,     primary_key=True, autoincrement=True),
-            sa.Column("company_id",                  sa.Integer,     sa.ForeignKey("companies.id"), nullable=False, unique=True, index=True),
+            sa.Column("company_id",                  sa.Integer,     sa.ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, unique=True, index=True),
             sa.Column("user_id",                     sa.String(256), nullable=False, index=True),
             sa.Column("billing_status",              sa.String(16),  nullable=False, server_default="included"),
             sa.Column("stripe_subscription_item_id", sa.String(256), nullable=True),
