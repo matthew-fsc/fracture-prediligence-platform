@@ -87,21 +87,38 @@ function Nav() {
               </Show>
             </>
           ) : (
-            <Link
-              to="/Home"
-              style={{
-                color: COLORS.offWhite,
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: 14,
-                fontWeight: 500,
-                textDecoration: 'none',
-                padding: '8px 14px',
-                borderRadius: 8,
-                border: `1px solid ${COLORS.border}`,
-              }}
-            >
-              Dashboard
-            </Link>
+            <>
+              <Link
+                to="/sign-in"
+                style={{
+                  color: COLORS.offWhite,
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  textDecoration: 'none',
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: `1px solid ${COLORS.border}`,
+                }}
+              >
+                Log in
+              </Link>
+              <Link
+                to="/sign-up"
+                style={{
+                  color: COLORS.bg,
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  background: COLORS.gold,
+                }}
+              >
+                Sign up
+              </Link>
+            </>
           )}
           <Link
             to="/request-demo"
@@ -208,7 +225,7 @@ function Hero() {
               border: `1px solid ${COLORS.border}`,
             }}
           >
-            Log in to platform
+            Log in
           </Link>
         </div>
       </div>
