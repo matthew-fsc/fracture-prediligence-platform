@@ -17,6 +17,7 @@ from app.ontology.models import AppSetting, DemoLink, UserSubscription
 
 _SPOTS_TOTAL = 20
 _SPOTS_SETTING_KEY = "spots_remaining"
+_DEMO_LOCKED_KEY = "demo_locked"
 
 
 # ---------------------------------------------------------------------------
@@ -30,6 +31,7 @@ def update_user_subscription(
     stripe_subscription_id: Optional[str],
     tier: Optional[str],
     status: str,
+    billing_interval: str = "monthly",
 ) -> dict:
     """Upsert the subscription record for a Clerk user."""
     sub = db.query(UserSubscription).filter(UserSubscription.user_id == user_id).first()
@@ -41,27 +43,28 @@ def update_user_subscription(
     sub.stripe_subscription_id = stripe_subscription_id
     sub.tier = tier
     sub.status = status
+    sub.billing_interval = billing_interval
     sub.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(sub)
-    return {
-        "user_id": sub.user_id,
-        "tier": sub.tier,
-        "status": sub.status,
-        "stripe_customer_id": sub.stripe_customer_id,
-        "stripe_subscription_id": sub.stripe_subscription_id,
-    }
+    return _subscription_to_dict(sub)
 
 
 def get_user_subscription(db: Session, user_id: str) -> Optional[dict]:
-    """Return tier and status for a user, or None if no subscription exists."""
+    """Return tier, status, and billing details for a user, or None if no subscription exists."""
     sub = db.query(UserSubscription).filter(UserSubscription.user_id == user_id).first()
     if sub is None:
         return None
+    return _subscription_to_dict(sub)
+
+
+def _subscription_to_dict(sub: UserSubscription) -> dict:
     return {
         "user_id": sub.user_id,
         "tier": sub.tier,
         "status": sub.status,
+        "billing_interval": sub.billing_interval,
+        "max_companies": sub.max_companies,
         "stripe_customer_id": sub.stripe_customer_id,
         "stripe_subscription_id": sub.stripe_subscription_id,
     }
@@ -163,11 +166,53 @@ def get_spots_remaining(db: Session) -> int:
         return _SPOTS_TOTAL
 
 
+def try_decrement_founding_spot(db: Session) -> bool:
+    """
+    Decrement spots_remaining if > 0. Call after a founding-tier payment succeeds (e.g. Stripe webhook).
+    Returns True if a spot was consumed. For strict concurrency, run against Postgres with row locks.
+    """
+    setting = db.query(AppSetting).filter(AppSetting.key == _SPOTS_SETTING_KEY).first()
+    if setting is None:
+        return False
+    try:
+        n = int(setting.value)
+    except (ValueError, TypeError):
+        n = 0
+    if n <= 0:
+        return False
+    setting.value = str(n - 1)
+    db.commit()
+    return True
+
+
 def _ensure_spots_setting(db: Session) -> None:
     """Seed the spots_remaining setting if it doesn't exist."""
     if not db.query(AppSetting).filter(AppSetting.key == _SPOTS_SETTING_KEY).first():
         db.add(AppSetting(key=_SPOTS_SETTING_KEY, value="18"))
         db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Demo lock
+# ---------------------------------------------------------------------------
+
+def get_demo_locked(db: Session) -> bool:
+    """Return whether the demo is locked (inputs read-only for visitors). Defaults to True."""
+    setting = db.query(AppSetting).filter(AppSetting.key == _DEMO_LOCKED_KEY).first()
+    if setting is None:
+        return True
+    return setting.value.lower() == "true"
+
+
+def set_demo_locked(db: Session, locked: bool) -> bool:
+    """Set the demo lock state. Returns the new state."""
+    setting = db.query(AppSetting).filter(AppSetting.key == _DEMO_LOCKED_KEY).first()
+    if setting is None:
+        db.add(AppSetting(key=_DEMO_LOCKED_KEY, value="true" if locked else "false"))
+    else:
+        setting.value = "true" if locked else "false"
+    db.commit()
+    return locked
 
 
 # ---------------------------------------------------------------------------

@@ -2,22 +2,27 @@
 A3 — Revenue Quality Score (Blueprint II §A3)
 
 Five sub-dimensions weighted to produce a 0–100 score:
-  1. Recurring Revenue Rate (30%)   — % of total revenue from recurring/subscription streams
-  2. Customer Concentration (25%)   — Herfindahl-Hirschman Index; lower HHI = better
-  3. Contract Durability (20%)      — % of revenue under contracts with >12 months remaining
-  4. Revenue CAGR Consistency (15%) — std-dev of monthly/annual growth rate
-  5. Churn / NRR (10%)              — estimated net revenue retention if calculable
+  1. Recurring Revenue Rate (30%)      — % of TTM revenue from recurring/subscription streams
+  2. Customer Concentration (25%)      — Herfindahl-Hirschman Index on TTM revenue; lower HHI = better
+  3. Contract Durability (20%)         — durable contract value as % of TTM revenue
+  4. Revenue Consistency (15%)         — coefficient of variation of monthly revenue (lower = better)
+  5. Recurring Revenue Growth (10%)    — year-over-year growth in recurring revenue
+                                         (approximation of NRR; not true cohort-based NRR)
 
 DRS weight: Revenue Quality = 25% of composite score.
+
+Note on sub-dimension 5: labeled 'nrr_score' for backward compatibility but measures
+YoY growth in total recurring revenue, not cohort-based Net Revenue Retention.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
-from datetime import date
+from dataclasses import dataclass, field
+from datetime import date, timedelta
 from decimal import Decimal
 from math import sqrt
 from typing import Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.ontology.models import RevenueStream, Contract
@@ -26,18 +31,50 @@ from app.ontology.models import RevenueStream, Contract
 # ── Sub-score helpers ─────────────────────────────────────────────────────────
 
 def _recurring_rate_score(revenue_rows: list) -> tuple[float, float]:
-    """Returns (score_0_100, recurring_pct)."""
+    """Returns (score_0_100, recurring_pct).
+
+    Explicit tagging (recurring_flag / RECURRING / SUBSCRIPTION) is used when
+    meaningful coverage exists (>=5% of revenue is explicitly tagged).
+    Otherwise, behavioral detection kicks in: revenue from customers who appear
+    in 3+ distinct calendar months is treated as recurring.  This handles
+    QuickBooks imports where recurring project/retainer lines land as PROJECT or
+    TRANSACTIONAL types despite being de-facto recurring.
+    """
     if not revenue_rows:
         return 50.0, 0.0
-    total = sum(float(r.revenue_gross) for r in revenue_rows if r.revenue_gross)
-    recurring = sum(
-        float(r.revenue_gross) for r in revenue_rows
-        if r.recurring_flag or r.revenue_type in ("RECURRING", "SUBSCRIPTION")
-    )
+
+    total = sum(float(r.revenue_gross or 0) for r in revenue_rows)
     if total == 0:
         return 50.0, 0.0
-    pct = recurring / total
-    # Linear: 0%→0, 50%→60, 75%→80, 90%→95, 100%→100
+
+    # --- Explicit tagging ---
+    explicit_recurring = sum(
+        float(r.revenue_gross or 0) for r in revenue_rows
+        if r.recurring_flag or r.revenue_type in ("RECURRING", "SUBSCRIPTION")
+    )
+    explicit_pct = explicit_recurring / total
+
+    if explicit_pct >= 0.05:
+        # Sufficient explicit tagging — use it directly
+        pct = explicit_pct
+    else:
+        # Sparse tagging — fall back to behavioral detection:
+        # customers with revenue in >=3 distinct months are recurring
+        cust_months: dict = {}
+        cust_revenue: dict = {}
+        for r in revenue_rows:
+            if r.customer_id and r.revenue_period:
+                month = r.revenue_period.strftime("%Y-%m")
+                cust_months.setdefault(r.customer_id, set()).add(month)
+                cust_revenue[r.customer_id] = (
+                    cust_revenue.get(r.customer_id, 0.0) + float(r.revenue_gross or 0)
+                )
+        behavioral_recurring = sum(
+            v for k, v in cust_revenue.items() if len(cust_months[k]) >= 3
+        )
+        pct = behavioral_recurring / total
+
+    # Scoring bands: 0%→0, 50%→60, 75%→80, 90%→95, 100%→100
     if pct >= 0.90:
         score = 95 + (pct - 0.90) / 0.10 * 5
     elif pct >= 0.75:
@@ -78,32 +115,40 @@ def _hhi_score(revenue_rows: list) -> tuple[float, float]:
 
 
 def _contract_durability_score(revenue_rows: list, contracts: list) -> tuple[float, float]:
-    """Returns (score_0_100, pct_under_durable_contract)."""
-    if not contracts:
+    """Returns (score_0_100, pct_of_revenue_under_durable_contract).
+
+    Durable = contract with >12 months remaining end_date.
+    Denominator is total TTM revenue (not just contracted value) so the score
+    reflects what fraction of the full revenue base is durably contracted.
+    """
+    today = date.today()
+    total_rev = sum(float(r.revenue_gross or 0) for r in revenue_rows)
+
+    if total_rev == 0:
         return 40.0, 0.0
 
-    today = date.today()
-    total_contract_value = 0.0
     durable_value = 0.0
-
     for c in contracts:
         if not c.annual_value:
             continue
-        val = float(c.annual_value)
-        total_contract_value += val
         if c.end_date and (c.end_date - today).days > 365:
-            durable_value += val
+            durable_value += float(c.annual_value)
 
-    if total_contract_value == 0:
-        return 40.0, 0.0
-
-    pct = durable_value / total_contract_value
+    pct = durable_value / total_rev
     score = min(100, pct * 100 * 1.1)  # slight bonus for any durability
     return round(score, 1), round(pct * 100, 1)
 
 
 def _cagr_consistency_score(revenue_rows: list) -> tuple[float, float]:
-    """Returns (score_0_100, coefficient_of_variation_pct)."""
+    """Returns (score_0_100, coefficient_of_variation_pct).
+
+    Handles the common QuickBooks export pattern where annual summary rows are
+    dumped into Jan-1 of each year alongside true monthly transaction rows.
+    Detection: if any month exceeds 3× the median of all months in the series,
+    treat it as an annual aggregate and normalize it to 1/12 of its value before
+    computing CV.  This prevents a small number of lump-sum rows from
+    artificially inflating variance.
+    """
     if not revenue_rows:
         return 50.0, 0.0
 
@@ -117,14 +162,39 @@ def _cagr_consistency_score(revenue_rows: list) -> tuple[float, float]:
     if len(monthly) < 3:
         return 50.0, 0.0
 
-    values = [monthly[k] for k in sorted(monthly.keys())]
+    values_raw = [monthly[k] for k in sorted(monthly.keys())]
+
+    # Detect annual-dump outliers: months > 3× median — normalize to monthly avg
+    sorted_vals = sorted(values_raw)
+    median = sorted_vals[len(sorted_vals) // 2]
+    threshold = median * 3 if median > 0 else float("inf")
+
+    values = []
+    for v in values_raw:
+        values.append(v / 12.0 if v > threshold else v)
+
     mean = sum(values) / len(values)
     if mean == 0:
         return 50.0, 0.0
 
     variance = sum((v - mean) ** 2 for v in values) / len(values)
     std_dev = sqrt(variance)
-    cv = (std_dev / mean) * 100  # coefficient of variation %
+    cv = (std_dev / mean) * 100
+
+    # If monthly CV is still very high (>80%), the monthly series is too noisy
+    # (mixed annual-dump and transactional data) — fall back to annual granularity.
+    if cv > 80:
+        annual: dict[int, float] = {}
+        for r in revenue_rows:
+            if r.revenue_period:
+                yr = r.revenue_period.year
+                annual[yr] = annual.get(yr, 0.0) + float(r.revenue_gross or 0)
+        if len(annual) >= 2:
+            ann_vals = [annual[k] for k in sorted(annual.keys())]
+            ann_mean = sum(ann_vals) / len(ann_vals)
+            if ann_mean > 0:
+                ann_var = sum((v - ann_mean) ** 2 for v in ann_vals) / len(ann_vals)
+                cv = (sqrt(ann_var) / ann_mean) * 100
 
     # Low CV = consistent = high score
     if cv <= 10:
@@ -143,8 +213,9 @@ def _cagr_consistency_score(revenue_rows: list) -> tuple[float, float]:
 
 def _nrr_score(revenue_rows: list) -> tuple[float, float]:
     """
-    Approximate NRR from year-over-year recurring revenue change.
-    Returns (score_0_100, estimated_nrr_pct).
+    Year-over-year growth in total recurring revenue (not true cohort-based NRR).
+    True NRR requires per-customer cohort tracking; this is an aggregate proxy.
+    Returns (score_0_100, yoy_recurring_growth_pct).
     """
     if not revenue_rows:
         return 60.0, 100.0
@@ -202,14 +273,21 @@ class RevenueQualityScore:
     revenue_cv_pct: float
     estimated_nrr: float
     data_confidence: str                  # HIGH / MEDIUM / LOW
+    # Revenue type breakdown for drill-down (total by type in TTM window)
+    revenue_type_breakdown: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
             "company_id": self.company_id,
             "composite":  self.composite,
             "sub_scores": {
-                "recurring_rate":   {"score": self.recurring_rate_score,  "value": self.recurring_pct,           "label": f"{self.recurring_pct:.0f}% recurring"},
-                "concentration":    {"score": self.concentration_score,   "value": self.hhi,                     "label": f"HHI {self.hhi:.0f}"},
+                "recurring_rate": {
+                    "score": self.recurring_rate_score,
+                    "value": self.recurring_pct,
+                    "label": f"{self.recurring_pct:.0f}% recurring",
+                    "source_rows": self.revenue_type_breakdown,
+                },
+                "concentration":    {"score": self.concentration_score,   "value": self.hhi,                     "label": "HHI"},
                 "durability":       {"score": self.durability_score,      "value": self.contract_durability_pct, "label": f"{self.contract_durability_pct:.0f}% under durable contract"},
                 "consistency":      {"score": self.consistency_score,     "value": self.revenue_cv_pct,          "label": f"CV {self.revenue_cv_pct:.1f}%"},
                 "nrr":              {"score": self.nrr_score,             "value": self.estimated_nrr,           "label": f"NRR ~{self.estimated_nrr:.0f}%"},
@@ -230,14 +308,27 @@ WEIGHTS = {
 
 
 def compute_revenue_quality(company_id: int, db: Session) -> RevenueQualityScore:
-    revenue_rows = db.query(RevenueStream).filter(RevenueStream.company_id == company_id).all()
-    contracts    = db.query(Contract).filter(Contract.company_id == company_id).all()
+    all_revenue_rows = db.query(RevenueStream).filter(RevenueStream.company_id == company_id).all()
+    contracts        = db.query(Contract).filter(Contract.company_id == company_id).all()
 
-    s_rec,  recurring_pct  = _recurring_rate_score(revenue_rows)
-    s_hhi,  hhi            = _hhi_score(revenue_rows)
-    s_dur,  dur_pct        = _contract_durability_score(revenue_rows, contracts)
-    s_cv,   cv_pct         = _cagr_consistency_score(revenue_rows)
-    s_nrr,  nrr            = _nrr_score(revenue_rows)
+    # Use TTM window for point-in-time metrics (concentration, recurring rate, durability)
+    # to match A1's approach and reflect current business state.
+    data_dates = [r.revenue_period for r in all_revenue_rows if r.revenue_period]
+    ref_date = max(data_dates) if data_dates else date.today()
+    if ref_date > date.today():
+        ref_date = date.today()
+    ttm_start = ref_date - timedelta(days=365)
+    ttm_rows = [r for r in all_revenue_rows if r.revenue_period and r.revenue_period >= ttm_start]
+
+    # TTM data for current-state concentration and recurring metrics
+    s_rec,  recurring_pct  = _recurring_rate_score(ttm_rows)
+    s_hhi,  hhi            = _hhi_score(ttm_rows)
+    s_dur,  dur_pct        = _contract_durability_score(ttm_rows, contracts)
+    # Full history for multi-period metrics
+    s_cv,   cv_pct         = _cagr_consistency_score(all_revenue_rows)
+    s_nrr,  nrr            = _nrr_score(all_revenue_rows)
+
+    revenue_rows = ttm_rows  # use TTM for row_count confidence assessment
 
     composite = (
         s_rec  * WEIGHTS["recurring"]
@@ -249,6 +340,26 @@ def compute_revenue_quality(company_id: int, db: Session) -> RevenueQualityScore
 
     row_count = len(revenue_rows)
     confidence = "HIGH" if row_count >= 50 else "MEDIUM" if row_count >= 12 else "LOW"
+
+    # Build revenue type breakdown for drill-down (TTM totals by type)
+    type_totals: dict[str, float] = {}
+    ttm_total = sum(float(r.revenue_gross or 0) for r in ttm_rows)
+    for r in ttm_rows:
+        rtype = (r.revenue_type.value if hasattr(r.revenue_type, "value") else str(r.revenue_type)) or "OTHER"
+        type_totals[rtype] = type_totals.get(rtype, 0.0) + float(r.revenue_gross or 0)
+    revenue_type_breakdown = sorted(
+        [
+            {
+                "type": rtype,
+                "revenue": round(amt, 0),
+                "pct": round(amt / ttm_total * 100, 1) if ttm_total > 0 else 0.0,
+                "recurring": rtype in ("RECURRING", "SUBSCRIPTION"),
+            }
+            for rtype, amt in type_totals.items()
+        ],
+        key=lambda x: x["revenue"],
+        reverse=True,
+    )
 
     return RevenueQualityScore(
         company_id=company_id,
@@ -264,4 +375,5 @@ def compute_revenue_quality(company_id: int, db: Session) -> RevenueQualityScore
         revenue_cv_pct=cv_pct,
         estimated_nrr=nrr,
         data_confidence=confidence,
+        revenue_type_breakdown=revenue_type_breakdown,
     )

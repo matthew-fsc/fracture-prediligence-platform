@@ -1,0 +1,22 @@
+# Railway — deploy from Dockerfile at repo root (directory that contains Dockerfile + frontend/ + backend/).
+# Create project → connect repo → add PostgreSQL → set env vars in UI.
+# Required for a working SPA: VITE_CLERK_PUBLISHABLE_KEY (and VITE_API_BASE_URL if API is on another host).
+# Runtime: uvicorn listens on 0.0.0.0:$PORT — do not override PORT unless it matches Railway networking.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+# VITE_* vars are baked into the JS bundle at build time (not runtime).
+# Set these in Railway Variables → they are passed as Docker build args.
+buildArgs = ["VITE_CLERK_PUBLISHABLE_KEY", "VITE_API_BASE_URL"]
+
+[deploy]
+# Do not set a Custom Start Command in the Railway dashboard unless you know what you're doing.
+# A wrong start command overrides the Dockerfile ENTRYPOINT and often causes 502 + "connection refused"
+# (nothing listening on $PORT). Leave empty to use backend/docker-entrypoint.sh.
+# Migrations are handled by docker-entrypoint.sh when RUN_MIGRATIONS=true is set, which runs
+# after the container starts and has full environment variable injection from Railway.
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

@@ -1,10 +1,68 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { ClerkProvider } from '@clerk/clerk-react'
+import { ClerkProvider } from '@clerk/react'
+import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query'
+import { Toaster } from 'sonner'
+import posthog from 'posthog-js'
+import ClerkAuthBridge from './components/auth/ClerkAuthBridge.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import App from './App.jsx'
 import './index.css'
+import { ApiError } from './lib/apiClient'
+import { toast } from './lib/notify'
 
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+// Catch any JS errors before React mounts and write them visibly to the page.
+window.addEventListener('error', (e) => {
+  const root = document.getElementById('root')
+  if (root && !root.children.length) {
+    root.innerHTML = `<pre style="color:red;background:#fff;padding:20px;font-size:13px;white-space:pre-wrap">[JS Error] ${e.message}\n\n${e.error?.stack || ''}</pre>`
+  }
+})
+window.addEventListener('unhandledrejection', (e) => {
+  const root = document.getElementById('root')
+  if (root && !root.children.length) {
+    root.innerHTML = `<pre style="color:red;background:#fff;padding:20px;font-size:13px;white-space:pre-wrap">[Unhandled Promise] ${e.reason?.message || e.reason}\n\n${e.reason?.stack || ''}</pre>`
+  }
+})
+
+// PostHog — initialises only when VITE_POSTHOG_KEY is set; no-op otherwise.
+const _PH_KEY  = (import.meta.env.VITE_POSTHOG_KEY  || '').trim()
+const _PH_HOST = (import.meta.env.VITE_POSTHOG_HOST || 'https://app.posthog.com').trim()
+if (_PH_KEY) {
+  posthog.init(_PH_KEY, { api_host: _PH_HOST, capture_pageview: true, autocapture: false })
+}
+
+/** Trimmed — stray whitespace in .env breaks Clerk JS load. */
+const PUBLISHABLE_KEY = (import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim()
+
+function toastQueryError(err, query) {
+  if (query?.meta?.suppressErrorToast) return
+  if (err instanceof ApiError && err.status === 404) return
+  const msg = err?.message || 'Something went wrong'
+  toast.error(msg.length > 180 ? `${msg.slice(0, 180)}—` : msg)
+}
+
+// TanStack Query v5: global error handling moved to QueryCache / MutationCache
+const queryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: (err, query) => toastQueryError(err, query) }),
+  mutationCache: new MutationCache({ onError: (err) => toastQueryError(err, null) }),
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
+
+const appTree = (
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <App />
+      <Toaster position="top-right" theme="dark" richColors closeButton />
+    </QueryClientProvider>
+  </ErrorBoundary>
+)
 
 // ---------------------------------------------------------------------------
 // Render — wraps app in ClerkProvider when key is configured, otherwise
@@ -15,8 +73,15 @@ const root = ReactDOM.createRoot(document.getElementById('root'))
 if (PUBLISHABLE_KEY) {
   root.render(
     <React.StrictMode>
-      <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignInUrl="/Home" afterSignUpUrl="/dashboard/onboarding">
-        <App />
+      <ClerkProvider
+        publishableKey={PUBLISHABLE_KEY}
+        afterSignInUrl="/auth-redirect"
+        afterSignUpUrl="/role-select"
+        afterSignOutUrl="/"
+      >
+        <ClerkAuthBridge>
+          {appTree}
+        </ClerkAuthBridge>
       </ClerkProvider>
     </React.StrictMode>,
   )
@@ -25,7 +90,7 @@ if (PUBLISHABLE_KEY) {
   // Protected routes will redirect to /sign-in which will show a config notice.
   root.render(
     <React.StrictMode>
-      <App />
+      {appTree}
     </React.StrictMode>,
   )
 }

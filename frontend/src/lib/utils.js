@@ -19,7 +19,9 @@ export function fmt(value, type = 'currency') {
 }
 
 export function fmtM(value) {
-  if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`
-  if (Math.abs(value) >= 1_000) return `$${(value / 1_000).toFixed(0)}K`
-  return `$${value}`
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return '—'
+  if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
+  if (Math.abs(n) >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
+  return `$${n}`
 }

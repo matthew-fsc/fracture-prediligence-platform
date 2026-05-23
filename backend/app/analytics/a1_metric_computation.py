@@ -7,6 +7,7 @@ This metric registry is the input to every subsequent analytical phase (A2–A14
 
 from __future__ import annotations
 from dataclasses import dataclass, field
+import calendar
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
@@ -15,7 +16,28 @@ import statistics
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from app.ontology.models import RevenueStream, Customer, Employee, Expense, Contract, RevenueType, ExpenseCategory, EmployeeStatus
+from app.ontology.models import Company, RevenueStream, Customer, Employee, Expense, Contract, RevenueType, ExpenseCategory, EmployeeStatus
+
+
+def effective_total_headcount(company_row: Optional[Company], ingested_count: int) -> int:
+    """
+    Advisor-entered companies.total_headcount (client profile / intake) overrides
+    payroll-ingested rows when set to a positive integer.
+    """
+    if company_row is not None:
+        th = company_row.total_headcount
+        if th is not None and th > 0:
+            return int(th)
+    return ingested_count
+
+
+def _add_months(d: date, months: int) -> date:
+    """Calendar month arithmetic; clamps day to last day of target month."""
+    m_idx = d.year * 12 + d.month - 1 + months
+    y = m_idx // 12
+    mo = m_idx % 12 + 1
+    last = calendar.monthrange(y, mo)[1]
+    return date(y, mo, min(d.day, last))
 
 
 @dataclass
@@ -79,6 +101,10 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
     ref_date = latest_rev_date if latest_rev_date and latest_rev_date < today else today
     ttm_start = ref_date - timedelta(days=365)
 
+    # TTM revenue sums every row with period >= ttm_start. If the DB mixes annual,
+    # monthly, and extra connector ingests for the same economics, this double-counts
+    # and inflates revenue, gross profit, and EBITDA vs. a single clean P&L path.
+
     # --- Revenue: TTM ---
     ttm_revenue_rows = (
         db.query(RevenueStream)
@@ -119,19 +145,30 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
         ).scalar() or Decimal(0)
         m.total_revenue_by_year[yr] = total
 
-    # CAGR
+    # CAGR: use full-year endpoints, divide by number of periods (years - 1)
     years = sorted(m.total_revenue_by_year.keys())
     if len(years) >= 2 and m.total_revenue_by_year[years[0]]:
-        n = len(years)
-        m.cagr_3yr = (float(m.total_revenue_ttm / m.total_revenue_by_year[years[0]]) ** (1 / n) - 1) * 100
+        n = len(years) - 1  # periods of growth between first and last full year
+        m.cagr_3yr = (float(m.total_revenue_by_year[years[-1]] / m.total_revenue_by_year[years[0]]) ** (1 / n) - 1) * 100
 
-    # Revenue consistency (coefficient of variation on monthly)
+    # Revenue consistency (coefficient of variation on monthly — uses 24m window, not TTM-only)
+    revenue_24m_start = ref_date - timedelta(days=730)
+    revenue_24m_rows = (
+        db.query(RevenueStream)
+        .filter(RevenueStream.company_id == company_id, RevenueStream.revenue_period >= revenue_24m_start)
+        .all()
+    )
     monthly_vals = []
+    ref_month_first = ref_date.replace(day=1)
     for i in range(24):
-        mo_start = ref_date.replace(day=1) - timedelta(days=30 * i)
-        mo_end = (mo_start.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-        mo_rev = sum(r.revenue_gross for r in ttm_revenue_rows if mo_start <= r.revenue_period <= mo_end)
-        key = mo_start.strftime("%Y-%m")
+        month_anchor = _add_months(ref_month_first, -i)
+        y, mo = month_anchor.year, month_anchor.month
+        period_start = date(y, mo, 1)
+        period_end = date(y, mo, calendar.monthrange(y, mo)[1])
+        mo_rev = sum(
+            r.revenue_gross for r in revenue_24m_rows if period_start <= r.revenue_period <= period_end
+        )
+        key = f"{y:04d}-{mo:02d}"
         m.monthly_revenue_24m[key] = mo_rev
         monthly_vals.append(float(mo_rev))
     if monthly_vals and statistics.mean(monthly_vals):
@@ -143,6 +180,13 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
     m.total_customer_count = db.query(func.count(Customer.id)).filter(Customer.company_id == company_id).scalar() or 0
     if m.active_customer_count_ttm and m.total_revenue_ttm:
         m.avg_customer_revenue_ttm = m.total_revenue_ttm / m.active_customer_count_ttm
+
+    # Customer churn rate: % of all customers who are marked inactive
+    inactive_count = db.query(func.count(Customer.id)).filter(
+        Customer.company_id == company_id, Customer.is_active == False
+    ).scalar() or 0
+    if m.total_customer_count > 0:
+        m.customer_churn_rate = inactive_count / m.total_customer_count * 100
 
     # Tenure
     customers = db.query(Customer).filter(Customer.company_id == company_id, Customer.is_active == True).all()
@@ -178,21 +222,22 @@ def compute_metrics(company_id: int, db: Session) -> MetricRegistry:
         m.ebitda_ttm = m.gross_profit - opex
     else:
         # Fall back to payroll data as labor cost proxy.
-        # comp_annual is stored from monthly payroll rows (Gross Pay per period),
-        # so annualize by multiplying by 12.
+        # comp_annual stores the annual compensation figure — use it directly.
         active_emps_all = db.query(Employee).filter(Employee.company_id == company_id, Employee.status == EmployeeStatus.ACTIVE).all()
-        labor_monthly_sum = Decimal(str(sum(float(e.comp_annual or 0) for e in active_emps_all)))
-        labor_est = labor_monthly_sum * 12
+        labor_est = Decimal(str(sum(float(e.comp_annual or 0) for e in active_emps_all)))
         m.ebitda_ttm = m.total_revenue_ttm - labor_est
 
     owner_comp = sum(e.amount for e in expenses if e.category in (ExpenseCategory.OWNER, ExpenseCategory.PERSONAL))
     employees_q = db.query(Employee).filter(Employee.company_id == company_id, Employee.is_owner == True, Employee.status == EmployeeStatus.ACTIVE).all()
-    owner_salary = sum(e.comp_annual or 0 for e in employees_q)
+    # Use OWNER expenses as authoritative when present (avoids double-counting with comp_annual)
+    owner_salary = Decimal(0) if owner_comp > 0 else sum(e.comp_annual or 0 for e in employees_q)
     m.owner_compensation_total = owner_comp + Decimal(str(owner_salary))
 
     # --- Employees ---
     active_emps = db.query(Employee).filter(Employee.company_id == company_id, Employee.status == EmployeeStatus.ACTIVE).all()
-    m.total_headcount = len(active_emps)
+    ingested_headcount = len(active_emps)
+    company_row = db.query(Company).filter(Company.id == company_id).first()
+    m.total_headcount = effective_total_headcount(company_row, ingested_headcount)
     if m.total_headcount and m.total_revenue_ttm:
         m.revenue_per_employee = m.total_revenue_ttm / m.total_headcount
     emp_tenures = [(today - e.hire_date).days / 365 for e in active_emps if e.hire_date]

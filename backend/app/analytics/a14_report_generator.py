@@ -18,16 +18,17 @@ from fpdf import FPDF
 from sqlalchemy.orm import Session
 
 from app.analytics.a1_metric_computation import compute_metrics
-from app.analytics.a3_revenue_quality import compute_revenue_quality
-from app.analytics.a4_operational_independence import compute_operational_independence
-from app.analytics.a5_customer_risk import compute_customer_risk
-from app.analytics.a6_management_team import compute_management_team
-from app.analytics.a7_growth_drivers import compute_growth_drivers
-from app.analytics.a8_financial_integrity import compute_financial_integrity
+from app.analytics.ebitda_basis import ebitda_basis_for_company
 from app.analytics.a9_drs_composite import CategoryScores, compute_drs
 from app.analytics.a10_enterprise_value import compute_enterprise_value
+from app.analytics.market_benchmarks import get_market_multiple_context
 from app.analytics.a11_value_gap import compute_value_gap
 from app.analytics.a13_buyer_questions import generate_buyer_questions
+from app.core.config import settings
+from app.core.scoring_rules import SCORING_RULES
+from app.ontology.models import Company
+from app.services.analytics_service import compute_category_modules
+from app.services.company_logo_storage import resolve_company_logo_path
 
 
 # ── Color palette ──────────────────────────────────────────────────────────────
@@ -79,22 +80,33 @@ def _score_color(score: float) -> tuple[int, int, int]:
 class _BasePDF(FPDF):
     """Shared header/footer for all report types."""
 
-    _company_name = "Meridian Consulting Group"
+    _company_name = "ABC Company Inc"
     _report_title = "Advisory Report"
     _report_date  = ""
+    _brand_primary = "FRACTURE SYSTEMS"
+    _brand_sub = "Pre-Diligence Platform"
+    _logo_path: Optional[str] = None
 
     def header(self):
         # Dark header bar
         self.set_fill_color(*_DARK)
         self.rect(0, 0, 210, 18, "F")
+        x_text = 10
+        lp = getattr(self, "_logo_path", None)
+        if lp:
+            try:
+                self.image(lp, x=10, y=3, h=12)
+                x_text = 24
+            except Exception:
+                pass
         self.set_text_color(*_WHITE)
         self.set_font("Helvetica", "B", 10)
-        self.set_xy(10, 4)
-        self.cell(0, 5, "FRACTURE SYSTEMS | Pre-Diligence Platform", ln=False)
+        self.set_xy(x_text, 4)
+        self.cell(0, 5, _safe(f"{self._brand_primary} | {self._brand_sub}"), ln=False)
         self.set_font("Helvetica", "", 8)
-        self.set_xy(10, 10)
+        self.set_xy(x_text, 10)
         self.set_text_color(160, 160, 180)
-        self.cell(0, 5, f"{self._report_title}  |  {self._company_name}  |  {self._report_date}")
+        self.cell(0, 5, _safe(f"{self._report_title}  |  {self._company_name}  |  {self._report_date}"), ln=False)
         self.set_y(22)
 
     def footer(self):
@@ -176,13 +188,15 @@ class _BasePDF(FPDF):
 # ── Report: DRS Summary ────────────────────────────────────────────────────────
 
 def _build_drs_summary(pdf: _BasePDF, company_id: int, db: Session):
-    rev    = compute_revenue_quality(company_id, db)
-    ops    = compute_operational_independence(company_id, db)
-    cust   = compute_customer_risk(company_id, db)
-    mgmt   = compute_management_team(company_id, db)
-    growth = compute_growth_drivers(company_id, db)
-    fin    = compute_financial_integrity(company_id, db)
+    modules = compute_category_modules(company_id, db)
+    rev = modules["revenue_quality"]
+    ops = modules["operational_independence"]
+    cust = modules["customer_risk"]
+    mgmt = modules["management_team"]
+    growth = modules["growth_drivers"]
+    fin = modules["financial_integrity"]
     metrics = compute_metrics(company_id, db)
+    basis = ebitda_basis_for_company(company_id, db)
 
     cat = CategoryScores(
         revenue_quality=rev.composite,
@@ -195,7 +209,9 @@ def _build_drs_summary(pdf: _BasePDF, company_id: int, db: Session):
     drs = compute_drs(cat)
 
     from decimal import Decimal as _D
-    ev = compute_enterprise_value(_D(str(round(float(metrics.ebitda_ttm), 2))), drs.tier)
+    ebitda_f = float(basis["ebitda_normalized_ttm"])
+    mctx = get_market_multiple_context(db, company_id, ebitda_f)
+    ev = compute_enterprise_value(_D(str(round(ebitda_f, 2))), drs.tier, market_context=mctx)
 
     tier_color = _EMERALD if drs.tier.value == "Investment Grade" else _AMBER
 
@@ -231,7 +247,14 @@ def _build_drs_summary(pdf: _BasePDF, company_id: int, db: Session):
         ("Management & Team",        mgmt.composite,   mgmt.data_confidence),
         ("Growth Drivers",           growth.composite, growth.data_confidence),
     ]
-    weights = [0.25, 0.20, 0.20, 0.15, 0.10, 0.10]
+    weights = [
+        SCORING_RULES.category_weights["revenue_quality"],
+        SCORING_RULES.category_weights["financial_integrity"],
+        SCORING_RULES.category_weights["operational_independence"],
+        SCORING_RULES.category_weights["customer_risk"],
+        SCORING_RULES.category_weights["management_team"],
+        SCORING_RULES.category_weights["growth_drivers"],
+    ]
 
     for i, ((label, score, conf), w) in enumerate(zip(cats, weights)):
         y = pdf.get_y()
@@ -259,8 +282,8 @@ def _build_drs_summary(pdf: _BasePDF, company_id: int, db: Session):
         "management_team":          mgmt.composite,
         "growth_drivers":           growth.composite,
     })
-    critical = [q for q in questions if q.severity == "CRITICAL"][:3]
-    high     = [q for q in questions if q.severity == "HIGH"][:3]
+    critical = [q for q in questions if q.severity == "CRITICAL"][: settings.REPORT_TOP_CRITICAL_COUNT]
+    high = [q for q in questions if q.severity == "HIGH"][: settings.REPORT_TOP_HIGH_COUNT]
 
     if critical or high:
         pdf.section_title("Top Due Diligence Risks")
@@ -288,10 +311,10 @@ def _build_drs_summary(pdf: _BasePDF, company_id: int, db: Session):
         {"revenue_quality": rev.composite, "financial_integrity": fin.composite,
          "operational_independence": ops.composite, "customer_risk": cust.composite,
          "management_team": mgmt.composite, "growth_drivers": growth.composite},
-        float(metrics.ebitda_ttm),
+        float(basis["ebitda_normalized_ttm"]),
     )
 
-    for i, gap in enumerate(gaps_result.gaps[:5], 1):
+    for i, gap in enumerate(gaps_result.gaps[: settings.REPORT_IMMEDIATE_ACTION_COUNT], 1):
         y = pdf.get_y()
         if i % 2 == 1:
             pdf.set_fill_color(250, 250, 252)
@@ -319,13 +342,15 @@ def _build_drs_summary(pdf: _BasePDF, company_id: int, db: Session):
 # ── Report: Value Gap ──────────────────────────────────────────────────────────
 
 def _build_value_gap(pdf: _BasePDF, company_id: int, db: Session):
-    rev    = compute_revenue_quality(company_id, db)
-    ops    = compute_operational_independence(company_id, db)
-    cust   = compute_customer_risk(company_id, db)
-    mgmt   = compute_management_team(company_id, db)
-    growth = compute_growth_drivers(company_id, db)
-    fin    = compute_financial_integrity(company_id, db)
+    modules = compute_category_modules(company_id, db)
+    rev = modules["revenue_quality"]
+    ops = modules["operational_independence"]
+    cust = modules["customer_risk"]
+    mgmt = modules["management_team"]
+    growth = modules["growth_drivers"]
+    fin = modules["financial_integrity"]
     metrics = compute_metrics(company_id, db)
+    basis = ebitda_basis_for_company(company_id, db)
 
     cat_scores = {
         "revenue_quality":          rev.composite,
@@ -335,7 +360,7 @@ def _build_value_gap(pdf: _BasePDF, company_id: int, db: Session):
         "management_team":          mgmt.composite,
         "growth_drivers":           growth.composite,
     }
-    ebitda = float(metrics.ebitda_ttm)
+    ebitda = float(basis["ebitda_normalized_ttm"])
     vg = compute_value_gap(company_id, cat_scores, ebitda)
 
     pdf.add_page()
@@ -430,12 +455,13 @@ def _build_value_gap(pdf: _BasePDF, company_id: int, db: Session):
 # ── Report: Buyer Preparation Package ─────────────────────────────────────────
 
 def _build_buyer_prep(pdf: _BasePDF, company_id: int, db: Session):
-    rev    = compute_revenue_quality(company_id, db)
-    ops    = compute_operational_independence(company_id, db)
-    cust   = compute_customer_risk(company_id, db)
-    mgmt   = compute_management_team(company_id, db)
-    growth = compute_growth_drivers(company_id, db)
-    fin    = compute_financial_integrity(company_id, db)
+    modules = compute_category_modules(company_id, db)
+    rev = modules["revenue_quality"]
+    ops = modules["operational_independence"]
+    cust = modules["customer_risk"]
+    mgmt = modules["management_team"]
+    growth = modules["growth_drivers"]
+    fin = modules["financial_integrity"]
 
     cat_scores = {
         "revenue_quality":          rev.composite,
@@ -521,27 +547,160 @@ def _build_buyer_prep(pdf: _BasePDF, company_id: int, db: Session):
             _question_block(q, i)
 
 
+# ── Report: EBITDA Recast ─────────────────────────────────────────────────────
+
+def _build_ebitda_recast_pdf(pdf: _BasePDF, company_id: int, db: Session):
+    from app.api.routes.analytics import _build_recast_payload
+
+    payload = _build_recast_payload(company_id, db)
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_text_color(*_TEXT)
+    pdf.cell(0, 10, "EBITDA Recast Schedule", ln=True)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(*_SUBTEXT)
+    pdf.multi_cell(
+        0, 5,
+        _safe(
+            f"Proxy {_fmt_m(payload.get('ebitda_proxy_ttm', 0))} + D&A -> reported "
+            f"{_fmt_m(payload.get('reported_ebitda', 0))} before addbacks."
+        ),
+        ln=True,
+    )
+    pdf.ln(2)
+    y0 = pdf.get_y()
+    pdf.kpi_box(10, y0, 48, 22, "CONSERVATIVE", _fmt_m(payload["conservative_ebitda"]), "LOW addbacks only", _RED)
+    pdf.kpi_box(60, y0, 48, 22, "BASE", _fmt_m(payload["base_ebitda"]), "Defensible case", _PRIMARY)
+    pdf.kpi_box(110, y0, 48, 22, "AGGRESSIVE", _fmt_m(payload["aggressive_ebitda"]), "All qualifying addbacks", _EMERALD)
+    pdf.set_y(y0 + 26)
+    pdf.section_title("Data notes")
+    for n in payload.get("data_notes", []):
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*_SUBTEXT)
+        pdf.multi_cell(0, 4, _safe(n), ln=True)
+    pdf.ln(2)
+    pdf.section_title("Addback schedule")
+    for ab in payload.get("addback_schedule", [])[:35]:
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(*_TEXT)
+        pdf.cell(0, 5, _safe(ab.get("description", "Item")), ln=True)
+        pdf.set_font("Helvetica", "", 7)
+        pdf.set_text_color(*_MUTED)
+        line = (
+            f"Amount {_fmt_m(ab.get('amount', 0))}  |  {ab.get('challenge_label') or ab.get('challenge', '')}  |  "
+            f"{_safe(ab.get('notes', '') or '')[:120]}"
+        )
+        pdf.multi_cell(0, 4, line, ln=True)
+        pdf.ln(1)
+
+
+# ── Report: Company profile teaser ────────────────────────────────────────────
+
+def _build_company_profile(pdf: _BasePDF, company_id: int, db: Session):
+    co = db.query(Company).filter(Company.id == company_id).first()
+    metrics = compute_metrics(company_id, db)
+    basis = ebitda_basis_for_company(company_id, db)
+    modules = compute_category_modules(company_id, db)
+    rev = modules["revenue_quality"]
+    fin = modules["financial_integrity"]
+    ops = modules["operational_independence"]
+    cust = modules["customer_risk"]
+    mgmt = modules["management_team"]
+    growth = modules["growth_drivers"]
+    cat = CategoryScores(
+        revenue_quality=rev.composite,
+        financial_integrity=fin.composite,
+        operational_independence=ops.composite,
+        customer_risk=cust.composite,
+        management_team=mgmt.composite,
+        growth_drivers=growth.composite,
+    )
+    drs = compute_drs(cat)
+    from decimal import Decimal as _D
+    ebitda_f = float(basis["ebitda_normalized_ttm"])
+    mctx = get_market_multiple_context(db, company_id, ebitda_f)
+    ev = compute_enterprise_value(_D(str(round(ebitda_f, 2))), drs.tier, market_context=mctx)
+
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 22)
+    pdf.set_text_color(*_TEXT)
+    pdf.cell(0, 10, _safe(co.name if co else "Company Profile"), ln=True)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(*_SUBTEXT)
+    ind = (co.industry or "Industry TBD") if co else ""
+    pdf.cell(0, 6, _safe(f"{ind}  |  Confidential teaser"), ln=True)
+    pdf.ln(4)
+    if co and co.report_cover_blurb:
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(*_TEXT)
+        pdf.multi_cell(0, 5, _safe(co.report_cover_blurb[:800]), ln=True)
+        pdf.ln(3)
+    pdf.section_title("Highlights")
+    pdf.set_font("Helvetica", "", 9)
+    rows = [
+        ("TTM revenue", _fmt_m(float(metrics.total_revenue_ttm))),
+        ("Reported EBITDA (normalized)", _fmt_m(ebitda_f)),
+        ("DRS score", f"{drs.base_drs:.1f} / 100 ({drs.tier.value})"),
+        ("Indicative EV (mid)", _fmt_m(float(ev.ev_midpoint))),
+    ]
+    for label, val in rows:
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_text_color(*_MUTED)
+        pdf.cell(70, 6, label, ln=False)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(*_TEXT)
+        pdf.cell(0, 6, val, ln=True)
+    pdf.ln(4)
+    pdf.section_title("Investment considerations")
+    pdf.set_font("Helvetica", "", 8)
+    pdf.multi_cell(
+        0, 4,
+        _safe(
+            "This one-pager is illustrative and not an offering memorandum. "
+            "Engage qualified M&A counsel and tax advisors before marketing the business."
+        ),
+        ln=True,
+    )
+
+
 # ── Public interface ───────────────────────────────────────────────────────────
 
 REPORT_BUILDERS = {
     "drs_summary": (_build_drs_summary, "DRS Readiness Summary"),
-    "value_gap":   (_build_value_gap,   "Value Gap Analysis"),
-    "buyer_prep":  (_build_buyer_prep,  "Buyer Preparation Package"),
+    "value_gap": (_build_value_gap, "Value Gap Analysis"),
+    "buyer_prep": (_build_buyer_prep, "Buyer Preparation Package"),
+    "ebitda_recast": (_build_ebitda_recast_pdf, "EBITDA Recast Schedule"),
+    "company_profile": (_build_company_profile, "Company Profile Teaser"),
 }
 
 
 def generate_report_pdf(report_type: str, company_id: int, db: Session,
-                         company_name: str = "Meridian Consulting Group") -> bytes:
+                        company_name: str = "ABC Company Inc") -> bytes:
     """
     Generate a PDF report and return its bytes.
     Raises KeyError for unknown report_type.
     """
     builder_fn, title = REPORT_BUILDERS[report_type]
 
+    co = db.query(Company).filter(Company.id == company_id).first()
+    display_name = co.name if co and co.name else company_name
+    firm = (co.report_firm_name or "").strip() if co else ""
+    if not firm:
+        firm = "FRACTURE SYSTEMS"
+
     pdf = _BasePDF(orientation="P", unit="mm", format="A4")
-    pdf._company_name = company_name
+    pdf._company_name = display_name
     pdf._report_title = title
-    pdf._report_date  = date.today().strftime("%B %d, %Y")
+    pdf._report_date = date.today().strftime("%B %d, %Y")
+    pdf._brand_primary = firm[:120]
+    pdf._brand_sub = "Pre-Diligence Platform"
+    logo_p = resolve_company_logo_path(company_id)
+    if logo_p:
+        pdf._logo_path = str(logo_p)
+    elif co and (co.report_logo_url or "").strip().lower().startswith(("http://", "https://")):
+        pdf._logo_path = (co.report_logo_url or "").strip()
+    else:
+        pdf._logo_path = None
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.set_margins(10, 10, 10)
 

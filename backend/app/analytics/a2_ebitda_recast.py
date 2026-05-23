@@ -107,7 +107,9 @@ def compute_ebitda_recast(metrics: MetricRegistry, raw_inputs: dict) -> EBITDARe
             r.aggressive_ebitda   += ab.amount
 
         elif ab.challenge == ChallengeLikelihood.MEDIUM:
-            r.conservative_ebitda += ab.amount * Decimal("0.5")
+            # Conservative: excludes MEDIUM (challenge risk too high)
+            # Base: 50% of MEDIUM (partially defensible)
+            # Aggressive: 100% of MEDIUM
             r.base_ebitda         += ab.amount * Decimal("0.5")
             r.aggressive_ebitda   += ab.amount
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from app.core.scoring_rules import SCORING_RULES
 
 class DRSTier(str, Enum):
     INSTITUTIONAL  = "Institutional Grade"   # 85–100
@@ -60,14 +61,7 @@ class CategoryScores:
                 setattr(self, f"{attr}_optimistic", getattr(self, attr))
 
 
-WEIGHTS = {
-    "revenue_quality":          0.25,
-    "financial_integrity":      0.20,
-    "operational_independence": 0.20,
-    "customer_risk":            0.15,
-    "management_team":          0.10,
-    "growth_drivers":           0.10,
-}
+WEIGHTS = SCORING_RULES.category_weights
 
 
 @dataclass
@@ -79,19 +73,29 @@ class DRSResult:
     category_contributions: dict[str, float]
 
 
-def _weighted_sum(scores: dict[str, float]) -> float:
-    return sum(scores[k] * WEIGHTS[k] for k in WEIGHTS)
+def _weighted_sum(scores: dict[str, float], weights: dict[str, float]) -> float:
+    return sum(scores[k] * weights[k] for k in weights)
 
 
 def _classify_tier(drs: float) -> DRSTier:
-    if drs >= 85: return DRSTier.INSTITUTIONAL
-    if drs >= 70: return DRSTier.INVESTMENT
-    if drs >= 55: return DRSTier.CONDITIONAL
-    if drs >= 40: return DRSTier.HIGH_RISK
+    for threshold, tier_name in SCORING_RULES.drs_tier_thresholds:
+        if drs >= threshold:
+            return DRSTier[tier_name]
     return DRSTier.PRE_DILIGENCE
 
 
-def compute_drs(scores: CategoryScores) -> DRSResult:
+def compute_drs(
+    scores: CategoryScores,
+    weights: dict[str, float] | None = None,
+) -> DRSResult:
+    """
+    Compute the DRS composite.
+
+    Pass ``weights`` to apply a buyer-type profile (e.g. BUYER_WEIGHT_PROFILES["pe"]).
+    When omitted, the default SCORING_RULES.category_weights are used.
+    """
+    w = weights if weights is not None else WEIGHTS
+
     base_scores = {
         "revenue_quality":          scores.revenue_quality,
         "financial_integrity":      scores.financial_integrity,
@@ -117,11 +121,11 @@ def compute_drs(scores: CategoryScores) -> DRSResult:
         "growth_drivers":           scores.growth_drivers_optimistic,
     }
 
-    base_drs         = _weighted_sum(base_scores)
-    conservative_drs = _weighted_sum(conservative_scores)
-    optimistic_drs   = _weighted_sum(optimistic_scores)
+    base_drs         = _weighted_sum(base_scores, w)
+    conservative_drs = _weighted_sum(conservative_scores, w)
+    optimistic_drs   = _weighted_sum(optimistic_scores, w)
 
-    contributions = {k: base_scores[k] * WEIGHTS[k] for k in WEIGHTS}
+    contributions = {k: base_scores[k] * w[k] for k in w}
 
     return DRSResult(
         base_drs=round(base_drs, 1),

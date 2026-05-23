@@ -46,6 +46,7 @@ backend/data/uploads/
 
 # Reports output
 backend/data/reports/
+backend/data/company_logos/
 
 # SQLite dev database
 *.db

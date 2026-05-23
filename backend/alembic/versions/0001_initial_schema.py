@@ -26,6 +26,7 @@ def upgrade() -> None:
         sa.Column("ein",         sa.String(32)),
         sa.Column("state",       sa.String(2)),
         sa.Column("entity_type", sa.String(32)),
+        if_not_exists=True,
     )
 
     # ── customers ──────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ def upgrade() -> None:
         sa.Column("confidence_level", sa.String(16),   server_default="MEDIUM"),
         sa.Column("ingested_at",      sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("reviewer_sign_off",sa.String(128)),
+        if_not_exists=True,
     )
 
     # ── employees ──────────────────────────────────────────────────────────
@@ -66,6 +68,7 @@ def upgrade() -> None:
         sa.Column("confidence_level", sa.String(16),   server_default="MEDIUM"),
         sa.Column("ingested_at",      sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("reviewer_sign_off",sa.String(128)),
+        if_not_exists=True,
     )
 
     # ── revenue_streams ────────────────────────────────────────────────────
@@ -85,6 +88,7 @@ def upgrade() -> None:
         sa.Column("confidence_level", sa.String(16),   server_default="MEDIUM"),
         sa.Column("ingested_at",      sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("reviewer_sign_off",sa.String(128)),
+        if_not_exists=True,
     )
 
     # ── expenses ───────────────────────────────────────────────────────────
@@ -104,6 +108,7 @@ def upgrade() -> None:
         sa.Column("confidence_level", sa.String(16),   server_default="MEDIUM"),
         sa.Column("ingested_at",      sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("reviewer_sign_off",sa.String(128)),
+        if_not_exists=True,
     )
 
     # ── contracts ──────────────────────────────────────────────────────────
@@ -125,6 +130,7 @@ def upgrade() -> None:
         sa.Column("confidence_level",  sa.String(16),   server_default="MEDIUM"),
         sa.Column("ingested_at",       sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("reviewer_sign_off", sa.String(128)),
+        if_not_exists=True,
     )
 
     # ── ingestion_jobs ─────────────────────────────────────────────────────
@@ -132,7 +138,7 @@ def upgrade() -> None:
         "ingestion_jobs",
         sa.Column("id",               sa.Integer,      primary_key=True),
         sa.Column("company_id",       sa.Integer,      sa.ForeignKey("companies.id"), nullable=False),
-        sa.Column("ingestion_id",     sa.String(128),  unique=True, index=True, nullable=False),
+        sa.Column("ingestion_id",     sa.String(128),  nullable=False),
         sa.Column("filename",         sa.String(512),  nullable=False),
         sa.Column("source_type",      sa.String(64)),
         sa.Column("file_path",        sa.String(1024)),
@@ -150,17 +156,37 @@ def upgrade() -> None:
         sa.Column("created_at",       sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("updated_at",       sa.DateTime,     server_default=sa.text("now()")),
         sa.Column("completed_at",     sa.DateTime),
+        if_not_exists=True,
     )
 
-    # ── seed a default company ─────────────────────────────────────────────
+    # ── ingestion_jobs indexes ─────────────────────────────────────────────
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    if "ingestion_jobs" in insp.get_table_names():
+        op.create_index(
+            "ix_ingestion_jobs_ingestion_id",
+            "ingestion_jobs",
+            ["ingestion_id"],
+            unique=True,
+            if_not_exists=True,
+        )
+
+    # ── seed a default company (idempotent — DB may already have id=1 from bootstrap or a retry)
     op.execute(
-        "INSERT INTO companies (id, name, industry, entity_type) "
-        "VALUES (1, 'Demo Company', 'Technology', 'LLC')"
+        """
+        INSERT INTO companies (id, name, industry, entity_type)
+        VALUES (1, 'Demo Company', 'Technology', 'LLC')
+        ON CONFLICT (id) DO NOTHING
+        """
     )
 
 
 def downgrade() -> None:
-    op.drop_table("ingestion_jobs")
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    if "ingestion_jobs" in insp.get_table_names():
+        op.drop_index("ix_ingestion_jobs_ingestion_id", table_name="ingestion_jobs", if_exists=True)
+        op.drop_table("ingestion_jobs")
     op.drop_table("contracts")
     op.drop_table("expenses")
     op.drop_table("revenue_streams")

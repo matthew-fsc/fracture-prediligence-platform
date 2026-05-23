@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, Zap, Mail } from 'lucide-react'
+import { apiClient } from '../../lib/apiClient'
 
 const COLORS = {
   bg: '#0C0E12',
@@ -17,13 +18,12 @@ const FEATURES = [
   'Founding rate locked for life at $179/mo',
 ]
 
-export default function ConversionModal({ isOpen, onClose, prefillEmail = '' }) {
+export default function ConversionModal({ isOpen, onClose, prefillEmail = '', slug = null }) {
   const [spotsRemaining, setSpotsRemaining] = useState(null)
 
   useEffect(() => {
     if (!isOpen) return
-    fetch('/api/spots-remaining')
-      .then((r) => r.ok ? r.json() : null)
+    apiClient.get('/api/spots-remaining')
       .then((d) => { if (d) setSpotsRemaining(d.spots_remaining) })
       .catch(() => {})
   }, [isOpen])
@@ -36,6 +36,18 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '' }) 
     `&body=${encodeURIComponent(
       'Hi Matthew,\n\nI\'d like to request a Founding Advisor license for the Pre-Diligence Platform.\n\nFirm: \nName: \nAny questions: \n'
     )}`
+
+  async function handleRequestClick(e) {
+    e.preventDefault()
+    if (slug) {
+      try {
+        await apiClient.post(`/api/demo/${slug}/mark-converted`)
+      } catch {
+        /* non-blocking */
+      }
+    }
+    window.location.href = mailtoHref
+  }
 
   return (
     <>
@@ -103,7 +115,7 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '' }) 
         <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px 0' }}>
           {FEATURES.map((feat) => (
             <li key={feat} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-              <span style={{ color: COLORS.gold, fontSize: 14, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>✓</span>
+              <span style={{ color: COLORS.gold, fontSize: 14, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>&#x2713;</span>
               <span style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontSize: 14, lineHeight: 1.5 }}>
                 {feat}
               </span>
@@ -137,15 +149,16 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '' }) 
           </div>
         </div>
 
-        {/* Primary CTA — mailto */}
+        {/* Primary CTA — records conversion for personalized links, then mailto */}
         <a
           href={mailtoHref}
+          onClick={handleRequestClick}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             width: '100%', background: COLORS.gold, color: COLORS.bg,
             fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 15,
             padding: '14px 20px', borderRadius: 8, textDecoration: 'none',
-            marginBottom: 12, boxSizing: 'border-box',
+            marginBottom: 12, boxSizing: 'border-box', cursor: 'pointer',
           }}
         >
           <Mail size={16} />

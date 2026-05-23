@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
-import { cn } from '../lib/utils'
-import { fmtM } from '../lib/utils'
+import { cn, fmtM } from '../lib/utils'
 import { Target, CheckCircle, Circle, Clock } from 'lucide-react'
-import { valueCreationLevers, kpis as mockKpis } from '../lib/mockData'
-
-const COMPANY_ID = 1
+import { useCompanyId } from '../context/CompanyContext'
+import { apiClient } from '../lib/apiClient'
+import { toast } from '../lib/notify'
+import { drsCategoryBadgeClass } from '../lib/drsCategoryColors'
 
 // Static initiative library for gap categories (live API fallback)
 const INITIATIVES_BY_CAT = {
@@ -34,42 +34,35 @@ const INITIATIVES_BY_CAT = {
   ],
 }
 
-const catColors = {
-  operations:    'bg-red-500/10 text-red-400 border-red-500/20',
-  revenue:       'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  margin:        'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  documentation: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  revenue_quality: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  operational_independence: 'bg-red-500/10 text-red-400 border-red-500/20',
-  customer_risk: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  management_team: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  financial_integrity: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  growth_drivers: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-}
-
-function buildMockDrivers() {
-  return valueCreationLevers.map(d => ({
-    initiative: d.initiative,
-    detail: d.detail,
-    valueMin: d.valueMin,
-    valueMax: d.valueMax,
-    timeline: d.timeline,
-    severity: d.severity,
-    category: d.rank <= 2 ? 'operations' : d.rank === 3 ? 'margin' : d.rank === 4 ? 'revenue' : 'documentation',
-    months: parseInt(d.timeline) || 9,
-  }))
-}
-
 export default function InitiativeImpact() {
+  const companyId = useCompanyId()
   const [selected, setSelected] = useState(new Set())
   const [gapData, setGapData] = useState(null)
+  const [customInits, setCustomInits] = useState([])
+  const [newTitle, setNewTitle] = useState('')
+  const [newCat, setNewCat] = useState('revenue_quality')
 
   useEffect(() => {
-    fetch(`/api/analytics/value-gap/${COMPANY_ID}`)
-      .then(r => r.ok ? r.json() : null)
+    apiClient.get(`/api/analytics/value-gap/${companyId}`)
       .then(setGapData)
-      .catch(() => {})
-  }, [])
+      .catch((err) => {
+        // Non-fatal: value gap chart degrades gracefully when unavailable
+        console.error('[InitiativeImpact] value-gap fetch failed:', err?.message)
+      })
+  }, [companyId])
+
+  const [libraryInits, setLibraryInits] = useState([])
+
+  useEffect(() => {
+    if (companyId == null || companyId < 1) return
+    Promise.all([
+      apiClient.get(`/api/analytics/initiatives/${companyId}`).catch(() => ({ initiatives: [] })),
+      apiClient.get(`/api/library/?item_type=initiative&is_active=true`).catch(() => ({ items: [] })),
+    ]).then(([d, lib]) => {
+      setCustomInits(d.initiatives ?? [])
+      setLibraryInits(lib.items ?? [])
+    })
+  }, [companyId])
 
   const toggle = (id) => {
     const s = new Set(selected)
@@ -77,32 +70,95 @@ export default function InitiativeImpact() {
     setSelected(s)
   }
 
-  // Build driver list: from live gap data or mock
-  const DRIVERS = gapData?.gaps
-    ? gapData.gaps.flatMap((g, gi) =>
-        (INITIATIVES_BY_CAT[g.category] ?? []).map((init, ii) => ({
-          initiative: init.title,
-          detail: init.description,
-          valueMin: (g.ev_uplift * 0.6) / (INITIATIVES_BY_CAT[g.category]?.length || 1),
-          valueMax: g.ev_uplift / (INITIATIVES_BY_CAT[g.category]?.length || 1),
-          timeline: init.timeline,
-          severity: g.priority <= 1 ? 'critical' : 'high',
-          category: g.category,
-          months: 9,
-        }))
-      )
-    : buildMockDrivers()
+  // Scale individual uplifts so they sum to total_value_gap before distributing across sub-initiatives
+  const rawUpliftSum = gapData?.gaps?.reduce((s, g) => s + g.ev_uplift, 0) ?? 0
+  const gapTotal     = gapData?.total_value_gap ?? rawUpliftSum
+  const upliftScale  = rawUpliftSum > 0 ? gapTotal / rawUpliftSum : 1
+
+  // Build per-category initiative lookup — prefer library items, fall back to static map
+  const initsByCat = Object.fromEntries(
+    Object.keys(INITIATIVES_BY_CAT).map(cat => {
+      const libItems = libraryInits.filter(i => i.category === cat)
+      return [cat, libItems.length > 0 ? libItems : INITIATIVES_BY_CAT[cat]]
+    })
+  )
+
+  const DRIVERS = gapData?.gaps?.length
+    ? [
+        ...gapData.gaps.flatMap((g) => {
+          const inits = initsByCat[g.category] ?? INITIATIVES_BY_CAT[g.category] ?? []
+          const scaledUplift = g.ev_uplift * upliftScale
+          const n = inits.length || 1
+          return inits.map((init) => ({
+            initiative: init.title,
+            detail:    init.description,
+            valueMin:  Math.round(scaledUplift * 0.75 / n),
+            valueMax:  Math.round(scaledUplift / n),
+            timeline:  init.timeline,
+            severity:  g.priority === 1 ? 'critical' : g.priority <= 3 ? 'high' : 'medium',
+            category:  g.category,
+            months:    g.priority <= 1 ? 18 : g.priority <= 3 ? 12 : 6,
+          }))
+        }),
+        ...customInits.map(c => ({
+          initiative: c.title,
+          detail:    `Custom · ${c.timeline || 'Timeline TBD'}`,
+          valueMin:  c.advisor_ev_override != null
+            ? Math.round(c.advisor_ev_override * 0.9)
+            : c.ev_impact_estimate != null
+              ? Math.round(Number(c.ev_impact_estimate) * 0.75)
+              : 0,
+          valueMax:  c.advisor_ev_override != null
+            ? Math.round(c.advisor_ev_override)
+            : c.ev_impact_estimate != null
+              ? Math.round(Number(c.ev_impact_estimate))
+              : 0,
+          timeline:  c.timeline || '—',
+          severity:  'medium',
+          category:  c.category || 'growth_drivers',
+          months:    12,
+          customId:  c.id,
+        })),
+      ]
+    : customInits.map(c => ({
+        initiative: c.title,
+        detail:    'Advisor-defined initiative',
+        valueMin:  c.advisor_ev_override != null ? Math.round(c.advisor_ev_override * 0.9) : 0,
+        valueMax:  c.advisor_ev_override != null ? Math.round(c.advisor_ev_override) : Math.round(Number(c.ev_impact_estimate || 0)),
+        timeline:  c.timeline || '—',
+        severity:  'medium',
+        category:  c.category || 'growth_drivers',
+        months:    12,
+        customId:  c.id,
+      }))
 
   const active = DRIVERS.filter((_, i) => selected.has(i))
   const totalEVMin = active.reduce((s, d) => s + (d.valueMin || 0), 0)
   const totalEVMax = active.reduce((s, d) => s + (d.valueMax || 0), 0)
   const maxMonths = active.length > 0 ? Math.max(...active.map(d => d.months || 9)) : 0
-  const maxVal = Math.max(...DRIVERS.map(d => d.valueMax || 1))
+  const maxVal = DRIVERS.length ? Math.max(...DRIVERS.map(d => d.valueMax || 1)) : 1
+
+  async function addCustomInitiative(e) {
+    e.preventDefault()
+    if (!newTitle.trim() || companyId == null || companyId < 1) return
+    try {
+      const created = await apiClient.post(`/api/analytics/initiatives/${companyId}`, {
+        title: newTitle.trim(),
+        category: newCat,
+        ev_impact_estimate: null,
+      })
+      setCustomInits((prev) => [created, ...prev])
+      setNewTitle('')
+      toast.success('Initiative added')
+    } catch (err) {
+      toast.error(err?.message || 'Could not add initiative')
+    }
+  }
 
   return (
     <div className="space-y-4 max-w-[1400px]">
       <div>
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-0.5">Value Creation</p>
+        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-0.5">Value Creation</p>
         <h1 className="text-xl font-bold text-foreground">Initiative Impact Modeling</h1>
         <p className="text-sm text-muted-foreground">Select initiatives to model combined enterprise value impact and projected timeline</p>
       </div>
@@ -112,16 +168,16 @@ export default function InitiativeImpact() {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-6">
               <div>
-                <p className="text-[9px] text-muted-foreground uppercase tracking-wider">EV Increase</p>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider">EV Increase</p>
                 <p className="text-xl font-bold text-emerald-400">+{fmtM(totalEVMin)}–{fmtM(totalEVMax)}</p>
               </div>
               <div>
-                <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Time to Realize</p>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Time to Realize</p>
                 <p className="text-xl font-bold text-foreground">{maxMonths} months</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-semibold px-2 py-1 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">
+              <span className="text-[11px] font-semibold px-2 py-1 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">
                 {selected.size} of {DRIVERS.length} selected
               </span>
               <button onClick={() => setSelected(new Set())}
@@ -136,7 +192,12 @@ export default function InitiativeImpact() {
       <div className="grid grid-cols-12 gap-4">
         {/* Initiative list */}
         <div className="col-span-12 lg:col-span-7 space-y-2">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Value Creation Initiatives · Ranked by Impact</p>
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Value Creation Initiatives · Ranked by Impact</p>
+          {DRIVERS.length === 0 && (
+            <p className="text-sm text-muted-foreground rounded-xl border border-border bg-card p-6 text-center">
+              No initiatives to show — resolve value-gap data or add a custom initiative below.
+            </p>
+          )}
           {DRIVERS.map((d, i) => {
             const isActive = selected.has(i)
             return (
@@ -154,13 +215,13 @@ export default function InitiativeImpact() {
                         +{fmtM(d.valueMin)}–{fmtM(d.valueMax)}
                       </span>
                     </div>
-                    <p className="text-[10px] text-muted-foreground mb-2">{d.detail}</p>
+                    <p className="text-[11px] text-muted-foreground mb-2">{d.detail}</p>
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <span className={cn('text-[9px] font-semibold px-1.5 py-0.5 rounded border', catColors[d.category] || 'border-border text-muted-foreground')}>{d.category?.replace('_', ' ')}</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded border border-border text-muted-foreground flex items-center gap-0.5">
+                      <span className={cn('text-[11px] font-semibold px-1.5 py-0.5 rounded border', drsCategoryBadgeClass(d.category))}>{d.category?.replace(/_/g, ' ')}</span>
+                      <span className="text-[11px] px-1.5 py-0.5 rounded border border-border text-muted-foreground flex items-center gap-0.5">
                         <Clock className="w-2.5 h-2.5" />{d.timeline}
                       </span>
-                      {d.severity && <span className={cn('text-[9px] px-1.5 py-0.5 rounded border font-semibold',
+                      {d.severity && <span className={cn('text-[11px] px-1.5 py-0.5 rounded border font-semibold',
                         d.severity === 'critical' ? 'border-red-500/20 bg-red-500/10 text-red-400' :
                         d.severity === 'high' ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' :
                         'border-border text-muted-foreground')}>{d.severity}</span>}
@@ -181,11 +242,11 @@ export default function InitiativeImpact() {
               const widthPct = (d.valueMax / maxVal) * 100
               return (
                 <div key={i} className="flex items-center gap-2 mb-2">
-                  <span className="text-[9px] text-muted-foreground w-28 truncate flex-shrink-0">{d.initiative.split(' ').slice(0, 2).join(' ')}</span>
+                  <span className="text-[11px] text-muted-foreground w-28 truncate flex-shrink-0">{d.initiative.split(' ').slice(0, 2).join(' ')}</span>
                   <div className="flex-1 h-4 bg-muted/30 rounded relative">
                     <div className={cn('h-full rounded transition-all', isActive ? 'bg-emerald-500/70' : 'bg-muted/60')}
                       style={{ width: `${widthPct}%` }} />
-                    <span className="absolute right-1 top-0 h-full flex items-center text-[8px] text-muted-foreground">+{fmtM(d.valueMax)}</span>
+                    <span className="absolute right-1 top-0 h-full flex items-center text-[11px] text-muted-foreground">+{fmtM(d.valueMax)}</span>
                   </div>
                 </div>
               )
@@ -194,7 +255,7 @@ export default function InitiativeImpact() {
 
           <div className="rounded-xl border border-border bg-card p-4">
             <p className="text-xs font-semibold text-foreground mb-3">Implementation Timeline</p>
-            <div className="flex justify-between text-[9px] text-muted-foreground mb-3">
+            <div className="flex justify-between text-[11px] text-muted-foreground mb-3">
               {[0, 3, 6, 9, 12].map(m => <span key={m}>{m}mo</span>)}
             </div>
             {DRIVERS.map((d, i) => {
@@ -202,11 +263,11 @@ export default function InitiativeImpact() {
               const widthPct = Math.min(((d.months || 9) / 12) * 100, 100)
               return (
                 <div key={i} className="flex items-center gap-2 mb-2">
-                  <span className="text-[9px] text-muted-foreground w-28 truncate flex-shrink-0">{d.initiative.split(' ').slice(0, 2).join(' ')}</span>
+                  <span className="text-[11px] text-muted-foreground w-28 truncate flex-shrink-0">{d.initiative.split(' ').slice(0, 2).join(' ')}</span>
                   <div className="flex-1 h-4 bg-muted/30 rounded relative">
                     <div className={cn('h-full rounded transition-all', isActive ? 'bg-emerald-500/40' : 'bg-muted/60')}
                       style={{ width: `${widthPct}%` }} />
-                    <span className="absolute right-1 top-0 h-full flex items-center text-[8px] text-muted-foreground">{d.months || 9}mo</span>
+                    <span className="absolute right-1 top-0 h-full flex items-center text-[11px] text-muted-foreground">{d.months || 9}mo</span>
                   </div>
                 </div>
               )
@@ -218,7 +279,7 @@ export default function InitiativeImpact() {
             <div className="space-y-2 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Current Enterprise Value</span>
-                <span className="font-bold text-foreground">{fmtM(mockKpis.currentEV)}</span>
+                <span className="font-bold text-foreground">{fmtM((gapData?.current_ev_midpoint ?? 0))}</span>
               </div>
               {selected.size > 0 && (
                 <div className="flex justify-between text-emerald-400">
@@ -230,12 +291,49 @@ export default function InitiativeImpact() {
                 <span className="font-semibold text-foreground">Projected EV</span>
                 <span className="font-bold text-emerald-400 text-sm">
                   {selected.size > 0
-                    ? `${fmtM(mockKpis.currentEV + totalEVMin)}–${fmtM(mockKpis.currentEV + totalEVMax)}`
-                    : fmtM(mockKpis.currentEV)}
+                    ? `${fmtM((gapData?.current_ev_midpoint ?? 0) + totalEVMin)}–${fmtM((gapData?.current_ev_midpoint ?? 0) + totalEVMax)}`
+                    : fmtM((gapData?.current_ev_midpoint ?? 0))}
                 </span>
               </div>
             </div>
           </div>
+
+          <form onSubmit={addCustomInitiative} className="rounded-xl border border-border bg-card p-4 space-y-3">
+            <p className="text-xs font-semibold text-foreground">Add custom initiative</p>
+            <p className="text-[11px] text-muted-foreground">
+              Stored per company and shown alongside template initiatives from the value gap.
+            </p>
+            <div className="flex flex-wrap gap-2 items-end">
+              <div className="flex-1 min-w-[160px]">
+                <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Title</label>
+                <input
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="w-full text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-muted-foreground placeholder:text-muted-foreground/45 focus:text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  placeholder="e.g. Implement weekly KPI cadence"
+                />
+              </div>
+              <div className="w-44">
+                <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Category</label>
+                <select
+                  value={newCat}
+                  onChange={(e) => setNewCat(e.target.value)}
+                  className="w-full text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-muted-foreground focus:text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                >
+                  {Object.keys(INITIATIVES_BY_CAT).map((k) => (
+                    <option key={k} value={k}>{k.replace(/_/g, ' ')}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="submit"
+                disabled={!newTitle.trim()}
+                className="text-xs font-semibold px-3 py-2 rounded-lg bg-primary text-primary-foreground disabled:opacity-40"
+              >
+                Add
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

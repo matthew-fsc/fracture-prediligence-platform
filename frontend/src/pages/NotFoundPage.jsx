@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import { usePageTitle } from '../hooks/usePageTitle'
-
-const COLORS = { bg: '#0A1628', gold: '#C9973A', muted: '#8A9BB0', offWhite: '#F0EDE8', border: '#1E3A5F' }
+import { marketingColors as COLORS } from '../theme/marketingColors'
 
 export default function NotFoundPage() {
   usePageTitle('404 — Page Not Found')
@@ -29,13 +28,13 @@ export default function NotFoundPage() {
           to="/"
           style={{ background: COLORS.gold, color: COLORS.bg, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 14, padding: '12px 28px', borderRadius: 8, textDecoration: 'none' }}
         >
-          Go Home →
+          Go Home ?
         </Link>
         <Link
-          to="/demo"
+          to="/request-demo"
           style={{ border: `1.5px solid ${COLORS.gold}`, color: COLORS.gold, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 14, padding: '12px 28px', borderRadius: 8, textDecoration: 'none' }}
         >
-          View Demo
+          Request live demo
         </Link>
       </div>
     </div>

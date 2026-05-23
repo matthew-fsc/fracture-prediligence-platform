@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
+from app.analytics.a1_metric_computation import effective_total_headcount
+from app.ontology.models import Company
 from app.ontology.models import Employee, RevenueStream, EmployeeStatus
 
 
@@ -54,7 +56,7 @@ class ManagementTeamScore:
             "composite":  self.composite,
             "sub_scores": {
                 "completeness":  {"score": self.completeness_score,  "value": self.mgmt_count,             "label": f"{self.mgmt_count} management roles"},
-                "size":          {"score": self.size_score,          "value": self.revenue_per_employee,   "label": f"${self.revenue_per_employee:,.0f} revenue per employee"},
+                "size":          {"score": self.size_score,          "value": self.revenue_per_employee,   "label": f"${self.revenue_per_employee:,.0f} revenue per employee · {self.total_headcount} FTE"},
                 "ownership":     {"score": self.ownership_score,     "value": self.owner_count,            "label": f"{self.owner_count} owner(s)"},
                 "role_coverage": {"score": self.role_coverage_score, "value": None,                        "label": f"Finance:{self.has_finance_role} Sales:{self.has_sales_role} Ops:{self.has_ops_role}"},
             },
@@ -75,26 +77,31 @@ def compute_management_team(company_id: int, db: Session) -> ManagementTeamScore
     employees = db.query(Employee).filter(Employee.company_id == company_id).all()
     revenue   = db.query(RevenueStream).filter(RevenueStream.company_id == company_id).all()
 
+    company_row = db.query(Company).filter(Company.id == company_id).first()
+
     if not employees:
+        total_hc = effective_total_headcount(company_row, 0)
         return ManagementTeamScore(
             company_id=company_id, composite=50.0,
             completeness_score=50.0, size_score=50.0,
             ownership_score=50.0, role_coverage_score=50.0,
-            mgmt_count=0, total_headcount=0, revenue_per_employee=0.0,
+            mgmt_count=0, total_headcount=total_hc, revenue_per_employee=0.0,
             owner_count=0, has_finance_role=False, has_sales_role=False, has_ops_role=False,
             data_confidence="LOW",
             data_gaps=["management_classification", "role_classification"],
         )
 
     active = [e for e in employees if e.status == EmployeeStatus.ACTIVE]
-    total  = len(active)
+    total  = effective_total_headcount(company_row, len(active))
     owners = [e for e in active if e.is_owner]
 
-    # Classify roles
+    # Classify roles — management_level 0=owner, 1=VP, 2=manager (per Employee model).
+    # Only level 1 (VP) is counted by level; owners (0) are already captured by _C_SUITE regex
+    # and are scored separately in the ownership sub-dimension, avoiding double-counting.
     mgmt_count = sum(
         1 for e in active
         if _C_SUITE.search(str(e.role or "")) or _VP_LEVEL.search(str(e.role or ""))
-        or (e.management_level is not None and e.management_level <= 1)
+        or (e.management_level is not None and e.management_level == 1)
     )
 
     has_finance = any(_FINANCE.search(str(e.role or "")) for e in active)
@@ -119,7 +126,14 @@ def compute_management_team(company_id: int, db: Session) -> ManagementTeamScore
         s_comp = 20
 
     # 2. Revenue per employee (benchmark: $150k–$300k is typical for SMB)
-    total_rev = sum(float(r.revenue_gross or 0) for r in revenue)
+    # Use TTM window (matching A1 approach) to avoid all-time revenue diluting current ratios.
+    from datetime import date as _date, timedelta as _timedelta
+    data_dates = [r.revenue_period for r in revenue if r.revenue_period]
+    rev_ref = max(data_dates) if data_dates else _date.today()
+    if rev_ref > _date.today():
+        rev_ref = _date.today()
+    ttm_rev_start = rev_ref - _timedelta(days=365)
+    total_rev = sum(float(r.revenue_gross or 0) for r in revenue if r.revenue_period and r.revenue_period >= ttm_rev_start)
     rev_per_emp = total_rev / total if total > 0 else 0.0
 
     if rev_per_emp >= 300_000:

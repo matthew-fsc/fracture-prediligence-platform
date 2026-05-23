@@ -1,65 +1,170 @@
-import { useAuth } from '@clerk/clerk-react'
-import { Navigate } from 'react-router-dom'
+/**
+ * ProtectedRoute — enforces authentication AND role-based routing.
+ *
+ * After Clerk auth resolves:
+ *   - No role yet          → /role-select
+ *   - CLIENT accessing /   → /client/dashboard
+ *   - ADVISOR accessing /client/* → /Home
+ *   - Otherwise            → render children
+ *
+ * In dev without VITE_CLERK_PUBLISHABLE_KEY the route is always accessible.
+ */
 
-const COLORS = { bg: '#0A1628', gold: '#C9973A', muted: '#8A9BB0' }
+import { useAuth } from '@clerk/react'
+import { Link, Navigate, useLocation } from 'react-router-dom'
+import { useUserRole } from '../../context/UserRoleContext'
+import { marketingColors } from '../../theme/marketingColors'
 
-// Spinner — matches dark design system loading states
 function LoadingShell() {
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div className="min-h-screen bg-background dark flex items-center justify-center">
       <div
-        style={{
-          width: 36,
-          height: 36,
-          border: `3px solid ${COLORS.gold}`,
-          borderTopColor: 'transparent',
-          borderRadius: '50%',
-          animation: 'spin 0.8s linear infinite',
-        }}
+        className="w-9 h-9 rounded-full border-2 animate-spin"
+        style={{ borderColor: 'hsl(var(--primary))', borderTopColor: 'transparent' }}
       />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
 
-// No-key notice — shown when VITE_CLERK_PUBLISHABLE_KEY is not in .env
 function NoClerkNotice() {
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px', textAlign: 'center' }}>
-      <div style={{ background: COLORS.gold, borderRadius: 6, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-        <span style={{ color: COLORS.bg, fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 20 }}>F</span>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: marketingColors.bg,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '40px 24px',
+        textAlign: 'center',
+      }}
+    >
+      <div
+        style={{
+          background: marketingColors.gold,
+          borderRadius: 6,
+          width: 40,
+          height: 40,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 24,
+        }}
+      >
+        <span style={{ color: marketingColors.bg, fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 20 }}>F</span>
       </div>
-      <h2 style={{ color: '#F0EDE8', fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 24, fontWeight: 600, margin: '0 0 12px 0' }}>
+      <h2
+        style={{
+          color: '#F0EDE8',
+          fontFamily: "'Cormorant Garamond', Georgia, serif",
+          fontSize: 24,
+          fontWeight: 600,
+          margin: '0 0 12px 0',
+        }}
+      >
         Auth not configured
       </h2>
-      <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, lineHeight: 1.6, maxWidth: 380, margin: '0 0 24px 0' }}>
-        Add <code style={{ color: COLORS.gold }}>VITE_CLERK_PUBLISHABLE_KEY</code> to{' '}
-        <code style={{ color: COLORS.gold }}>frontend/.env</code> to enable sign-in.
+      <p
+        style={{
+          color: marketingColors.muted,
+          fontFamily: "'DM Sans', sans-serif",
+          fontSize: 14,
+          lineHeight: 1.6,
+          maxWidth: 380,
+          margin: '0 0 24px 0',
+        }}
+      >
+        Set <code style={{ color: marketingColors.gold }}>VITE_CLERK_PUBLISHABLE_KEY</code> for the production Clerk
+        instance at build time (e.g. in your hosting provider env or <code style={{ color: marketingColors.gold }}>frontend/.env</code>{' '}
+        locally), then rebuild the SPA.
       </p>
-      <a href="/demo" style={{ color: COLORS.gold, fontFamily: "'DM Sans', sans-serif", fontSize: 14, textDecoration: 'none', border: `1px solid ${COLORS.gold}`, borderRadius: 6, padding: '8px 20px' }}>
-        View Demo instead →
-      </a>
+      <Link
+        to="/request-demo"
+        style={{
+          color: marketingColors.gold,
+          fontFamily: "'DM Sans', sans-serif",
+          fontSize: 14,
+          textDecoration: 'none',
+          border: `1px solid ${marketingColors.gold}`,
+          borderRadius: 6,
+          padding: '8px 20px',
+        }}
+      >
+        Request live demo instead
+      </Link>
     </div>
   )
 }
 
-// ---------------------------------------------------------------------------
-// ClerkGuard — only rendered when ClerkProvider is active
-// ---------------------------------------------------------------------------
-function ClerkGuard({ children }) {
-  const { isLoaded, isSignedIn } = useAuth()
-  if (!isLoaded) return <LoadingShell />
-  if (!isSignedIn) return <Navigate to="/sign-in" replace />
+/**
+ * Inner guard — Clerk is loaded. Apply role-based redirects.
+ * - `requireAdvisor`: the route is advisor-only (default for all /Home etc. routes)
+ * - `requireClient`: the route is client-only (all /client/* routes)
+ */
+function RoleGuard({ children, requireAdvisor = false, requireClient = false }) {
+  const { role, loading } = useUserRole()
+  const location = useLocation()
+  const path = (location.pathname || '').toLowerCase()
+  const isRoleBootstrapPath = path === '/role-select' || path.startsWith('/client-invite/')
+
+  if (loading) return <LoadingShell />
+
+  // No role set → prompt role selection
+  if (role === null) {
+    // If an advisor-only route is requested, allow access so the app can render
+    // while profile bootstrap catches up (avoids redirect loops/blank states).
+    if (requireAdvisor && !requireClient) return children
+    // Avoid redirect loops while the user is on role bootstrap routes.
+    if (isRoleBootstrapPath) return children
+    return <Navigate to="/role-select" replace state={{ from: location }} />
+  }
+
+  // Advisor tried to access client portal → redirect to advisor home
+  if (requireClient && role === 'ADVISOR') {
+    return <Navigate to="/Home" replace />
+  }
+
+  // Client tried to access advisor portal → redirect to client dashboard
+  if (requireAdvisor && role === 'CLIENT') {
+    return <Navigate to="/client/dashboard" replace />
+  }
+
   return children
 }
 
-// ---------------------------------------------------------------------------
-// ProtectedRoute — public API
-// When no Clerk key is configured, render children directly (dev passthrough).
-// NoClerkNotice is reserved for when auth is partially configured but broken.
-// ---------------------------------------------------------------------------
-export default function ProtectedRoute({ children }) {
-  const hasKey = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY)
-  if (!hasKey) return children  // dev passthrough — no Clerk configured
-  return <ClerkGuard>{children}</ClerkGuard>
+function ClerkGuard({ children, requireAdvisor, requireClient }) {
+  const { isLoaded, isSignedIn } = useAuth()
+  if (!isLoaded) return <LoadingShell />
+  if (!isSignedIn) return <Navigate to="/sign-in" replace />
+  return (
+    <RoleGuard requireAdvisor={requireAdvisor} requireClient={requireClient}>
+      {children}
+    </RoleGuard>
+  )
+}
+
+/**
+ * @param {object} props
+ * @param {React.ReactNode} props.children
+ * @param {boolean} [props.requireAdvisor]  — enforce ADVISOR role (default true for advisor routes)
+ * @param {boolean} [props.requireClient]   — enforce CLIENT role (for /client/* routes)
+ */
+export default function ProtectedRoute({
+  children,
+  requireAdvisor = false,
+  requireClient = false,
+}) {
+  const hasKey = Boolean((import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim())
+
+  if (!hasKey) {
+    // No Clerk key: bypass auth. API still enforces auth for writes; public/demo data is readable.
+    return children
+  }
+
+  return (
+    <ClerkGuard requireAdvisor={requireAdvisor} requireClient={requireClient}>
+      {children}
+    </ClerkGuard>
+  )
 }

@@ -1,18 +1,30 @@
 """Blueprint I ingestion pipeline — API routes."""
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+import hashlib
+from typing import Annotated
+
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Request
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_company_scope
+from app.core.analytics_events import track
+from app.core.config import settings
 from app.core.database import get_db
-from app.ingestion.pipeline import run_pipeline
+from app.core.rate_limiting import limiter
+from app.ontology.models import Company
+from app.ingestion.pipeline import run_pipeline, rerun_pipeline_job, resume_pipeline_after_mapping_review
 from app.ontology.ingestion_models import IngestionJob, PhaseStatus
 
 router = APIRouter()
 
+CompanyScoped = Annotated[Company, Depends(get_company_scope)]
+
 
 @router.post("/upload/{company_id}")
+@limiter.limit("10/hour")
 async def upload_file(
-    company_id: int,
+    request: Request,
+    company: CompanyScoped,
     file: UploadFile = File(...),
     source_type: str = Form(default="unknown"),
     db: Session = Depends(get_db),
@@ -22,12 +34,37 @@ async def upload_file(
     Returns the IngestionJob with validation report, schema profile, column mappings,
     and extraction error summary.
     """
+    if settings.DEMO_BLOCK_INGESTION_UPLOAD_FOR_COMPANY_1 and company.id == 1:
+        raise HTTPException(
+            status_code=403,
+            detail="Ingestion uploads are disabled for the ABC demo company (pre-seeded file).",
+        )
+
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
+    max_b = settings.INGESTION_MAX_UPLOAD_BYTES
+    if len(data) > max_b:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large (max {max_b // (1024 * 1024)} MB).",
+        )
+
+    file_hash = hashlib.sha256(data).hexdigest()
+    existing = (
+        db.query(IngestionJob)
+        .filter(IngestionJob.company_id == company.id, IngestionJob.file_hash == file_hash)
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail="This file was already ingested for this company (duplicate content).",
+        )
+
     job = run_pipeline(
-        company_id=company_id,
+        company_id=company.id,
         filename=file.filename,
         file_data=data,
         source_type=source_type,
@@ -35,6 +72,14 @@ async def upload_file(
     )
     db.commit()
     db.refresh(job)
+
+    track("file_uploaded", user_id=company.owner_user_id or "anon", properties={
+        "company_id": company.id,
+        "source_type": source_type,
+        "file_size_bytes": len(data),
+        "pipeline_status": job.current_status,
+        "row_count": job.row_count,
+    })
 
     return {
         "job_id":         job.id,
@@ -53,12 +98,19 @@ async def upload_file(
 
 
 @router.get("/jobs/{company_id}")
-def list_jobs(company_id: int, db: Session = Depends(get_db)):
-    """List all ingestion jobs for a company."""
+def list_jobs(
+    company: CompanyScoped,
+    db: Session = Depends(get_db),
+    limit: int = 50,
+    offset: int = 0,
+):
+    """List ingestion jobs for a company. Supports pagination via limit/offset."""
     jobs = (
         db.query(IngestionJob)
-        .filter(IngestionJob.company_id == company_id)
+        .filter(IngestionJob.company_id == company.id)
         .order_by(IngestionJob.created_at.desc())
+        .limit(min(limit, 200))   # API-1: cap at 200 rows per page
+        .offset(offset)
         .all()
     )
     return [
@@ -79,11 +131,11 @@ def list_jobs(company_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/jobs/{company_id}/{job_id}")
-def get_job(company_id: int, job_id: int, db: Session = Depends(get_db)):
+def get_job(company: CompanyScoped, job_id: int, db: Session = Depends(get_db)):
     """Get full job details including validation report, schema, mappings, and errors."""
     job = (
         db.query(IngestionJob)
-        .filter(IngestionJob.id == job_id, IngestionJob.company_id == company_id)
+        .filter(IngestionJob.id == job_id, IngestionJob.company_id == company.id)
         .first()
     )
     if not job:
@@ -110,7 +162,7 @@ def get_job(company_id: int, job_id: int, db: Session = Depends(get_db)):
 
 @router.patch("/jobs/{company_id}/{job_id}/mappings")
 def update_mappings(
-    company_id: int,
+    company: CompanyScoped,
     job_id: int,
     overrides: dict,
     db: Session = Depends(get_db),
@@ -123,11 +175,17 @@ def update_mappings(
     """
     job = (
         db.query(IngestionJob)
-        .filter(IngestionJob.id == job_id, IngestionJob.company_id == company_id)
+        .filter(IngestionJob.id == job_id, IngestionJob.company_id == company.id)
         .first()
     )
     if not job:
         raise HTTPException(status_code=404, detail="Job not found.")
+
+    if settings.DEMO_BLOCK_INGESTION_UPLOAD_FOR_COMPANY_1 and company.id == 1:
+        raise HTTPException(
+            status_code=403,
+            detail="Mapping overrides are disabled for the ABC demo company (read-only tour).",
+        )
 
     mappings = job.column_mappings or {"mappings": []}
     for m in mappings.get("mappings", []):
@@ -139,9 +197,56 @@ def update_mappings(
 
     job.column_mappings = mappings
 
-    # Re-trigger P6 if previously waiting for review
-    if job.current_status == PhaseStatus.AWAITING_REVIEW.value:
-        job.current_status = PhaseStatus.COMPLETE.value
+    if str(job.current_status) == PhaseStatus.AWAITING_REVIEW.value:
+        try:
+            resume_pipeline_after_mapping_review(job, company.id, db)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Could not resume pipeline: {e}") from e
 
     db.commit()
-    return {"message": "Mappings updated.", "mappings": job.column_mappings}
+    db.refresh(job)
+    return {
+        "message": "Mappings updated.",
+        "mappings": job.column_mappings,
+        "status": job.current_status,
+        "phase": job.current_phase.value if hasattr(job.current_phase, "value") else str(job.current_phase),
+    }
+
+
+@router.post("/jobs/{company_id}/{job_id}/retry")
+def retry_job(company: CompanyScoped, job_id: int, db: Session = Depends(get_db)):
+    """Re-run ingestion from the stored raw file (FAILED or QUARANTINED only)."""
+    try:
+        job = rerun_pipeline_job(job_id, company.id, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    db.commit()
+    db.refresh(job)
+    return {
+        "job_id": job.id,
+        "ingestion_id": job.ingestion_id,
+        "filename": job.filename,
+        "status": job.current_status.value if hasattr(job.current_status, "value") else str(job.current_status),
+        "phase": job.current_phase.value if hasattr(job.current_phase, "value") else str(job.current_phase),
+        "row_count": job.row_count,
+        "mapped_count": job.mapped_count,
+        "error_count": job.error_count,
+    }
+
+
+@router.delete("/jobs/{company_id}/{job_id}", status_code=204)
+def delete_job(company: CompanyScoped, job_id: int, db: Session = Depends(get_db)):
+    """Delete an ingestion job and its data."""
+    job = (
+        db.query(IngestionJob)
+        .filter(IngestionJob.id == job_id, IngestionJob.company_id == company.id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Ingestion job not found.")
+    db.delete(job)
+    db.commit()

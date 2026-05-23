@@ -1,71 +1,319 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
-import { Target, ChevronDown, ChevronRight, Clock } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { valueCreationLevers } from '../lib/mockData'
+import { Target, ChevronDown, ChevronRight, AlertTriangle, ArrowRight, TrendingUp, Info, BookOpen, CheckCircle, Clock, Circle, Plus, Trash2 } from 'lucide-react'
 import { Skeleton } from '../components/ui/Skeleton'
+import { useCompanyId } from '../context/CompanyContext'
+import { apiClient } from '../lib/apiClient'
+import { toast } from '../lib/notify'
+import { usePageTitle } from '../hooks/usePageTitle'
+import { getDrsCategoryStyle } from '../lib/drsCategoryColors'
 
-const COMPANY_ID = 1
-
-const catColors = {
-  operations:    { bg: 'bg-red-500/10',     text: 'text-red-400',     border: 'border-red-500/20'     },
-  revenue:       { bg: 'bg-blue-500/10',    text: 'text-blue-400',    border: 'border-blue-500/20'    },
-  margin:        { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
-  documentation: { bg: 'bg-purple-500/10', text: 'text-purple-400',  border: 'border-purple-500/20'  },
-  customer:      { bg: 'bg-amber-500/10',  text: 'text-amber-400',   border: 'border-amber-500/20'   },
+const INITIATIVE_STATUS_CFG = {
+  planned:     { icon: Circle,       label: 'Planned',     color: 'text-muted-foreground', border: 'border-border',          bg: 'bg-muted/20'        },
+  in_progress: { icon: Clock,        label: 'In Progress', color: 'text-blue-400',         border: 'border-blue-500/30',     bg: 'bg-blue-500/5'      },
+  complete:    { icon: CheckCircle,  label: 'Complete',    color: 'text-emerald-400',       border: 'border-emerald-500/30',  bg: 'bg-emerald-500/5'   },
 }
 
-function DriverCard({ d, rank }) {
-  const [open, setOpen] = useState(false)
-  const cat = catColors[d.category] || catColors.revenue
+const MITIGATION_TARGETS = {
+  revenue_quality: {
+    recurring_rate:  'Shift revenue mix toward recurring contracts and retainer agreements to reduce single-project dependency.',
+    concentration:   'Expand customer base to reduce HHI; target no single customer exceeding 15% of revenue.',
+    durability:      'Convert month-to-month engagements to multi-year contracts with renewal clauses.',
+  },
+  financial_integrity: {
+    margin_stability: 'Reduce EBITDA margin variance by tightening cost controls and pricing discipline.',
+    working_capital:  'Normalize working capital cycles; address AR days and payables timing.',
+    recast_confidence:'Document and defend all EBITDA addbacks with third-party support; remove non-defensible items.',
+  },
+  operational_independence: {
+    owner_dependency:  'Create documented SOPs, delegate key client relationships, and build a second layer of management.',
+    process_maturity:  'Formalize repeatable processes and hand-offs to reduce reliance on institutional knowledge.',
+    system_dependency: 'Migrate critical workflows off owner-managed tools; ensure continuity during ownership transition.',
+  },
+  customer_risk: {
+    concentration_risk: 'Diversify revenue across more customer accounts; reduce top-customer revenue concentration below 20%.',
+    churn_risk:         'Implement structured QBRs, customer health scoring, and proactive renewal management.',
+    contract_risk:      'Move customers onto formal MSAs with auto-renewal, termination penalties, and service level commitments.',
+  },
+  management_team: {
+    depth:       'Build out the leadership bench — hire or develop a COO, CFO, or VP of Sales to reduce key-person risk.',
+    retention:   'Implement equity or long-term incentive plans to retain key managers through transition.',
+    succession:  'Document succession plans and cross-train across all critical roles.',
+  },
+  growth_drivers: {
+    pipeline:    'Build a formal sales pipeline with CRM tracking, stage definitions, and conversion metrics.',
+    market_share:'Identify and quantify addressable expansion markets; develop a go-to-market plan for top-priority segments.',
+    product_mix: 'Broaden service or product offerings to reduce dependency on a single revenue line.',
+  },
+}
+
+// ── Score bar for visual score comparison ──────────────────────────────────
+function ScoreBar({ current, target, label }) {
+  const color = current >= 70 ? 'bg-emerald-500' : current >= 55 ? 'bg-amber-500' : 'bg-red-500'
+  const textColor = current >= 70 ? 'text-emerald-400' : current >= 55 ? 'text-amber-400' : 'text-red-400'
   return (
-    <div className={cn('rounded-xl border bg-card transition-all', cat.border)}>
+    <div className="space-y-1">
+      {label && <p className="text-[10px] text-muted-foreground">{label}</p>}
+      <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+        <div className={cn('h-2 rounded-full transition-all', color)} style={{ width: `${Math.min(current, 100)}%` }} />
+        <div
+          className="absolute top-0 w-0.5 h-2 bg-emerald-400/60 rounded-full"
+          style={{ left: `${target}%` }}
+          title={`Target: ${target}`}
+        />
+      </div>
+      <div className="flex items-center justify-between text-[10px]">
+        <span className={cn('font-bold', textColor)}>{current.toFixed(0)}</span>
+        <span className="text-muted-foreground/50">target {target}</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Detailed gap card ─────────────────────────────────────────────────────
+function GapCategoryCard({ d, rank, totalGap, initiatives = [], onInitiativeChange }) {
+  const companyId = useCompanyId()
+  const [open, setOpen] = useState(false)
+  const [addingTitle, setAddingTitle] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const cat = getDrsCategoryStyle(d.category)
+  const weakSubs = d.weak_sub_scores ?? []
+  const mitigationMap = MITIGATION_TARGETS[d.category] ?? {}
+  const pctOfGap = totalGap > 0 ? (d.ev_uplift / totalGap * 100) : 0
+  const categoryInitiatives = initiatives.filter(i => i.category === d.category)
+
+  async function updateStatus(initiativeId, newStatus) {
+    try {
+      await apiClient.patch(`/api/analytics/initiatives/${companyId}/${initiativeId}`, { status: newStatus })
+      onInitiativeChange()
+    } catch (e) {
+      toast.error(e?.message || 'Could not update status')
+    }
+  }
+
+  async function deleteInitiative(initiativeId) {
+    try {
+      await apiClient.del(`/api/analytics/initiatives/${companyId}/${initiativeId}`)
+      onInitiativeChange()
+    } catch (e) {
+      toast.error(e?.message || 'Could not delete initiative')
+    }
+  }
+
+  async function createInitiative() {
+    if (!addingTitle.trim()) return
+    setSaving(true)
+    try {
+      await apiClient.post(`/api/analytics/initiatives/${companyId}`, {
+        title: addingTitle.trim(),
+        category: d.category,
+        status: 'planned',
+      })
+      setAddingTitle('')
+      setAdding(false)
+      onInitiativeChange()
+    } catch (e) {
+      toast.error(e?.message || 'Could not create initiative')
+    }
+    setSaving(false)
+  }
+
+  return (
+    <div className={cn('rounded-xl border bg-card overflow-hidden transition-all', cat.border)}>
+      {/* Header — always visible */}
       <button className="w-full text-left p-4" onClick={() => setOpen(!open)}>
-        <div className="flex items-center gap-3">
-          <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold', cat.bg, cat.text)}>
+        <div className="flex items-start gap-3">
+          <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5', cat.bg, cat.text)}>
             {rank}
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold text-card-foreground">{d.initiative || d.label}</span>
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <span className="text-sm font-semibold text-card-foreground">{d.label}</span>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-sm font-bold text-emerald-400">+{fmtM(d.ev_uplift)}</p>
+                <p className="text-[10px] text-muted-foreground">{pctOfGap.toFixed(0)}% of gap</p>
+              </div>
             </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">{d.detail || d.description}</p>
+
+            {/* Score bar + EV contribution bar */}
+            <div className="grid grid-cols-2 gap-4">
+              <ScoreBar current={d.current_score} target={d.target_score} label={`Score: ${d.current_score.toFixed(0)} → ${d.target_score} (${d.score_gap.toFixed(0)}-pt gap)`} />
+              <div className="space-y-1">
+                <p className="text-[10px] text-muted-foreground">Share of total value gap</p>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-2 bg-emerald-500/60 rounded-full" style={{ width: `${Math.min(pctOfGap, 100)}%` }} />
+                </div>
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-emerald-400 font-bold">+{fmtM(d.ev_uplift)}</span>
+                  <span className="text-muted-foreground/50">{d.timeline}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Top weak sub-scores — always visible preview */}
+            {weakSubs.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {weakSubs.slice(0, 4).map(sub => (
+                  <span key={sub.key} className={cn(
+                    'text-[10px] font-medium px-1.5 py-0.5 rounded border',
+                    sub.score < 50 ? 'border-red-500/20 bg-red-500/5 text-red-400' :
+                    sub.score < 65 ? 'border-amber-500/20 bg-amber-500/5 text-amber-400' :
+                    'border-border bg-muted/30 text-muted-foreground',
+                  )}>
+                    {sub.key === 'concentration' && sub.value != null
+                      ? <>HHI <span className="tabular-nums">{Number(sub.value).toLocaleString()}</span> · {sub.score.toFixed(0)}</>
+                      : <>{sub.label} · {sub.score.toFixed(0)}</>}
+                  </span>
+                ))}
+                {weakSubs.length > 4 && (
+                  <span className="text-[10px] text-muted-foreground/50">+{weakSubs.length - 4} more</span>
+                )}
+              </div>
+            )}
           </div>
-          <div className="text-right flex-shrink-0">
-            <p className="text-sm font-bold text-emerald-400">
-              {d.valueMin != null ? `${fmtM(d.valueMin)}–${fmtM(d.valueMax)}` : `+${fmtM(d.ev_uplift)}`}
-            </p>
-            <p className="text-[10px] text-muted-foreground">{d.timeline || d.months + 'mo'} timeline</p>
-          </div>
-          {open ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+          {open ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" /> : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />}
         </div>
       </button>
+
+      {/* Expanded detail */}
       {open && (
-        <div className="px-4 pb-4 border-t border-border pt-4 space-y-3">
-          <div className="grid grid-cols-3 gap-4 text-xs">
-            <div className="rounded-lg bg-secondary/50 p-3">
-              <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1">Current State</p>
-              <p className="text-card-foreground">{d.detail || d.description || '—'}</p>
+        <div className="border-t border-border">
+          {/* Sub-score breakdown */}
+          {weakSubs.length > 0 && (
+            <div className="px-4 py-4 space-y-3">
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Sub-Metrics Below Target — What to Fix</p>
+              <div className="space-y-3">
+                {weakSubs.map(sub => (
+                  <div key={sub.key} className="rounded-lg border border-border/50 bg-secondary/20 p-3 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-foreground">
+                        {sub.key === 'concentration' && sub.value != null
+                          ? <>HHI <span className="text-muted-foreground font-normal">(index {Number(sub.value).toLocaleString()})</span></>
+                          : sub.label}
+                      </span>
+                      <span className={cn('text-xs font-bold',
+                        sub.score < 50 ? 'text-red-400' : sub.score < 65 ? 'text-amber-400' : 'text-muted-foreground')}>
+                        {sub.score.toFixed(0)}/100
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className={cn('h-1.5 rounded-full',
+                        sub.score < 50 ? 'bg-red-500' : sub.score < 65 ? 'bg-amber-500' : 'bg-muted-foreground/40')}
+                        style={{ width: `${sub.score}%` }}
+                      />
+                    </div>
+                    {mitigationMap[sub.key] && (
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        <span className="font-medium text-foreground/80">Action: </span>{mitigationMap[sub.key]}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-3">
-              <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1">Target State</p>
-              <p className="text-card-foreground">{d.target || 'Resolve identified risk'}</p>
-            </div>
-            <div className="rounded-lg bg-secondary/50 p-3">
-              <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1">Value Range</p>
-              <p className="text-emerald-400 font-bold">
-                {d.valueMin != null ? `${fmtM(d.valueMin)} – ${fmtM(d.valueMax)}` : `+${fmtM(d.ev_uplift)}`}
+          )}
+
+          {/* Initiatives for this category */}
+          <div className="px-4 pb-2">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                Initiatives
+                {categoryInitiatives.length > 0 && (
+                  <span className="ml-1.5 font-normal text-muted-foreground/60">
+                    ({categoryInitiatives.filter(i => i.status === 'complete').length}/{categoryInitiatives.length} complete)
+                  </span>
+                )}
               </p>
+              <button
+                type="button"
+                onClick={() => setAdding(a => !a)}
+                className="text-[11px] text-primary hover:underline flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3" /> Add
+              </button>
             </div>
+
+            {adding && (
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  autoFocus
+                  value={addingTitle}
+                  onChange={e => setAddingTitle(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && createInitiative()}
+                  placeholder="Initiative title…"
+                  className="flex-1 text-xs bg-background border border-border rounded px-2 py-1.5 text-muted-foreground placeholder:text-muted-foreground/45 focus:text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                />
+                <button
+                  type="button"
+                  onClick={createInitiative}
+                  disabled={saving || !addingTitle.trim()}
+                  className="text-xs px-2.5 py-1.5 bg-primary text-primary-foreground rounded font-medium hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {saving ? '…' : 'Add'}
+                </button>
+                <button type="button" onClick={() => { setAdding(false); setAddingTitle('') }} className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
+              </div>
+            )}
+
+            {categoryInitiatives.length === 0 && !adding && (
+              <p className="text-[11px] text-muted-foreground/60 italic mb-2">No initiatives yet — add one to track progress on this gap.</p>
+            )}
+
+            {categoryInitiatives.map(init => {
+              const scfg = INITIATIVE_STATUS_CFG[init.status] ?? INITIATIVE_STATUS_CFG.planned
+              const SIcon = scfg.icon
+              return (
+                <div key={init.id} className={cn('flex items-center gap-2 rounded-lg border px-3 py-2 mb-1.5 text-xs', scfg.border, scfg.bg)}>
+                  <SIcon className={cn('w-3.5 h-3.5 flex-shrink-0', scfg.color)} />
+                  <span className="flex-1 text-foreground truncate">{init.title}</span>
+                  <select
+                    value={init.status}
+                    onChange={e => updateStatus(init.id, e.target.value)}
+                    className="bg-transparent border border-border/60 rounded px-1 py-0.5 text-[11px] text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  >
+                    <option value="planned">Planned</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="complete">Complete</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => deleteInitiative(init.id)}
+                    className="text-muted-foreground/40 hover:text-red-400 transition-colors"
+                    aria-label="Delete initiative"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              )
+            })}
           </div>
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{d.timeline || d.months + 'mo'} to realize</span>
-            {d.severity && <span className={cn('font-medium px-1.5 py-0.5 rounded text-[9px] border uppercase',
-              d.severity === 'critical' ? 'border-red-500/20 bg-red-500/10 text-red-400' :
-              d.severity === 'high' ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' :
-              'border-border bg-muted text-muted-foreground')}>{d.severity}</span>}
-          </div>
+
+          {/* Methodology — collapsed into a compact disclosure */}
+          {d.methodology && (
+            <div className="px-4 pb-4">
+              <details className="rounded-lg border border-border/40 bg-muted/10">
+                <summary className="px-3 py-2 text-[11px] text-muted-foreground cursor-pointer hover:text-foreground transition-colors flex items-center gap-1">
+                  <Info className="w-3 h-3" /> How this uplift is calculated
+                </summary>
+                <div className="px-3 pb-3 text-[10px] text-muted-foreground/70 space-y-1">
+                  <p>{d.methodology.summary}</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 mt-1">
+                    <span>EBITDA used: <span className="text-foreground/60 font-mono">{fmtM(d.methodology.ebitda_ttm_used)}</span></span>
+                    <span>Category weight: <span className="text-foreground/60 font-mono">{d.methodology.category_weight_in_drs}%</span></span>
+                    <span>DRS before: <span className="text-foreground/60 font-mono">{d.methodology.drs_before}</span></span>
+                    <span>DRS after: <span className="text-foreground/60 font-mono">{d.methodology.drs_after_category_at_target}</span></span>
+                    <span>Multiple before: <span className="text-foreground/60 font-mono">{d.methodology.multiple_mid_before}×</span></span>
+                    <span>Multiple after: <span className="text-foreground/60 font-mono">{d.methodology.multiple_mid_after}×</span></span>
+                  </div>
+                </div>
+              </details>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -73,21 +321,58 @@ function DriverCard({ d, rank }) {
 }
 
 export default function ValueGap() {
-  const [liveData, setLiveData] = useState(null)
-  const [gapData, setGapData] = useState(null)
+  usePageTitle('Value Gap Analysis')
+  const companyId = useCompanyId()
+  const companyReady = companyId != null && companyId > 0
+  const queryClient = useQueryClient()
 
-  useEffect(() => {
-    fetch(`/api/analytics/scores/${COMPANY_ID}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(setLiveData)
-      .catch(() => {})
-    fetch(`/api/analytics/value-gap/${COMPANY_ID}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(setGapData)
-      .catch(() => {})
-  }, [])
+  const liveQuery = useQuery({
+    queryKey: ['analytics-scores', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/scores/${companyId}`),
+    enabled: companyReady,
+  })
+  const gapQuery = useQuery({
+    queryKey: ['analytics-value-gap', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/value-gap/${companyId}`),
+    enabled: companyReady,
+  })
+  const initiativesQuery = useQuery({
+    queryKey: ['analytics-initiatives', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/initiatives/${companyId}`),
+    enabled: companyReady,
+    staleTime: 30_000,
+  })
+  const triggeredQuery = useQuery({
+    queryKey: ['library-triggered', companyId],
+    queryFn: () => apiClient.get(`/api/analytics/library-triggered/${companyId}`),
+    enabled: companyReady,
+    staleTime: 60_000,
+  })
 
-  if (liveData === null || gapData === null) {
+  const liveData = liveQuery.data ?? null
+  const gapData = gapQuery.data ?? null
+  const initiatives = initiativesQuery.data?.initiatives ?? []
+  const loading = liveQuery.isPending || gapQuery.isPending
+  const pageError =
+    liveQuery.isError ? liveQuery.error?.message
+      : gapQuery.isError ? gapQuery.error?.message
+        : null
+
+  if (!companyReady) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="Value Gap Analysis"
+          subtitle="The difference between what the business is worth today and what it could be worth with targeted improvements"
+        />
+        <p className="text-sm text-muted-foreground">
+          Select or create a client in the header to load value gap data.
+        </p>
+      </div>
+    )
+  }
+
+  if (loading) {
     return (
       <div className="space-y-5 max-w-[1400px]">
         <Skeleton className="h-8 w-64" />
@@ -98,13 +383,37 @@ export default function ValueGap() {
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 lg:col-span-5 rounded-xl border border-border bg-card p-5">
-            <Skeleton className="h-56 w-full" />
-          </div>
-          <div className="col-span-12 lg:col-span-7 space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
-          </div>
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
+        </div>
+      </div>
+    )
+  }
+
+  if (pageError || liveData == null || gapData == null) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="Value Gap Analysis"
+          subtitle="The difference between what the business is worth today and what it could be worth with targeted improvements"
+        />
+        <div
+          className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-6 text-center text-sm text-red-400 flex flex-col items-center gap-3"
+          role="alert"
+        >
+          <AlertTriangle className="w-8 h-8 opacity-80" />
+          <p>{pageError || 'Value gap data could not be loaded.'}</p>
+          <button
+            type="button"
+            onClick={() => {
+              liveQuery.refetch()
+              gapQuery.refetch()
+              triggeredQuery.refetch()
+            }}
+            className="text-xs font-semibold px-3 py-2 rounded-lg border border-border bg-card hover:bg-muted/50"
+          >
+            Retry
+          </button>
         </div>
       </div>
     )
@@ -112,66 +421,104 @@ export default function ValueGap() {
 
   const ev = liveData?.enterprise_value
   const currentEV = ev?.midpoint ?? 0
-  const ceilingEV = ev?.ceiling ?? 0
   const floorEV = ev?.floor ?? 0
+  const ceilingEV = gapData?.potential_ev_midpoint ?? ev?.ceiling ?? 0
   const valueGap = Math.max(0, ceilingEV - currentEV)
   const ebitda = ev?.ebitda_base ?? 0
+  const ceilingMultiple = ceilingEV > 0 && ebitda > 0 ? (ceilingEV / ebitda).toFixed(1) : '—'
+  const progressPct = ceilingEV > floorEV ? Math.round((currentEV - floorEV) / (ceilingEV - floorEV) * 100) : 50
 
-  // Use live gap data if available, fall back to mock valueCreationLevers
-  const drivers = gapData?.gaps
-    ? gapData.gaps.map((g, i) => ({
-        initiative: g.label,
-        detail: `Score ${g.current_score} → ${g.target_score}`,
-        valueMin: g.ev_uplift * 0.7,
-        valueMax: g.ev_uplift,
-        ev_uplift: g.ev_uplift,
-        timeline: '9mo',
-        severity: g.priority <= 1 ? 'critical' : g.priority <= 2 ? 'high' : 'medium',
-        category: i === 0 ? 'operations' : i === 1 ? 'revenue' : i === 2 ? 'margin' : 'documentation',
-        months: 9,
-      }))
-    : valueCreationLevers.map(d => ({
-        ...d,
-        category: d.rank <= 2 ? 'operations' : d.rank === 3 ? 'margin' : d.rank === 4 ? 'revenue' : 'documentation',
-        months: parseInt(d.timeline) || 9,
-      }))
+  const rawUpliftSum = gapData?.gaps?.reduce((s, g) => s + g.ev_uplift, 0) ?? 0
+  const gapTotal     = gapData?.total_value_gap ?? rawUpliftSum
+  const upliftScale  = rawUpliftSum > 0 ? gapTotal / rawUpliftSum : 1
 
-  const waterfallData = [
-    { name: 'Current EV', value: currentEV, type: 'base' },
-    ...drivers.slice(0, 4).map(d => ({
-      name: (d.initiative || '').split(' ').slice(0, 2).join(' '),
-      value: d.valueMax || d.ev_uplift || 0,
-      type: 'add',
-    })),
-    { name: 'Potential EV', value: ceilingEV, type: 'total' },
-  ]
+  const vgCtx = gapData?.value_gap_context
+  const companyProfile = vgCtx?.company
+  const headcount =
+    companyProfile?.total_headcount != null ? companyProfile.total_headcount : vgCtx?.effective_headcount
+  const ttmRevenue = vgCtx?.ttm_revenue
+  const revPerEmployee = vgCtx?.revenue_per_employee
+
+  const drivers = (gapData?.gaps?.length
+    ? gapData.gaps.map(g => ({
+        label:           g.label,
+        current_score:   g.current_score,
+        target_score:    g.target_score,
+        score_gap:       g.score_gap,
+        ev_uplift:       Math.round(g.ev_uplift * upliftScale),
+        methodology:     g.methodology,
+        timeline:        g.priority <= 1 ? '18–24mo' : g.priority <= 3 ? '6–12mo' : '3–6mo',
+        severity:        g.priority === 1 ? 'critical' : g.priority <= 2 ? 'high' : 'medium',
+        category:        g.category,
+        category_weight: g.methodology?.category_weight_in_drs ?? 0,
+        weak_sub_scores: g.weak_sub_scores ?? [],
+      }))
+    : [])
+
+  // Group drivers by category for the waterfall
+  const totalDriverUplift = drivers.reduce((s, d) => s + d.ev_uplift, 0)
 
   return (
-    <div className="space-y-5 max-w-[1400px]">
+    <div className="space-y-6 max-w-[1400px]">
       <SectionHeader
         title="Value Gap Analysis"
         subtitle="The difference between what the business is worth today and what it could be worth with targeted improvements"
         action={
-          <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 flex items-center gap-1">
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 flex items-center gap-1">
             <Target className="w-3 h-3" />+{fmtM(valueGap)} opportunity
           </span>
         }
       />
 
-      {/* EV bridge cards */}
+      {/* Client profile + operating context (aligned with value-gap API) */}
+      {companyProfile && (
+        <div className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3 space-y-1.5">
+          <p className="text-sm font-semibold text-foreground">{companyProfile.name || 'Client'}</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+            {companyProfile.industry ? <span>{companyProfile.industry}</span> : null}
+            {companyProfile.founded != null ? <span>Founded {companyProfile.founded}</span> : null}
+            {companyProfile.entity_type ? <span>{companyProfile.entity_type.replace(/_/g, ' ')}</span> : null}
+            {companyProfile.state ? <span>{companyProfile.state}</span> : null}
+            {headcount != null ? <span className="text-foreground/90 font-medium">{headcount} employees</span> : null}
+            {ttmRevenue != null && Number(ttmRevenue) > 0 ? (
+              <span>TTM revenue {fmtM(ttmRevenue)}</span>
+            ) : null}
+            {revPerEmployee != null && Number(revPerEmployee) > 0 ? (
+              <span>Rev / employee {fmtM(revPerEmployee)}</span>
+            ) : null}
+          </div>
+          {(companyProfile.market_rate_replacement_annual != null
+            || companyProfile.depreciation_amortization_ttm != null) && (
+            <p className="text-[10px] text-muted-foreground/70 pt-1 border-t border-border/40">
+              EBITDA profile:{' '}
+              {companyProfile.market_rate_replacement_annual != null && (
+                <span className="mr-3">Market-rate replacement {fmtM(companyProfile.market_rate_replacement_annual)}</span>
+              )}
+              {companyProfile.depreciation_amortization_ttm != null && (
+                <span>D&amp;A {fmtM(companyProfile.depreciation_amortization_ttm)}</span>
+              )}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ── Top 3 EV cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-5 space-y-3">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Current Enterprise Value</p>
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Current Enterprise Value</p>
           <p className="text-3xl font-bold text-blue-400">{fmtM(currentEV)}</p>
           <div className="space-y-1.5 text-xs border-t border-border pt-3">
             <div className="flex justify-between"><span className="text-muted-foreground">EBITDA (TTM)</span><span className="font-bold text-card-foreground">{fmtM(ebitda)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Implied Multiple</span><span className="font-bold text-blue-400">{ev?.multiple_used ?? '6.0×'}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">DRS Tier</span><span className="text-muted-foreground text-[10px]">{liveData?.drs?.tier ?? 'Investment Grade'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Employees</span><span className="font-bold text-card-foreground">{headcount != null ? `${headcount}` : '—'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">TTM revenue</span><span className="font-bold text-card-foreground">{ttmRevenue != null && Number(ttmRevenue) > 0 ? fmtM(ttmRevenue) : '—'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Rev / employee</span><span className="font-bold text-card-foreground">{revPerEmployee != null && Number(revPerEmployee) > 0 ? fmtM(revPerEmployee) : '—'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Implied Multiple</span><span className="font-bold text-blue-400">{ev?.multiple_used ?? '—'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">DRS Tier</span><span className="text-muted-foreground text-[11px]">{(liveData?.drs?.tier ?? '').replace(/_/g, ' ')}</span></div>
           </div>
         </div>
 
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5 flex flex-col items-center justify-center gap-3">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Value Gap</p>
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Value Gap</p>
           <p className="text-4xl font-bold text-emerald-400">+{fmtM(valueGap)}</p>
           <p className="text-xs text-muted-foreground text-center">realizable through targeted operational improvements</p>
           <div className="flex items-center gap-2 text-xs">
@@ -180,52 +527,203 @@ export default function ValueGap() {
             <span className="text-emerald-400 font-bold">{fmtM(ceilingEV)}</span>
           </div>
           <div className="w-full h-1.5 bg-muted rounded-full mt-1">
-            <div className="h-1.5 bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full" style={{ width: '72%' }} />
+            <div className="h-1.5 bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full" style={{ width: `${progressPct}%` }} />
           </div>
         </div>
 
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5 space-y-3">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Potential Enterprise Value</p>
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Potential Enterprise Value</p>
           <p className="text-3xl font-bold text-emerald-400">{fmtM(ceilingEV)}</p>
           <div className="space-y-1.5 text-xs border-t border-border pt-3">
-            <div className="flex justify-between"><span className="text-muted-foreground">Target EBITDA</span><span className="font-bold text-card-foreground">{fmtM(ebitda * 1.15)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Target Multiple</span><span className="font-bold text-emerald-400">7.0×</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">All initiatives complete</span><span className="text-muted-foreground text-[10px]">18–24 months</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">EBITDA (base)</span><span className="font-bold text-card-foreground">{fmtM(ebitda)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">TTM revenue</span><span className="font-bold text-card-foreground">{ttmRevenue != null && Number(ttmRevenue) > 0 ? fmtM(ttmRevenue) : '—'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Ceiling Multiple</span><span className="font-bold text-emerald-400">{ceilingMultiple}×</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">All initiatives complete</span><span className="text-muted-foreground text-[11px]">18–24 months</span></div>
           </div>
         </div>
       </div>
 
-      {/* Bridge chart */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-semibold text-card-foreground mb-4">Value Creation Bridge</h3>
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={waterfallData} margin={{ top: 5, right: 5, bottom: 0, left: 10 }}>
-            <XAxis dataKey="name" tick={{ fontSize: 9, fill: 'hsl(220,10%,46%)' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: 'hsl(220,10%,46%)' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000000).toFixed(1)}M`} width={46} />
-            <Tooltip content={({ active, payload, label }) => active && payload?.length ? (
-              <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-xl text-xs">
-                <p className="font-semibold text-foreground mb-1">{label}</p>
-                <p className="font-bold text-emerald-400">{fmtM(payload[0].value)}</p>
-              </div>
-            ) : null} />
-            <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={60}>
-              {waterfallData.map((e, i) => (
-                <Cell key={i}
-                  fill={e.type === 'base' ? 'hsl(217,91%,60%)' : e.type === 'total' ? 'hsl(160,84%,39%)' : 'hsl(160,84%,39%)'}
-                  fillOpacity={e.type === 'add' ? 0.7 : 1}
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      {/* ── EV Bridge — horizontal waterfall ───────────────────────────── */}
+      {drivers.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-sm font-semibold text-card-foreground">Value Creation Bridge</h3>
+            <span className="text-[10px] text-muted-foreground ml-auto">Each bar shows EV uplift if that category alone were improved to target</span>
+          </div>
 
-      {/* Driver cards */}
-      <div>
-        <h3 className="text-sm font-semibold text-foreground mb-3">Value Gap Drivers — Ranked by Impact</h3>
-        <div className="space-y-3">
-          {drivers.map((d, i) => <DriverCard key={d.initiative || i} d={d} rank={i + 1} />)}
+          {/* Stacked horizontal bar */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 h-10 rounded-lg overflow-hidden">
+              <div
+                className="h-full bg-blue-500 flex items-center justify-center text-[10px] font-bold text-white rounded-l-lg"
+                style={{ width: `${currentEV / (currentEV + totalDriverUplift) * 100}%`, minWidth: 60 }}
+                title={`Current EV: ${fmtM(currentEV)}`}
+              >
+                {fmtM(currentEV)}
+              </div>
+              {drivers.map((d, i) => {
+                const pct = d.ev_uplift / (currentEV + totalDriverUplift) * 100
+                const cat = getDrsCategoryStyle(d.category)
+                const barBg = cat.barSolid
+                return (
+                  <div
+                    key={d.category}
+                    className={cn('h-full flex items-center justify-center text-[9px] font-bold text-white/90 transition-all hover:brightness-110', barBg, i === drivers.length - 1 && 'rounded-r-lg')}
+                    style={{ width: `${Math.max(pct, 2.5)}%` }}
+                    title={`${d.label}: +${fmtM(d.ev_uplift)}`}
+                  >
+                    {pct > 6 ? `+${fmtM(d.ev_uplift)}` : ''}
+                  </div>
+                )
+              })}
+            </div>
+            {/* Legend row */}
+            <div className="flex items-center gap-3 flex-wrap text-[10px] pt-1">
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" />
+                <span className="text-muted-foreground">Current EV</span>
+              </span>
+              {drivers.map(d => {
+                const cat = getDrsCategoryStyle(d.category)
+                return (
+                  <span key={d.category} className="flex items-center gap-1">
+                    <span className={cn('w-2.5 h-2.5 rounded-sm inline-block', cat.barSolid)} />
+                    <span className="text-muted-foreground">{d.label}</span>
+                    <span className={cn('font-bold', cat.text)}>+{fmtM(d.ev_uplift)}</span>
+                  </span>
+                )
+              })}
+              <span className="ml-auto flex items-center gap-1 font-semibold text-emerald-400">
+                <ArrowRight className="w-3 h-3" /> {fmtM(ceilingEV)}
+              </span>
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* ── Gap Breakdown by Category ──────────────────────────────────── */}
+      {drivers.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Gap Breakdown by Category</h3>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                {drivers.length} categories below the target score of {drivers[0]?.target_score ?? 80} — ranked by EV impact
+              </p>
+            </div>
+            <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />Critical</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" />High</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-muted-foreground/40" />Medium</span>
+            </div>
+          </div>
+
+          {/* Category gap cards */}
+          <div className="space-y-3">
+            {drivers.map((d, i) => (
+              <GapCategoryCard
+                key={d.category}
+                d={d}
+                rank={i + 1}
+                totalGap={totalDriverUplift}
+                initiatives={initiatives}
+                onInitiativeChange={() => queryClient.invalidateQueries({ queryKey: ['analytics-initiatives', companyId] })}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {drivers.length === 0 && (
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-8 text-center space-y-2">
+          <TrendingUp className="w-8 h-8 text-emerald-400 mx-auto" />
+          <p className="text-sm font-semibold text-emerald-400">All categories at or above target</p>
+          <p className="text-xs text-muted-foreground">No value-gap drivers identified — the business scores at investment grade across all DRS dimensions.</p>
+        </div>
+      )}
+
+      {/* ── Advisory Library Triggers ─────────────────────────────────── */}
+      {(() => {
+        const triggered = triggeredQuery.data?.triggered_items ?? []
+        if (triggered.length === 0) return null
+        const byType = {
+          risk_flag:      triggered.filter(i => i.item_type === 'risk_flag'),
+          buyer_question: triggered.filter(i => i.item_type === 'buyer_question'),
+          initiative:     triggered.filter(i => i.item_type === 'initiative'),
+        }
+        const typeLabels = { risk_flag: 'Risk Flags', buyer_question: 'Buyer Questions', initiative: 'Initiatives' }
+        const typeColors = {
+          risk_flag:      { bg: 'bg-red-500/5',    text: 'text-red-400',    border: 'border-red-500/20'    },
+          buyer_question: { bg: 'bg-amber-500/5',  text: 'text-amber-400',  border: 'border-amber-500/20'  },
+          initiative:     { bg: 'bg-blue-500/5',   text: 'text-blue-400',   border: 'border-blue-500/20'   },
+        }
+        const severityColor = { critical: 'text-red-400', high: 'text-amber-400', medium: 'text-blue-400', low: 'text-muted-foreground' }
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <BookOpen className="w-4 h-4 text-amber-400" />
+              <h3 className="text-sm font-semibold text-foreground">Advisory Library Alerts</h3>
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-400">
+                {triggered.length} triggered
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                Library items surfaced because category scores fall below their trigger threshold
+              </span>
+            </div>
+            {Object.entries(byType).map(([type, items]) => {
+              if (items.length === 0) return null
+              const tc = typeColors[type]
+              return (
+                <div key={type} className={cn('rounded-xl border p-4 space-y-3', tc.border, tc.bg)}>
+                  <p className={cn('text-[11px] font-bold uppercase tracking-wider', tc.text)}>
+                    {typeLabels[type]} ({items.length})
+                  </p>
+                  <div className="space-y-2">
+                    {items.map(item => (
+                      <div key={item.id} className="rounded-lg border border-border/50 bg-card/60 px-3 py-2.5 space-y-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-xs font-semibold text-foreground leading-snug">{item.title}</p>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <span className={cn('text-[10px] font-bold capitalize', severityColor[item.severity] ?? 'text-muted-foreground')}>
+                              {item.severity}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground/40">|</span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              {item.category_score?.toFixed(0)} / {item.score_trigger}
+                            </span>
+                          </div>
+                        </div>
+                        {item.content && (
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">{item.content}</p>
+                        )}
+                        <p className="text-[10px] text-muted-foreground/50 capitalize flex items-center gap-1.5">
+                          <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', getDrsCategoryStyle(item.category).dot)} />
+                          {(item.category ?? '').replace(/_/g, ' ')}
+                          {item.score_gap != null && ` · ${item.score_gap.toFixed(0)}-pt gap`}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
+
+      {/* ── Footnote ───────────────────────────────────────────────────── */}
+      <div className="rounded-lg border border-border/40 bg-muted/10 px-4 py-3 text-[10px] text-muted-foreground/60 space-y-1">
+        <p>
+          <span className="font-semibold text-muted-foreground">Note:</span> Uplift estimates are illustrative.
+          Each category's EV impact is modeled by simulating the DRS score change if that category alone
+          were raised to the target, then interpolating the resulting EBITDA multiple from the internal anchor curve.
+          Actual deal value depends on buyer sentiment, market conditions, and execution quality.
+        </p>
+        <p>
+          Category uplifts are not additive — resolving all gaps simultaneously produces the "Potential EV" figure shown above,
+          which may differ from the sum of individual uplifts due to non-linear multiple expansion.
+        </p>
       </div>
     </div>
   )

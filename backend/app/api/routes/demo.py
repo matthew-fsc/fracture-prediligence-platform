@@ -1,133 +1,138 @@
 """
-Demo routes — Meridian Consulting Group demo data, personalized demo links,
+Demo routes — static ABC Company demo payload, personalized demo links,
 spots-remaining counter, and admin link management.
+
+CSV sandbox samples for connectors live under `scripts/generate_sandbox_data.py` (separate narrative).
 """
 
-import random
-import string
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
-from app.ontology.models import DemoLink
+from app.core.db_functions import get_demo_locked, set_demo_locked
+from app.services import demo_service
 
 router = APIRouter()
 
-# ---------------------------------------------------------------------------
-# Hardcoded admin key — in production this would be an env var
-# ---------------------------------------------------------------------------
-ADMIN_API_KEY = "fs-admin-2026"
+TOTAL_SPOTS = settings.DEMO_TOTAL_SPOTS
 
 # ---------------------------------------------------------------------------
-# Spots remaining — module-level mutable state
-# ---------------------------------------------------------------------------
-_spots_remaining = 18
-TOTAL_SPOTS = 20
-
-# ---------------------------------------------------------------------------
-# Static demo data — Meridian Consulting Group (mirrors company_id=1 sandbox)
+# Static demo data — ABC Company (demo_company_seed.py: ~$4.20M TTM rev, ~$1.74M EBITDA proxy)
 # ---------------------------------------------------------------------------
 DEMO_DATA = {
     "company": {
         "id": "demo",
-        "name": "Meridian Consulting Group",
-        "industry": "Professional Services / Management Consulting",
-        "founded": 2014,
-        "state": "CO",
-        "employees": 13,
-        "ttm_revenue": 4280000,
-        "ebitda": 2400000,
-        "ebitda_margin": 56.1,
+        "name": "ABC Company Inc",
+        "industry": "Field Services — Traffic Management & Transportation",
+        "founded": 2009,
+        "state": "CA",
+        "employees": 25,
+        "ttm_revenue": 4196172,
+        "ebitda": 1743357,
+        "ebitda_margin": 41.5,
         "owner": "David Merrill",
         "advisor": "Sarah Chen, CEPA",
         "engagement_stage": "Pre-Diligence",
     },
     "drs": {
-        "base": 81.2,
-        "conservative": 77.4,
-        "optimistic": 85.1,
+        "base": 72.0,
+        "conservative": 68.5,
+        "optimistic": 75.5,
         "tier": "Investment Grade",
         "contributions": {
-            "revenue_quality": 17.6,
-            "financial_integrity": 18.3,
-            "operational_independence": 16.1,
-            "customer_risk": 14.96,
-            "management_team": 16.4,
-            "growth_drivers": 10.76,
+            "revenue_quality": 17.5,
+            "financial_integrity": 14.8,
+            "operational_independence": 14.2,
+            "customer_risk": 10.5,
+            "management_team": 7.2,
+            "growth_drivers": 7.8,
         },
     },
     "category_scores": {
         "revenue_quality": {
-            "composite": 88,
+            "composite": 70,
             "data_confidence": "HIGH",
             "sub_scores": {
-                "recurring_rate": {"score": 91, "label": "87% recurring retainer contracts"},
-                "concentration": {"score": 82, "label": "Top customer 19% of revenue"},
-                "durability": {"score": 90, "label": "83% of contracts multi-year"},
-                "consistency": {"score": 88, "label": "CV 9% — highly consistent"},
-                "nrr": {"score": 89, "label": "NRR 104% — net expansion"},
+                "recurring_rate": {"score": 58, "label": "Project-based municipal work; limited recurring revenue mix"},
+                "concentration": {"score": 62, "label": "Top customer ~49% of TTM revenue — primary concentration risk"},
+                "durability": {"score": 80, "label": "Government contracts provide multi-year durability"},
+                "consistency": {"score": 82, "label": "Revenue trend positive across 3-year P&L window"},
+                "nrr": {"score": 75, "label": "Stable account base; limited expansion within existing accounts"},
             },
         },
         "financial_integrity": {
-            "composite": 91.5,
+            "composite": 74,
             "data_confidence": "HIGH",
             "sub_scores": {
-                "addback_exposure": {"score": 88, "label": "Owner comp $320K vs $280K market (modest delta)"},
-                "expense_completeness": {"score": 96, "label": "96% categorized"},
-                "revenue_completeness": {"score": 98, "label": "98% with period + type"},
-                "data_coverage": {"score": 95, "label": "36 months of data"},
+                "addback_exposure": {"score": 68, "label": "Officer salary $202K vs ~$120K market replacement — $82K addback"},
+                "expense_completeness": {"score": 78, "label": "QB-style GL fully mapped to ontology categories"},
+                "revenue_completeness": {"score": 82, "label": "Monthly 2025 + annual 2023/2024 ingested"},
+                "data_coverage": {"score": 76, "label": "3-year P&L path with complete monthly TTM"},
             },
         },
         "operational_independence": {
-            "composite": 80.7,
+            "composite": 71,
             "data_confidence": "HIGH",
             "sub_scores": {
-                "owner_comp": {"score": 82, "label": "Owner comp $320K vs $280K market ($40K delta)"},
-                "key_person": {"score": 76, "label": "3 senior consultants run day-to-day delivery"},
-                "management_depth": {"score": 84, "label": "Director of Ops + Practice Leads in place"},
-                "staff_stability": {"score": 88, "label": "Avg tenure 5.8 years"},
+                "owner_comp": {"score": 68, "label": "Owner comp normalized; field ops documented"},
+                "key_person": {"score": 65, "label": "Owner-led customer relationships — key person dependency noted"},
+                "management_depth": {"score": 74, "label": "Field leads identified; bench depth improving"},
+                "staff_stability": {"score": 76, "label": "Field staff tenure stable across core accounts"},
             },
         },
         "customer_risk": {
-            "composite": 74.8,
+            "composite": 70,
             "data_confidence": "HIGH",
             "sub_scores": {
-                "concentration": {"score": 72, "label": "Top customer 19% of revenue"},
-                "diversification": {"score": 79, "label": "18 active customers, 4 industries"},
-                "churn": {"score": 71, "label": "28% inactive last 12 months — GAP"},
-                "tenure": {"score": 80, "label": "Avg tenure 4.1 years"},
+                "concentration": {"score": 58, "label": "Top customer ~49% — concentration risk flagged for buyer review"},
+                "diversification": {"score": 76, "label": "68 customers total; 55 active — solid breadth for field services"},
+                "churn": {"score": 72, "label": "13 dormant accounts; 55 active customers retained"},
+                "tenure": {"score": 80, "label": "Municipal relationships multi-year with strong renewal history"},
             },
         },
         "management_team": {
-            "composite": 82,
+            "composite": 72,
             "data_confidence": "MEDIUM",
             "sub_scores": {
-                "completeness": {"score": 84, "label": "Director of Ops, 3 Practice Leads"},
-                "size": {"score": 80, "label": "13 employees, 4 leadership roles"},
-                "ownership": {"score": 78, "label": "Partial equity sharing with 2 principals"},
-                "role_coverage": {"score": 86, "label": "Operations and delivery well-covered"},
+                "completeness": {"score": 72, "label": "Ops + field leads identified; BD coverage gap noted"},
+                "size": {"score": 70, "label": "25 employees — lean field services structure"},
+                "ownership": {"score": 68, "label": "Owner-director role central; succession path in progress"},
+                "role_coverage": {"score": 74, "label": "Core operational roles covered; commercial expansion needed"},
             },
         },
         "growth_drivers": {
-            "composite": 53.8,
+            "composite": 78,
             "data_confidence": "MEDIUM",
             "sub_scores": {
-                "revenue_cagr": {"score": 58, "label": "CAGR 7.9% (2022–2024) — below benchmark"},
-                "new_customers": {"score": 46, "label": "Pipeline 0.46x coverage — GAP"},
-                "contract_pipeline": {"score": 55, "label": "No formal new business development process"},
+                "revenue_cagr": {"score": 76, "label": "2023→2025 TTM growth: $2.79M → $4.20M (+50% over 2 years)"},
+                "new_customers": {"score": 72, "label": "Active customer count stable; new logo acquisition limited"},
+                "contract_pipeline": {"score": 74, "label": "Pipeline coverage below 1.0x; formal BD cadence in development"},
             },
         },
     },
     "enterprise_value": {
-        "floor": 12000000,
-        "midpoint": 14400000,
-        "ceiling": 16800000,
-        "multiple_used": "5.0-7.0",
-        "ebitda_base": 2400000,
+        "floor": 8320000,
+        "midpoint": 9810000,
+        "ceiling": 11320000,
+        "multiple_used": "4.8–6.5",
+        "ebitda_base": 1743357,
+        "multiple_basis": "blended",
+        "drs_multiple_floor": 5.0,
+        "drs_multiple_ceiling": 7.0,
+        "market_reference": None,
+        "valuation_summary": (
+            "~$1.74M normalized EBITDA × blended DRS Investment band (5.0x–7.0x) with curated "
+            "field_services $1M–$5M market reference (4.55x–6.0x). Live /api/analytics/scores/1 should align after re-seed."
+        ),
+        "source_citation": (
+            "Blended per a10_enterprise_value with market_benchmarks field_services band; ABC seed P&L TTM."
+        ),
     },
     "flagged_issues": [
         {
@@ -144,21 +149,21 @@ DEMO_DATA = {
             "id": 2,
             "severity": "HIGH",
             "category": "customer_risk",
-            "title": "28% customer churn rate — above professional services benchmark",
-            "description": "13 of 18 customers are active; 5 accounts went inactive in the trailing 12 months. Industry benchmark for management consulting is 10–15% annual churn. Buyers will apply a revenue quality discount until a retention program is demonstrated.",
-            "data_needed": "Churn analysis by account, client health scoring system",
+            "title": "Customer concentration and dormant accounts",
+            "description": "Top customer is ~49% of TTM revenue and 13 of 68 accounts are inactive (dormant segment). Buyers will haircut revenue quality until concentration and reactivation plans are documented.",
+            "data_needed": "Churn analysis by account, reactivation pipeline, concentration mitigation plan",
             "timeline": "6 months",
-            "ev_impact": 840000,
+            "ev_impact": 480000,
         },
         {
             "id": 3,
             "severity": "MEDIUM",
             "category": "growth_drivers",
-            "title": "CAGR 7.9% trails professional services benchmark of 12%+",
-            "description": "Revenue grew from $3.7M to $4.28M over 36 months — solid but below the benchmark buyers use to justify a premium multiple. Without a documented pipeline and growth plan, buyers will not apply a growth premium to the valuation.",
+            "title": "Growth is project-led — limited premium multiple",
+            "description": "3-year revenue moves from ~$2.79M (2023) to ~$4.20M (2025 TTM) — positive but uneven and below typical buyer expectations for a growth premium without a formal BD engine.",
             "data_needed": "Revenue forecast by account, market expansion plan",
             "timeline": "9 months",
-            "ev_impact": 720000,
+            "ev_impact": 360000,
         },
         {
             "id": 4,
@@ -210,7 +215,7 @@ DEMO_DATA = {
                 "name": "Legal & Corporate",
                 "icon": "shield",
                 "docs": [
-                    {"name": "Certificate of Formation (Colorado)", "status": "complete", "size": "380 KB"},
+                    {"name": "Certificate of Formation (California)", "status": "complete", "size": "380 KB"},
                     {"name": "Operating Agreement — 2023 Amended", "status": "complete", "size": "1.4 MB"},
                     {"name": "Buy-Sell Agreement (2024)", "status": "complete", "size": "890 KB"},
                     {"name": "EIN Confirmation Letter (IRS)", "status": "complete", "size": "160 KB"},
@@ -262,16 +267,16 @@ DEMO_DATA = {
             "category": "customer_risk",
             "severity": "HIGH",
             "buyer_type": "All",
-            "question": "Why did 5 accounts go inactive in the trailing 12 months and what is the reactivation pipeline?",
-            "data_needed": "Churn analysis by account with exit reasons, reactivation outreach log",
+            "question": "What is the plan to reduce top-customer concentration (~49% of TTM) and reactivate dormant accounts?",
+            "data_needed": "Account-level revenue roll-forward, reactivation outreach log, concentration mitigation plan",
         },
         {
             "id": 3,
             "category": "growth_drivers",
             "severity": "HIGH",
             "buyer_type": "PE",
-            "question": "What is the documented plan to accelerate revenue growth from 7.9% CAGR to the 15–20% range required for a premium multiple?",
-            "data_needed": "3-year revenue forecast, market expansion plan, new service line roadmap",
+            "question": "What is the documented plan to build pipeline and new logos beyond project-based municipal awards?",
+            "data_needed": "3-year revenue forecast, BD budget and coverage, win-rate by segment",
         },
         {
             "id": 4,
@@ -282,19 +287,22 @@ DEMO_DATA = {
             "data_needed": "Client success playbook, QBR cadence documentation, NPS results",
         },
     ],
+    # Monthly revenue: same seasonal shape and annual total as demo_company_seed
+    # (MONTHLY_WEIGHTS_2025 × ANNUAL_REVENUE[2025]); each month is distinct; Dec
+    # absorbs cent rounding so the sum equals exactly $4,196,172.
     "monthly_revenue": [
-        {"month": "Jan '24", "revenue": 312000},
-        {"month": "Feb '24", "revenue": 298000},
-        {"month": "Mar '24", "revenue": 358000},
-        {"month": "Apr '24", "revenue": 382000},
-        {"month": "May '24", "revenue": 421000},
-        {"month": "Jun '24", "revenue": 395000},
-        {"month": "Jul '24", "revenue": 368000},
-        {"month": "Aug '24", "revenue": 412000},
-        {"month": "Sep '24", "revenue": 389000},
-        {"month": "Oct '24", "revenue": 354000},
-        {"month": "Nov '24", "revenue": 341000},
-        {"month": "Dec '24", "revenue": 250000},
+        {"month": "Jan '25", "revenue": 226593},
+        {"month": "Feb '25", "revenue": 234986},
+        {"month": "Mar '25", "revenue": 310517},
+        {"month": "Apr '25", "revenue": 373459},
+        {"month": "May '25", "revenue": 423813},
+        {"month": "Jun '25", "revenue": 436402},
+        {"month": "Jul '25", "revenue": 444794},
+        {"month": "Aug '25", "revenue": 415421},
+        {"month": "Sep '25", "revenue": 394440},
+        {"month": "Oct '25", "revenue": 360871},
+        {"month": "Nov '25", "revenue": 297928},
+        {"month": "Dec '25", "revenue": 276948},
     ],
 }
 
@@ -304,15 +312,11 @@ DEMO_DATA = {
 # ---------------------------------------------------------------------------
 
 def _check_admin_key(x_admin_key: Optional[str] = Header(default=None)):
-    if x_admin_key != ADMIN_API_KEY:
+    if not settings.ADMIN_API_KEY:
+        raise HTTPException(status_code=503, detail="Admin API key is not configured")
+    if x_admin_key != settings.ADMIN_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing X-Admin-Key header")
     return x_admin_key
-
-
-def _generate_slug(recipient_name: str) -> str:
-    name_part = recipient_name.lower().replace(" ", "-")[:20]
-    rand_part = "".join(random.choices(string.ascii_lowercase + string.digits, k=5))
-    return f"{name_part}-{rand_part}"
 
 
 # ---------------------------------------------------------------------------
@@ -326,14 +330,82 @@ class CreateLinkRequest(BaseModel):
     sender_note: Optional[str] = None
 
 
+class VerifyAccessCodeRequest(BaseModel):
+    code: str
+
+
+# ---------------------------------------------------------------------------
+# Generic demo access (shared passphrase when DEMO_ACCESS_CODE is set)
+# ---------------------------------------------------------------------------
+
+DEMO_ACCESS_TOKEN_EXPIRE_DAYS = 7
+
+
+def _encode_demo_access_token() -> str:
+    from jose import jwt as _jwt
+    expire = datetime.now(timezone.utc) + timedelta(days=DEMO_ACCESS_TOKEN_EXPIRE_DAYS)
+    return _jwt.encode(
+        {"sub": "demo_access", "exp": expire},
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+    )
+
+
+def _demo_token_valid(token: str) -> bool:
+    from jose import JWTError as _JWTError, jwt as _jwt
+    try:
+        payload = _jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return payload.get("sub") == "demo_access"
+    except _JWTError:
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
 @router.get("/demo/data")
-def get_demo_data():
-    """Return full Meridian Consulting Group demo dataset."""
-    return DEMO_DATA
+def get_demo_data(db: Session = Depends(get_db)):
+    """Return full ABC Company demo dataset with current lock state."""
+    return {**DEMO_DATA, "demo_locked": get_demo_locked(db)}
+
+
+@router.get("/demo/access-status")
+def demo_access_status(
+    x_demo_access_token: Optional[str] = Header(default=None, alias="X-Demo-Access-Token"),
+):
+    """Whether generic demo access is gated and whether the caller's token is valid.
+
+    The demo is ALWAYS gated — access requires either:
+      1. A valid JWT token obtained via /demo/verify-access-code (when DEMO_ACCESS_CODE is set), or
+      2. A personalized slug link (/demo/:slug), which bypasses this check in the frontend.
+
+    When DEMO_ACCESS_CODE is not configured, no code-based entry is possible;
+    visitors must request access via email. The 'code_configured' field tells the
+    frontend whether to show the code input form.
+    """
+    code_configured = bool(settings.DEMO_ACCESS_CODE)
+    if x_demo_access_token and _demo_token_valid(x_demo_access_token):
+        return {"required": True, "granted": True, "code_configured": code_configured}
+    return {"required": True, "granted": False, "code_configured": code_configured}
+
+
+@router.post("/demo/verify-access-code")
+def verify_access_code(body: VerifyAccessCodeRequest):
+    """Exchange the configured passphrase for a short-lived demo access JWT."""
+    if not settings.DEMO_ACCESS_CODE:
+        raise HTTPException(
+            status_code=400,
+            detail="Demo access code is not configured on the server",
+        )
+    provided = (body.code or "").strip()
+    if not secrets.compare_digest(provided, settings.DEMO_ACCESS_CODE):
+        raise HTTPException(status_code=401, detail="Invalid access code")
+    token = _encode_demo_access_token()
+    return {
+        "access_token": token,
+        "expires_in": DEMO_ACCESS_TOKEN_EXPIRE_DAYS * 86400,
+    }
 
 
 @router.get("/spots-remaining")
@@ -350,26 +422,13 @@ def create_demo_link(
     _: str = Depends(_check_admin_key),
 ):
     """Create a personalized demo link for a specific recipient."""
-    slug = _generate_slug(body.recipient_name)
-
-    # Ensure slug uniqueness — retry up to 5 times
-    for _ in range(5):
-        existing = db.query(DemoLink).filter(DemoLink.slug == slug).first()
-        if not existing:
-            break
-        slug = _generate_slug(body.recipient_name)
-
-    link = DemoLink(
-        slug=slug,
+    link = demo_service.create_demo_link(
+        db=db,
         recipient_name=body.recipient_name,
         recipient_firm=body.recipient_firm,
         recipient_email=body.recipient_email,
         sender_note=body.sender_note,
-        created_at=datetime.utcnow(),
     )
-    db.add(link)
-    db.commit()
-    db.refresh(link)
 
     return {
         "id": link.id,
@@ -386,16 +445,7 @@ def create_demo_link(
 @router.get("/demo/{slug}")
 def get_personalized_demo(slug: str, db: Session = Depends(get_db)):
     """Return demo data personalized for the specific recipient link."""
-    link = db.query(DemoLink).filter(DemoLink.slug == slug).first()
-    if not link:
-        raise HTTPException(status_code=404, detail="Demo link not found")
-
-    now = datetime.utcnow()
-    link.visit_count = (link.visit_count or 0) + 1
-    if link.first_visited_at is None:
-        link.first_visited_at = now
-    link.last_visited_at = now
-    db.commit()
+    link = demo_service.get_personalized_demo(db, slug)
 
     return {
         "personalized": {
@@ -403,28 +453,47 @@ def get_personalized_demo(slug: str, db: Session = Depends(get_db)):
             "recipient_firm": link.recipient_firm,
             "recipient_email": link.recipient_email,
         },
-        "demo_data": DEMO_DATA,
+        "demo_data": {**DEMO_DATA, "demo_locked": get_demo_locked(db)},
     }
 
 
 @router.post("/demo/{slug}/track")
 def track_section(slug: str, body: dict, db: Session = Depends(get_db)):
     """Track which section a visitor viewed. Body: { section: str }"""
-    import json as _json
-    link = db.query(DemoLink).filter(DemoLink.slug == slug).first()
-    if not link:
-        return {"status": "ok"}  # silent — don't 404 on tracking calls
-
     section = body.get("section", "")
-    if section:
-        existing: list = _json.loads(link.sections_viewed or "[]")
-        if section not in existing:
-            existing.append(section)
-            link.sections_viewed = _json.dumps(existing)
-        link.last_visited_at = datetime.utcnow()
-        db.commit()
-
+    demo_service.track_section_view(db, slug, section)
     return {"status": "ok"}
+
+
+@router.post("/demo/{slug}/mark-converted")
+def mark_demo_converted(slug: str, db: Session = Depends(get_db)):
+    """Record that the visitor took a conversion action (e.g. requested Founding license)."""
+    demo_service.mark_demo_converted(db, slug)
+    return {"status": "ok"}
+
+
+@router.get("/admin/demo-lock")
+def get_demo_lock_status(
+    db: Session = Depends(get_db),
+    _: str = Depends(_check_admin_key),
+):
+    """Return current demo lock state."""
+    return {"locked": get_demo_locked(db)}
+
+
+class SetDemoLockRequest(BaseModel):
+    locked: bool
+
+
+@router.post("/admin/demo-lock")
+def set_demo_lock(
+    body: SetDemoLockRequest,
+    db: Session = Depends(get_db),
+    _: str = Depends(_check_admin_key),
+):
+    """Set demo lock state. When locked=true, all demo inputs are read-only for visitors."""
+    new_state = set_demo_locked(db, body.locked)
+    return {"locked": new_state}
 
 
 @router.get("/admin/demos")
@@ -433,7 +502,7 @@ def list_demo_links(
     _: str = Depends(_check_admin_key),
 ):
     """Return all demo links ordered by created_at descending."""
-    links = db.query(DemoLink).order_by(DemoLink.created_at.desc()).all()
+    links = demo_service.list_demo_links(db)
     return [
         {
             "id": lnk.id,

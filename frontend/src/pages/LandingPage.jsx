@@ -1,15 +1,9 @@
 import { Link } from 'react-router-dom'
+import { Show, SignInButton, SignUpButton } from '@clerk/react'
 import { AlertTriangle, Clock, BarChart3, FolderOpen, TrendingUp, FileText, CheckSquare } from 'lucide-react'
+import { marketingColors as COLORS } from '../theme/marketingColors'
 
-const COLORS = {
-  bg: '#0C0E12',
-  gold: '#C9973A',
-  lightGold: '#E8B96A',
-  offWhite: '#E8EAED',
-  muted: '#6C7585',
-  card: '#15181E',
-  border: '#212630',
-}
+const HAS_CLERK = Boolean((import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim())
 
 // ---------------------------------------------------------------------------
 // Nav
@@ -33,13 +27,104 @@ function Nav() {
           </span>
         </div>
 
-        {/* Right nav */}
-        <div className="flex items-center gap-6">
+        {/* Right nav — Clerk prebuilt buttons when configured; plain links otherwise */}
+        <div className="flex items-center gap-4 sm:gap-6">
+          {HAS_CLERK ? (
+            <>
+              <Show when="signed-out">
+                <SignInButton
+                  mode="redirect"
+                  forceRedirectUrl="/Home"
+                  style={{
+                    color: COLORS.offWhite,
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: `1px solid ${COLORS.border}`,
+                    background: 'transparent',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Log in
+                </SignInButton>
+                <SignUpButton
+                  mode="redirect"
+                  forceRedirectUrl="/dashboard/onboarding"
+                  style={{
+                    color: COLORS.bg,
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: COLORS.gold,
+                    cursor: 'pointer',
+                    marginLeft: 8,
+                  }}
+                >
+                  Sign up
+                </SignUpButton>
+              </Show>
+              <Show when="signed-in">
+                <Link
+                  to="/Home"
+                  style={{
+                    color: COLORS.offWhite,
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    textDecoration: 'none',
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: `1px solid ${COLORS.border}`,
+                  }}
+                >
+                  Dashboard
+                </Link>
+              </Show>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/sign-in"
+                style={{
+                  color: COLORS.offWhite,
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  textDecoration: 'none',
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: `1px solid ${COLORS.border}`,
+                }}
+              >
+                Log in
+              </Link>
+              <Link
+                to="/sign-up"
+                style={{
+                  color: COLORS.bg,
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  background: COLORS.gold,
+                }}
+              >
+                Sign up
+              </Link>
+            </>
+          )}
           <Link
-            to="/demo"
+            to="/request-demo"
             style={{ color: COLORS.gold, fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 500, textDecoration: 'none' }}
           >
-            See Demo
+            Request live demo
           </Link>
         </div>
       </div>
@@ -96,26 +181,53 @@ function Hero() {
           }}
         >
           Fracture Systems gives CEPA advisors the structure, scoring, and reporting to prepare
-          SMB clients for diligence — before buyers find the gaps.
+          SMB clients for diligence—before buyers find the gaps.
         </p>
 
-        {/* CTA */}
-        <Link
-          to="/demo"
+        {/* CTAs */}
+        <div
           style={{
-            background: COLORS.gold,
-            color: COLORS.bg,
-            fontFamily: "'DM Sans', sans-serif",
-            fontWeight: 600,
-            fontSize: 15,
-            padding: '14px 32px',
-            borderRadius: 8,
-            textDecoration: 'none',
-            display: 'inline-block',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 16,
+            justifyContent: 'center',
+            alignItems: 'center',
           }}
         >
-          See Live Demo →
-        </Link>
+          <Link
+            to="/request-demo"
+            style={{
+              background: COLORS.gold,
+              color: COLORS.bg,
+              fontFamily: "'DM Sans', sans-serif",
+              fontWeight: 600,
+              fontSize: 15,
+              padding: '14px 32px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              display: 'inline-block',
+            }}
+          >
+            Request live demo
+          </Link>
+          <Link
+            to="/sign-in"
+            style={{
+              background: 'transparent',
+              color: COLORS.offWhite,
+              fontFamily: "'DM Sans', sans-serif",
+              fontWeight: 600,
+              fontSize: 15,
+              padding: '14px 28px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              display: 'inline-block',
+              border: `1px solid ${COLORS.border}`,
+            }}
+          >
+            Log in
+          </Link>
+        </div>
       </div>
     </section>
   )
@@ -198,7 +310,7 @@ function Features() {
       Icon: TrendingUp,
       title: 'Diligence Gap Scoring',
       description:
-        'Our DRS engine scores 6 dimensions of business quality. Know exactly what a buyer will find — and fix it first.',
+        'Our DRS engine scores 6 dimensions of business quality. Know exactly what a buyer will find—and fix it first.',
     },
     {
       Icon: FileText,
@@ -370,16 +482,16 @@ function Pricing() {
   const tiers = [
     {
       name: 'Founding Advisor',
-      price: '$179',
+      price: 'TBD',
       badge: 'Limited — 20 spots',
       highlight: true,
       features: ['All Pro features', 'Rate locked for life', 'White-glove onboarding', 'Founding member badge'],
-      cta: 'Claim Founding Access →',
+      cta: 'Claim Founding Access',
       ctaLink: '/pricing',
     },
     {
       name: 'Pro',
-      price: '$299',
+      price: 'TBD',
       badge: null,
       highlight: false,
       features: ['Unlimited clients', 'PDF report generation', 'Data room organization', 'Priority support'],
@@ -388,7 +500,7 @@ function Pricing() {
     },
     {
       name: 'Team',
-      price: '$799',
+      price: 'TBD',
       badge: null,
       highlight: false,
       features: ['Up to 5 advisors', 'Shared client workspace', 'Team reporting', 'API access'],
@@ -422,7 +534,7 @@ function Pricing() {
             marginBottom: 56,
           }}
         >
-          Lock in your advisor rate today.
+          Pricing details coming soon.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -482,15 +594,6 @@ function Pricing() {
                   }}
                 >
                   {tier.price}
-                </span>
-                <span
-                  style={{
-                    color: COLORS.muted,
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontSize: 14,
-                  }}
-                >
-                  /mo
                 </span>
               </div>
 
@@ -578,9 +681,10 @@ function Footer() {
         </p>
 
         {/* Row 2 — links */}
-        <div style={{ display: 'flex', gap: 24, marginBottom: 20 }}>
+        <div style={{ display: 'flex', gap: 24, marginBottom: 20, flexWrap: 'wrap' }}>
           {[
-            { label: 'Demo', to: '/demo' },
+            { label: 'Log in', to: '/sign-in' },
+            { label: 'Request demo', to: '/request-demo' },
             { label: 'Contact', to: 'mailto:matthew@fracturesystems.com' },
           ].map(({ label, to }) => (
             <Link
@@ -607,7 +711,7 @@ function Footer() {
             margin: 0,
           }}
         >
-          matthew@fracturesystems.com · © 2026 Fracture Systems. All rights reserved.
+          matthew@fracturesystems.com — © 2026 Fracture Systems. All rights reserved.
         </p>
       </div>
     </footer>

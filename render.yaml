@@ -1,0 +1,34 @@
+# Render Blueprint — Docker web service (same-origin image).
+# Create a PostgreSQL instance in the Render dashboard (or another provider), then set DATABASE_URL.
+# Adjust `name` / region as needed. See deploy/README.md.
+
+services:
+  - type: web
+    name: prediligence-web
+    runtime: docker
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: APP_ENV
+        value: production
+      - key: RUN_MIGRATIONS
+        value: "true"
+      # Passed into the Docker build stage as ARG (must match Dockerfile) + available at runtime.
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: VITE_API_BASE_URL
+        value: ""
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: CLERK_JWKS_URL
+        sync: false

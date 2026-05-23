@@ -29,7 +29,9 @@ ONTOLOGY_REGISTRY: dict[str, tuple[str, str, list[str]]] = {
         "revenue_stream", "numeric",
         ["sales", "revenue", "net sales", "gross revenue", "billing", "invoiced amount",
          "total revenue", "gross sales", "billings", "fees", "service revenue",
-         "consulting fees", "project revenue", "total income", "net revenue"],
+         "consulting fees", "project revenue", "total income", "net revenue",
+         # QuickBooks synonyms
+         "totalamount", "totalamt", "total amount", "total amt"],
     ),
     "REVENUE_TYPE": (
         "revenue_stream", "categorical",
@@ -45,12 +47,16 @@ ONTOLOGY_REGISTRY: dict[str, tuple[str, str, list[str]]] = {
         "revenue_stream", "date",
         ["period", "month", "year", "date", "invoice date", "billing period",
          "fiscal period", "service period", "transaction date", "posting date",
-         "close date", "bill date", "as of"],
+         "close date", "bill date", "as of",
+         # QuickBooks synonyms
+         "txndate", "txn date", "transaction date"],
     ),
     "REVENUE_CUSTOMER_ID": (
         "revenue_stream", "text",
         ["customer", "client", "account", "customer name", "client name", "account name",
-         "bill to", "sold to", "customer id", "client id", "account id", "contact"],
+         "bill to", "sold to", "customer id", "client id", "account id", "contact",
+         # QuickBooks synonyms — CustomerRef.name on invoice rows
+         "customerref.name", "customerrefname", "customerref name"],
     ),
     "REVENUE_DESCRIPTION": (
         "revenue_stream", "text",
@@ -62,7 +68,9 @@ ONTOLOGY_REGISTRY: dict[str, tuple[str, str, list[str]]] = {
     "CUSTOMER_NAME": (
         "customer", "text",
         ["customer name", "client name", "account name", "company name", "client",
-         "customer", "account", "name", "business name", "organization"],
+         "customer", "account", "name", "business name", "organization",
+         # QuickBooks synonyms
+         "fullyqualifiedname", "fully qualified name", "customerrefname", "customerref name"],
     ),
     "CUSTOMER_TENURE_START": (
         "customer", "date",
@@ -235,6 +243,45 @@ class ColumnMappingResult:
             "excluded": self.excluded,
             "mappings": [m.to_dict() for m in self.mappings],
         }
+
+
+def column_mapping_result_from_stored(stored: dict, ingestion_id: str) -> ColumnMappingResult:
+    """Rebuild ColumnMappingResult from persisted job.column_mappings JSON (after advisor overrides)."""
+    if not stored:
+        return ColumnMappingResult(ingestion_id=ingestion_id)
+    mappings: list[ColumnMapping] = []
+    for m in stored.get("mappings", []):
+        alts_raw = m.get("alternative_fields") or []
+        if alts_raw and isinstance(alts_raw[0], dict):
+            alt_tuples = [(x["field"], int(x["confidence"])) for x in alts_raw]
+        else:
+            alt_tuples = [(x[0], int(x[1])) for x in alts_raw] if alts_raw else []
+        mappings.append(
+            ColumnMapping(
+                source_column=m["source_column"],
+                ontology_field=m.get("ontology_field"),
+                entity_type=m.get("entity_type"),
+                confidence=int(m.get("confidence", 0)),
+                match_method=m.get("match_method", "manual"),
+                match_detail=m.get("match_detail", ""),
+                requires_review=bool(m.get("requires_review", False)),
+                alternative_fields=alt_tuples,
+            )
+        )
+    auto_mapped = sum(
+        1
+        for x in mappings
+        if x.ontology_field and not x.requires_review and x.match_method != "excluded"
+    )
+    excluded = sum(1 for x in mappings if x.match_method == "excluded")
+    review_required = sum(1 for x in mappings if x.requires_review)
+    return ColumnMappingResult(
+        ingestion_id=stored.get("ingestion_id") or ingestion_id,
+        mappings=mappings,
+        auto_mapped=auto_mapped,
+        review_required=review_required,
+        excluded=excluded,
+    )
 
 
 def _normalize(s: str) -> str:

@@ -1,9 +1,19 @@
-import { useState, useEffect } from 'react'
-import { ArrowRight, CheckCircle, AlertCircle } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowRight, CheckCircle, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
+import { Skeleton } from '../components/ui/Skeleton'
 import { cn } from '../lib/utils'
+import { useCompanyId } from '../context/CompanyContext'
+import { apiClient } from '../lib/apiClient'
+import { toast } from '../lib/notify'
+import { withCompanyQuery, resolvePath } from '../lib/navLinks'
 
-const COMPANY_ID = 1
+function useSiblingPath(segment) {
+  const { pathname } = useLocation()
+  return pathname.replace(/\/[^/]*$/, '') + '/' + segment
+}
 
 const ONTOLOGY_FIELDS = [
   'REVENUE_GROSS','REVENUE_TYPE','REVENUE_RECURRING_FLAG','REVENUE_PERIOD','REVENUE_CUSTOMER_ID','REVENUE_DESCRIPTION',
@@ -34,82 +44,213 @@ function methodBadge(m) {
 }
 
 export default function DataMapping() {
-  const [jobs, setJobs]         = useState([])
-  const [selected, setSelected] = useState(null)
+  const companyId = useCompanyId()
+  const qc = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlJobId = searchParams.get('jobId')
+  const { pathname } = useLocation()
+  const isDemo = pathname.startsWith('/demo')
+  const readOnlyDemo = isDemo
+  const dataSourcesPath = useSiblingPath('data-sources')
+  const connectorsPath = withCompanyQuery(resolvePath('/Connectors', pathname), companyId)
+  const [selectedJobId, setSelectedJobId] = useState(null)
   const [mappings, setMappings] = useState([])
   const [overrides, setOverrides] = useState({})
   const [saving, setSaving]     = useState(false)
   const [saved, setSaved]       = useState(false)
+  const [reviewOnly, setReviewOnly] = useState(() => Boolean(urlJobId))
+
+  const companyReady = companyId != null && companyId > 0
+
+  const {
+    data: jobs = [],
+    isLoading: jobsLoading,
+    isError: jobsError,
+    error: jobsErr,
+    refetch: refetchJobs,
+  } = useQuery({
+    queryKey: ['ingestion-jobs', companyId],
+    queryFn: () => apiClient.get(`/api/ingestion/jobs/${companyId}`),
+    enabled: companyReady,
+  })
 
   useEffect(() => {
-    fetch(`/api/ingestion/jobs/${COMPANY_ID}`)
-      .then(r => r.json())
-      .then(data => { setJobs(data); if (data.length > 0) loadJob(data[0].job_id) })
-      .catch(() => {})
-  }, [])
+    if (!jobs.length) {
+      setSelectedJobId(null)
+      return
+    }
+    const ids = jobs.map((j) => j.job_id)
+    const fromUrl = urlJobId ? parseInt(urlJobId, 10) : NaN
+    setSelectedJobId((prev) => {
+      if (Number.isFinite(fromUrl) && ids.includes(fromUrl)) return fromUrl
+      if (prev && ids.includes(prev)) return prev
+      return jobs[0].job_id
+    })
+  }, [jobs, urlJobId])
 
-  async function loadJob(jobId) {
-    try {
-      const res = await fetch(`/api/ingestion/jobs/${COMPANY_ID}/${jobId}`)
-      const job = await res.json()
-      setSelected(job)
-      setMappings(job.mappings?.mappings ?? [])
-    } catch {}
+  function selectJob(id) {
+    setSelectedJobId(id)
+    const next = new URLSearchParams(searchParams)
+    next.set('jobId', String(id))
+    setSearchParams(next, { replace: true })
   }
 
+  const {
+    data: selected,
+    isLoading: jobLoading,
+  } = useQuery({
+    queryKey: ['ingestion-job', companyId, selectedJobId],
+    queryFn: () => apiClient.get(`/api/ingestion/jobs/${companyId}/${selectedJobId}`),
+    enabled: companyReady && !!selectedJobId,
+  })
+
+  useEffect(() => {
+    if (!selected) {
+      setMappings([])
+      return
+    }
+    setMappings(selected.mappings?.mappings ?? [])
+    setOverrides({})
+  }, [selected])
+
   async function saveOverrides() {
+    if (readOnlyDemo) return
     if (!selected || Object.keys(overrides).length === 0) return
     setSaving(true)
     try {
-      await fetch(`/api/ingestion/jobs/${COMPANY_ID}/${selected.job_id}/mappings`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(overrides),
-      })
+      await apiClient.patch(
+        `/api/ingestion/jobs/${companyId}/${selected.job_id}/mappings`,
+        overrides,
+      )
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
-    } catch {}
+      await qc.invalidateQueries({ queryKey: ['ingestion-job', companyId, selected.job_id] })
+      await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
+      toast.success('Mappings saved')
+    } catch (e) {
+      toast.error(e?.message || 'Could not save mappings')
+    }
     setSaving(false)
   }
 
   const reviewRequired = mappings.filter(m => m.requires_review)
   const autoMapped     = mappings.filter(m => !m.requires_review && m.ontology_field)
+  const displayMappings = useMemo(
+    () => (reviewOnly ? mappings.filter(m => m.requires_review) : mappings),
+    [mappings, reviewOnly],
+  )
+  const [errorsOpen, setErrorsOpen] = useState(false)
+
+  // Build lookup: raw_header → sample_values[] from schema profile
+  const sampleValueMap = useMemo(() => {
+    const cols = selected?.schema?.columns ?? []
+    return Object.fromEntries(cols.map(c => [c.raw_header, c.sample_values ?? []]))
+  }, [selected])
+
+  if (!companyReady) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="Field Mapping"
+          subtitle={
+            readOnlyDemo
+              ? 'Demo: column → ontology mappings for ABC Company Inc. are read-only.'
+              : 'Review and approve column → ontology field assignments. Override low-confidence mappings before committing.'
+          }
+        />
+        <p className="text-sm text-muted-foreground">
+          Select or create a client in the header to edit field mappings.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5 max-w-[1400px]">
       <SectionHeader
         title="Field Mapping"
-        subtitle="Review and approve column → ontology field assignments. Override low-confidence mappings before committing."
+        subtitle={
+          readOnlyDemo
+            ? 'Demo: pre-mapped QuickBooks columns for ABC Company Inc. — view only (overrides disabled).'
+            : 'Review and approve column → ontology field assignments. Override low-confidence mappings before committing.'
+        }
         action={selected ? (
-          <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-400">
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-400">
             {autoMapped.length} auto · {reviewRequired.length} review
           </span>
         ) : null}
       />
 
-      {jobs.length === 0 && (
-        <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground text-sm">
-          No ingestion jobs found. Upload a file in <a href="/Connectors" className="text-primary">Data Sources</a> first.
+      {jobsError && (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400 flex items-center justify-between gap-3" role="alert">
+          <span>{jobsErr?.message || 'Could not load jobs'}</span>
+          <button
+            type="button"
+            onClick={() => refetchJobs()}
+            className="text-xs font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          >
+            Retry
+          </button>
         </div>
       )}
 
-      {jobs.length > 0 && (
+      {jobsLoading && (
+        <div className="space-y-3">
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
+      )}
+
+      {!jobsLoading && !jobsError && jobs.length === 0 && (
+        <div className="rounded-xl border border-border bg-card p-8 text-center space-y-3">
+          <p className="text-muted-foreground text-sm">No ingestion jobs found.</p>
+          <p className="text-xs text-muted-foreground">Upload a file first, then return here to review column mappings.</p>
+          <Link
+            to={connectorsPath}
+            className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            Go to Data Sources
+          </Link>
+        </div>
+      )}
+
+      {!jobsLoading && !jobsError && jobs.length > 0 && (
         <div className="grid grid-cols-4 gap-4">
+          {readOnlyDemo && (
+            <div className="col-span-4 rounded-lg border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-sm text-card-foreground">
+              <p className="font-semibold text-amber-400 text-xs uppercase tracking-wide mb-1">Demo — read-only mappings</p>
+              <p className="text-xs text-muted-foreground">
+                You can browse all columns and filter by “needs review,” but dropdowns and save are disabled for the tour.
+              </p>
+            </div>
+          )}
+          {!readOnlyDemo && urlJobId && selectedJobId === parseInt(urlJobId, 10) && (
+            <div className="col-span-4 rounded-lg border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-sm text-card-foreground">
+              <p className="font-semibold text-amber-400 text-xs uppercase tracking-wide mb-1">Mapping review for this upload</p>
+              <p className="text-xs text-muted-foreground">
+                Columns flagged below need a confident ontology field (or exclusion). Unmatched or low-confidence headers stay in
+                <span className="text-amber-400 font-medium"> Needs review</span> until you assign a field and save.
+              </p>
+            </div>
+          )}
           {/* Job selector */}
           <div className="col-span-1">
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Ingestion Jobs</p>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Ingestion Jobs</p>
             <div className="space-y-1">
               {jobs.map(job => (
                 <button
                   key={job.job_id}
-                  onClick={() => loadJob(job.job_id)}
+                  onClick={() => selectJob(job.job_id)}
                   className={cn('w-full text-left px-3 py-2.5 rounded-lg border transition-colors',
                     selected?.job_id === job.job_id
                       ? 'border-primary/20 bg-primary/5 text-foreground'
                       : 'border-border hover:bg-muted/30 text-muted-foreground')}
                 >
                   <p className="text-xs font-medium truncate">{job.filename}</p>
-                  <p className="text-[10px] opacity-60 mt-0.5">{job.status} · {job.row_count ?? 0} rows</p>
+                  <p className="text-[11px] opacity-60 mt-0.5">{job.status} · {job.row_count ?? 0} rows</p>
+                  {job.error_count > 0 && (
+                    <p className="text-[10px] text-red-400 mt-0.5">{job.error_count} parse errors</p>
+                  )}
                 </button>
               ))}
             </div>
@@ -117,7 +258,13 @@ export default function DataMapping() {
 
           {/* Mappings table */}
           <div className="col-span-3">
-            {selected && (
+            {jobLoading && selectedJobId && (
+              <div className="space-y-3">
+                <Skeleton className="h-24 w-full rounded-xl" />
+                <Skeleton className="h-56 w-full rounded-xl" />
+              </div>
+            )}
+            {!jobLoading && selected && (
               <>
                 {/* Summary */}
                 <div className="grid grid-cols-3 gap-3 mb-4">
@@ -127,7 +274,7 @@ export default function DataMapping() {
                     { label: 'Total Columns', value: mappings.length,       total: null,            color: 'blue'    },
                   ].map(k => (
                     <div key={k.label} className="rounded-xl border border-border bg-card p-3">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">{k.label}</p>
+                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-1">{k.label}</p>
                       <p className={cn('text-xl font-bold',
                         k.color === 'emerald' ? 'text-emerald-400' : k.color === 'amber' ? 'text-amber-400' : 'text-blue-400')}>
                         {k.value}
@@ -142,12 +289,69 @@ export default function DataMapping() {
                   ))}
                 </div>
 
+                {/* Extraction errors panel */}
+                {selected.error_count > 0 && (
+                  <div className="rounded-xl border border-red-500/20 bg-red-500/5 overflow-hidden mb-4">
+                    <button
+                      type="button"
+                      onClick={() => setErrorsOpen(o => !o)}
+                      className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-red-500/10 transition-colors"
+                    >
+                      <span className="flex items-center gap-2 text-sm font-semibold text-red-400">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        {selected.error_count.toLocaleString()} row{selected.error_count !== 1 ? 's' : ''} failed to parse
+                        <span className="text-[11px] font-normal text-red-300/70">
+                          ({((selected.error_count / (selected.row_count || 1)) * 100).toFixed(1)}% of {selected.row_count?.toLocaleString()} rows)
+                        </span>
+                      </span>
+                      {errorsOpen
+                        ? <ChevronDown className="w-4 h-4 text-red-400" />
+                        : <ChevronRight className="w-4 h-4 text-red-400" />}
+                    </button>
+                    {errorsOpen && (
+                      <div className="border-t border-red-500/20 px-4 pb-4 pt-3 space-y-2 max-h-72 overflow-y-auto">
+                        {selected.errors && typeof selected.errors === 'object' && Object.keys(selected.errors).length > 0 ? (
+                          Object.entries(selected.errors).map(([key, val]) => (
+                            <div key={key} className="rounded-lg border border-red-500/15 bg-red-500/5 p-2">
+                              <p className="text-[11px] font-semibold text-red-400 font-mono mb-0.5">{key}</p>
+                              <p className="text-[11px] text-muted-foreground break-all">
+                                {typeof val === 'string' ? val : JSON.stringify(val)}
+                              </p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">
+                            {selected.error_count} rows could not be parsed. Re-upload the file with corrected formatting to reduce parse failures.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Mappings */}
+                <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+                  <label
+                    className={cn(
+                      'flex items-center gap-2 text-xs text-muted-foreground select-none',
+                      readOnlyDemo ? 'cursor-default opacity-90' : 'cursor-pointer',
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={reviewOnly}
+                      onChange={e => setReviewOnly(e.target.checked)}
+                      className="rounded border-border"
+                    />
+                    Show only columns needing review
+                  </label>
+                </div>
                 <div className="rounded-xl border border-border bg-card overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                     <p className="text-xs font-semibold text-card-foreground">Column Mappings — {selected.filename}</p>
-                    {Object.keys(overrides).length > 0 && (
+                    {!readOnlyDemo && Object.keys(overrides).length > 0 && (
                       <button
+                        type="button"
                         onClick={saveOverrides}
                         disabled={saving}
                         className="text-xs px-3 py-1 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
@@ -157,7 +361,10 @@ export default function DataMapping() {
                     )}
                   </div>
                   <div className="divide-y divide-border">
-                    {mappings.map((m, i) => (
+                    {displayMappings.length === 0 && reviewOnly && (
+                      <p className="px-4 py-6 text-sm text-muted-foreground text-center">No columns need review for this job.</p>
+                    )}
+                    {displayMappings.map((m, i) => (
                       <div key={i} className={cn('flex items-center gap-4 px-4 py-3', m.requires_review && 'bg-amber-500/5')}>
                         <span className="text-xs text-muted-foreground font-mono w-40 truncate flex-shrink-0" title={m.source_column}>
                           {m.source_column}
@@ -168,7 +375,15 @@ export default function DataMapping() {
                             <select
                               value={overrides[m.source_column] ?? m.ontology_field ?? ''}
                               onChange={e => setOverrides(prev => ({ ...prev, [m.source_column]: e.target.value }))}
-                              className="bg-muted border border-border rounded px-2 py-1 text-xs text-card-foreground focus:outline-none focus:ring-1 focus:ring-primary w-full max-w-xs"
+                              disabled={readOnlyDemo}
+                              aria-label={`Map column ${m.source_column}`}
+                              aria-readonly={readOnlyDemo}
+                              className={cn(
+                                'bg-muted border border-border rounded px-2 py-1 text-xs text-card-foreground w-full max-w-xs',
+                                readOnlyDemo
+                                  ? 'cursor-not-allowed opacity-90'
+                                  : 'focus:outline-none focus:ring-2 focus:ring-ring',
+                              )}
                             >
                               <option value="">— unassigned —</option>
                               {ONTOLOGY_FIELDS.map(f => <option key={f} value={f}>{f}</option>)}
@@ -176,13 +391,22 @@ export default function DataMapping() {
                           ) : (
                             <span className="text-xs font-mono text-primary">{m.ontology_field ?? '—'}</span>
                           )}
-                          <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{m.match_detail}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{m.match_detail}</p>
+                          {(sampleValueMap[m.source_column] ?? []).length > 0 && (
+                            <div className="flex items-center gap-1 mt-1 flex-wrap">
+                              {(sampleValueMap[m.source_column]).slice(0, 4).map((v, vi) => (
+                                <span key={vi} className="text-[10px] font-mono px-1 py-0.5 rounded bg-muted/60 border border-border/40 text-muted-foreground/70 max-w-[120px] truncate" title={String(v)}>
+                                  {String(v)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <span className="text-[10px] text-muted-foreground w-20 text-right flex-shrink-0 capitalize">{m.entity_type ?? '—'}</span>
+                        <span className="text-[11px] text-muted-foreground w-20 text-right flex-shrink-0 capitalize">{m.entity_type ?? '—'}</span>
                         <span className={cn('text-xs font-bold w-10 text-right flex-shrink-0', confidenceColor(m.confidence))}>
                           {m.confidence > 0 ? `${m.confidence}%` : '—'}
                         </span>
-                        <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0', methodBadge(m.match_method))}>
+                        <span className={cn('text-[11px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0', methodBadge(m.match_method))}>
                           {m.match_method}
                         </span>
                         <div className="w-4 flex-shrink-0">

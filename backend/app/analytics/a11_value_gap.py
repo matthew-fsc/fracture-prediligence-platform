@@ -9,25 +9,25 @@ identified diligence gaps are resolved. Produces:
   - Priority ranking of initiatives by EV impact
 
 Gap formula:
-  For each weak category (score < 75):
-    simulated_score = min(score + improvement_delta, 85)
+  For each weak category (score < _TARGET_SCORE):
+    simulated_score = _TARGET_SCORE  (currently 80.0, not 85)
     new_DRS         = weighted composite with simulated score
-    new_EV          = compute_ev(ebitda, new_tier)
+    new_EV          = EBITDA × interpolated_multiple(new_DRS)
     uplift          = new_EV.midpoint - current_EV.midpoint
 """
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Optional
 
 from app.analytics.a9_drs_composite import CategoryScores, compute_drs, WEIGHTS
+from app.core.scoring_rules import SCORING_RULES
 
 
 # Target score for a "resolved" category (investment grade threshold)
-_TARGET_SCORE = 80.0
+_TARGET_SCORE = SCORING_RULES.value_gap_target_score
 
 # DRS-to-multiple anchors: (drs, midpoint_multiple)
-_DRS_MULTIPLE_ANCHORS = [(0, 2.0), (40, 3.0), (55, 4.25), (70, 6.0), (85, 8.0), (100, 9.0)]
+_DRS_MULTIPLE_ANCHORS = SCORING_RULES.drs_multiple_anchors
 
 
 def _drs_to_multiple(drs: float) -> float:
@@ -46,12 +46,12 @@ def _continuous_ev_mid(drs: float, ebitda: float) -> float:
 
 # Category display metadata
 CATEGORY_META = {
-    "revenue_quality":          {"label": "Revenue Quality",          "weight": 0.25},
-    "financial_integrity":      {"label": "Financial Integrity",      "weight": 0.20},
-    "operational_independence": {"label": "Operational Independence", "weight": 0.20},
-    "customer_risk":            {"label": "Customer Risk",            "weight": 0.15},
-    "management_team":          {"label": "Management & Team",        "weight": 0.10},
-    "growth_drivers":           {"label": "Growth Drivers",           "weight": 0.10},
+    "revenue_quality": {"label": "Revenue Quality", "weight": WEIGHTS["revenue_quality"]},
+    "financial_integrity": {"label": "Financial Integrity", "weight": WEIGHTS["financial_integrity"]},
+    "operational_independence": {"label": "Operational Independence", "weight": WEIGHTS["operational_independence"]},
+    "customer_risk": {"label": "Customer Risk", "weight": WEIGHTS["customer_risk"]},
+    "management_team": {"label": "Management & Team", "weight": WEIGHTS["management_team"]},
+    "growth_drivers": {"label": "Growth Drivers", "weight": WEIGHTS["growth_drivers"]},
 }
 
 
@@ -65,6 +65,12 @@ class GapItem:
     drs_uplift: float          # DRS points gained if resolved
     ev_uplift: float           # $ uplift at midpoint EV
     priority: int              # 1 = highest
+    category_weight: float = 0.0
+    ebitda_used: float = 0.0
+    drs_before: float = 0.0
+    drs_after_sim: float = 0.0
+    multiple_before: float = 0.0
+    multiple_after: float = 0.0
 
     def to_dict(self) -> dict:
         return {
@@ -76,6 +82,20 @@ class GapItem:
             "drs_uplift":    round(self.drs_uplift, 2),
             "ev_uplift":     round(self.ev_uplift, 0),
             "priority":      self.priority,
+            "methodology": {
+                "summary": (
+                    "Illustrative marginal enterprise value if only this category were raised to the "
+                    f"target score ({self.target_score}), holding other categories constant."
+                ),
+                "formula": "ev_uplift = EV_mid(DRS_simulated) - EV_mid(DRS_current); "
+                "EV_mid(DRS) = EBITDA × interpolated_multiple(DRS) from internal anchor curve.",
+                "ebitda_ttm_used": round(self.ebitda_used, 2),
+                "category_weight_in_drs": round(self.category_weight * 100, 1),
+                "drs_before": round(self.drs_before, 2),
+                "drs_after_category_at_target": round(self.drs_after_sim, 2),
+                "multiple_mid_before": round(self.multiple_before, 3),
+                "multiple_mid_after": round(self.multiple_after, 3),
+            },
         }
 
 
@@ -111,7 +131,9 @@ def compute_value_gap(
     current_scores: dict of {category_key: float 0-100}
     ebitda: defensible EBITDA in dollars
     """
-    def _build_cat_scores(overrides: dict[str, float] = {}) -> CategoryScores:
+    def _build_cat_scores(overrides: dict[str, float] | None = None) -> CategoryScores:
+        if overrides is None:
+            overrides = {}
         merged = {**current_scores, **overrides}
         return CategoryScores(
             revenue_quality=merged.get("revenue_quality", 50),
@@ -155,6 +177,8 @@ def compute_value_gap(
 
         drs_uplift = sim_drs.base_drs - current_drs.base_drs
         ev_uplift  = sim_mid - current_mid
+        mb = _drs_to_multiple(current_drs.base_drs)
+        ma = _drs_to_multiple(sim_drs.base_drs)
 
         gaps.append(GapItem(
             category=key,
@@ -164,7 +188,13 @@ def compute_value_gap(
             score_gap=round(_TARGET_SCORE - score, 1),
             drs_uplift=drs_uplift,
             ev_uplift=ev_uplift,
-            priority=0,  # set after sort
+            priority=0,
+            category_weight=meta["weight"],
+            ebitda_used=ebitda,
+            drs_before=current_drs.base_drs,
+            drs_after_sim=sim_drs.base_drs,
+            multiple_before=mb,
+            multiple_after=ma,
         ))
 
     # Sort by EV uplift descending

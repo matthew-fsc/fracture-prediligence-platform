@@ -1,89 +1,127 @@
-// Static reference data for Meridian Consulting Group — Client-0 demo
+// Static reference data for ABC Company Inc — Field Services / Traffic Management
 // Live analytics values come from API; these are fallbacks and UI-only fields
 
 export const company = {
-  id: 'meridian-001',
-  name: 'Meridian Consulting Group',
-  initials: 'MC',
-  industry: 'Professional Services',
-  employees: 12,
-  founded: 2018,
+  id: 'abc-company-001',
+  name: 'ABC Company Inc',
+  initials: 'AC',
+  industry: 'Field Services — Traffic Management & Transportation',
+  employees: 13,
+  founded: 2009,
   status: 'Active Engagement',
   stage: 'Pre-Diligence',
 }
 
 // Baseline fallback values — overridden by live API data where available
 export const kpis = {
-  drs: 82,
-  drsPercentile: 68,
-  ebitda: 2_400_000,
-  ebitdaMultiple: 6.0,
-  currentEV: 14_400_000,
-  potentialEV: 19_200_000,
-  valueGap: 4_800_000,
-  ttmRevenue: 4_170_000,
-  revenueGrowthYoY: 7.9,
-  recurringRevenuePct: 68,
-  grossMargin: 58,
-  payrollRatio: 43,
+  drs: 72,
+  drsPercentile: 78,
+  ebitda: 1_743_357,
+  ebitdaMultiple: 5.62,
+  currentEV: 9_810_000,
+  potentialEV: 11_320_000,
+  valueGap: 1_510_000,
+  ttmRevenue: 4_196_172,
+  revenueGrowthYoY: 18.7,
+  recurringRevenuePct: 0,
+  grossMargin: 44.4,
+  payrollRatio: 29.2,
 }
 
+// Category scores derived from drs.contributions in demo.py — each score × weight = contribution; contributions sum to 72.0
+// revenue_quality: 17.5/0.25=70  financial_integrity: 14.8/0.20=74  operational_independence: 14.2/0.20=71
+// customer_risk: 10.5/0.15=70  management_team: 7.2/0.10=72  growth_drivers: 7.8/0.10=78
+//
+// Confidence levels per category (based on demo seeded record counts):
+//   revenue_quality:          MEDIUM — 36 TTM rows (≥12 but <50 for HIGH)
+//   financial_integrity:      MEDIUM — ~84 financial records (≥24 but <100 for HIGH)
+//   operational_independence: HIGH   — 13 employee records (≥10)
+//   customer_risk:            HIGH   — 68 customers (≥20)
+//   management_team:          HIGH   — 13 staff records (≥5)
+//   growth_drivers:           HIGH   — multi-year revenue + customer history
 export const drsCategories = [
-  { name: 'Revenue Quality',          score: 88, weight: 0.25, tier: 'Strong' },
-  { name: 'Financial Integrity',      score: 92, weight: 0.20, tier: 'Strong' },
-  { name: 'Operational Independence', score: 81, weight: 0.20, tier: 'Strong' },
-  { name: 'Customer Risk',            score: 75, weight: 0.15, tier: 'Adequate' },
-  { name: 'Management & Team',        score: 82, weight: 0.10, tier: 'Strong' },
-  { name: 'Growth Drivers',           score: 54, weight: 0.10, tier: 'Weak' },
+  { name: 'Revenue Quality',          score: 70, weight: 0.25, tier: 'Investment Grade', confidence: 'MEDIUM', scoreRange: { conservative: 68, base: 70, optimistic: 71 } },
+  { name: 'Financial Integrity',      score: 74, weight: 0.20, tier: 'Investment Grade', confidence: 'MEDIUM', scoreRange: { conservative: 72, base: 74, optimistic: 75 } },
+  { name: 'Operational Independence', score: 71, weight: 0.20, tier: 'Investment Grade', confidence: 'HIGH',   scoreRange: { conservative: 71, base: 71, optimistic: 71 } },
+  { name: 'Customer Risk',            score: 70, weight: 0.15, tier: 'Investment Grade', confidence: 'HIGH',   scoreRange: { conservative: 70, base: 70, optimistic: 70 } },
+  { name: 'Management & Team',        score: 72, weight: 0.10, tier: 'Investment Grade', confidence: 'HIGH',   scoreRange: { conservative: 72, base: 72, optimistic: 72 } },
+  { name: 'Growth Drivers',           score: 78, weight: 0.10, tier: 'Investment Grade', confidence: 'HIGH',   scoreRange: { conservative: 78, base: 78, optimistic: 78 } },
 ]
 
+// DRS confidence summary — mirrors the shape returned by the live API's
+// drs.confidence_summary field (built by backend/app/core/confidence.py).
+// Overall = MEDIUM because revenue_quality and financial_integrity have limited
+// row counts.  Band: MEDIUM multipliers (×0.97 conservative, ×1.02 optimistic)
+// applied to affected category scores; composite shifts base 72 → [70, 74].
+export const drsConfidence = {
+  overall_level: 'MEDIUM',
+  score_range: { conservative: 70, base: 72, optimistic: 74 },
+  band_width: 4,
+  category_levels: {
+    revenue_quality:          'MEDIUM',
+    financial_integrity:      'MEDIUM',
+    operational_independence: 'HIGH',
+    customer_risk:            'HIGH',
+    management_team:          'HIGH',
+    growth_drivers:           'HIGH',
+  },
+  factors: [
+    'Limited data for Revenue Quality — minor uncertainty applied. HIGH requires ≥50 revenue rows; MEDIUM requires ≥12.',
+    'Limited data for Financial Integrity — minor uncertainty applied. HIGH requires ≥100 financial records; MEDIUM requires ≥24.',
+  ],
+  low_categories: [],
+  medium_categories: ['revenue_quality', 'financial_integrity'],
+}
+
 export const ebitdaRecast = {
-  reportedNetIncome: 2_150_000,
+  reportedNetIncome: 1_743_357,
   addbackDA: 0,
   addbackInterest: 0,
   addbackTaxes: 0,
-  reportedEBITDA: 2_150_000,
-  addbackOwnerComp: 190_000,
-  addbackPersonal: 58_000,
+  reportedEBITDA: 1_743_357,
+  addbackOwnerComp: 82_221,
+  addbackPersonal: 0,
   addbackNonRecurring: 0,
-  defensibleEBITDA: 2_400_000,
+  defensibleEBITDA: 1_825_578,
   scenarios: {
-    conservative: 2_260_000,
-    base: 2_400_000,
-    aggressive: 2_590_000,
+    conservative: 1_680_000,
+    base: 1_825_578,
+    aggressive: 1_950_000,
   },
 }
 
 export const customerConcentration = [
-  { name: 'Pinnacle Manufacturing LLC', revenuePct: 12, revenue: 487_500,  contractStatus: 'Active',   tenure: 3.2 },
-  { name: 'Vertex Capital Partners',    revenuePct: 10, revenue: 416_000,  contractStatus: 'Active',   tenure: 3.4 },
-  { name: 'Cascade Health Systems',     revenuePct:  9, revenue: 376_000,  contractStatus: 'Active',   tenure: 3.0 },
-  { name: 'Redwood Logistics Inc',      revenuePct:  8, revenue: 334_000,  contractStatus: 'Active',   tenure: 2.9 },
-  { name: 'Summit Technology Group',    revenuePct:  7, revenue: 291_000,  contractStatus: 'Active',   tenure: 2.8 },
-  { name: 'Others (13)',                revenuePct: 54, revenue: 2_265_739, contractStatus: 'Mixed',   tenure: null },
+  { name: 'COMPANY 1',    revenuePct: 49.4, revenue: 2_072_865, contractStatus: 'Active', tenure: 9.0 },
+  { name: 'COMPANY 2',    revenuePct: 19.0, revenue:   796_991, contractStatus: 'Active', tenure: 9.0 },
+  { name: 'COMPANY 3',    revenuePct:  4.9, revenue:   205_694, contractStatus: 'Active', tenure: 8.0 },
+  { name: 'COMPANY 4',    revenuePct:  3.3, revenue:   138_502, contractStatus: 'Active', tenure: 8.0 },
+  { name: 'COMPANY 5',    revenuePct:  2.4, revenue:   100_691, contractStatus: 'Active', tenure: 7.0 },
+  { name: 'Others (63)',  revenuePct: 21.0, revenue:   881_429, contractStatus: 'Mixed',  tenure: null },
 ]
 
+// Seasonal monthly breakdown matching demo.py DEMO_DATA monthly_revenue (sum = $4,196,172)
 export const monthlyRevenue = [
-  { month: "Jan '24", revenue: 306_876 },
-  { month: "Feb '24", revenue: 333_613 },
-  { month: "Mar '24", revenue: 393_245 },
-  { month: "Apr '24", revenue: 314_075 },
-  { month: "May '24", revenue: 365_957 },
-  { month: "Jun '24", revenue: 353_620 },
-  { month: "Jul '24", revenue: 339_100 },
-  { month: "Aug '24", revenue: 339_834 },
-  { month: "Sep '24", revenue: 378_000 },
-  { month: "Oct '24", revenue: 346_071 },
-  { month: "Nov '24", revenue: 350_335 },
-  { month: "Dec '24", revenue: 352_870 },
+  { month: "Jan '25", revenue: 226_593 },
+  { month: "Feb '25", revenue: 234_986 },
+  { month: "Mar '25", revenue: 310_517 },
+  { month: "Apr '25", revenue: 373_459 },
+  { month: "May '25", revenue: 423_813 },
+  { month: "Jun '25", revenue: 436_402 },
+  { month: "Jul '25", revenue: 444_794 },
+  { month: "Aug '25", revenue: 415_421 },
+  { month: "Sep '25", revenue: 394_440 },
+  { month: "Oct '25", revenue: 360_871 },
+  { month: "Nov '25", revenue: 297_928 },
+  { month: "Dec '25", revenue: 276_948 },
 ]
 
 export const valueCreationLevers = [
-  { rank: 1, initiative: 'Growth Acceleration',    valueMin: 1_400_000, valueMax: 2_200_000, detail: 'CAGR 7.9% vs top-quartile benchmark of 20%+ — pipeline at 0.47x coverage', timeline: '18mo', severity: 'high' },
-  { rank: 2, initiative: 'Client Retention',        valueMin: 800_000,  valueMax: 1_400_000, detail: '5 of 18 clients inactive (28% churn) — address at-risk accounts to rebuild ARR', timeline: '12mo', severity: 'high' },
-  { rank: 3, initiative: 'Key Person Dependency',   valueMin: 600_000,  valueMax: 1_000_000, detail: 'CEO holds 60%+ of client relationships — institutional transition plan required', timeline: '12mo', severity: 'high' },
-  { rank: 4, initiative: 'Contract Pipeline',       valueMin: 300_000,  valueMax: 600_000,   detail: '0.47x pipeline coverage — target 1.5x for Investment Grade buyer confidence',  timeline: '6mo',  severity: 'medium' },
-  { rank: 5, initiative: 'Finance Infrastructure',  valueMin: 150_000,  valueMax: 350_000,   detail: 'No dedicated CFO/Controller — PE buyers will require independent financial leadership', timeline: '3mo', severity: 'medium' },
+  { rank: 1, initiative: 'Customer Concentration',    valueMin: 600_000,  valueMax: 1_000_000, detail: 'Top 2 customers = 68.4% of revenue. Reduce below 40% to move from PRE_DILIGENCE to HIGH_RISK tier', timeline: '24mo', severity: 'high' },
+  { rank: 2, initiative: 'Contract Formalization',    valueMin: 400_000,  valueMax: 800_000,   detail: 'Project-based relationships lack MSAs. Contractualize top 10 accounts to increase revenue quality score', timeline: '6mo',  severity: 'high' },
+  { rank: 3, initiative: 'Key Person Dependency',     valueMin: 300_000,  valueMax: 600_000,   detail: 'Owner drives all customer relationships and field ops. Hire operations manager and document processes', timeline: '12mo', severity: 'high' },
+  { rank: 4, initiative: 'Financial Documentation',   valueMin: 150_000,  valueMax: 350_000,   detail: 'No CPA review or audit. Engage CPA for 3-year review to support buyer financial integrity score', timeline: '3mo',  severity: 'medium' },
+  { rank: 5, initiative: 'Revenue Diversification',   valueMin: 200_000,  valueMax: 500_000,   detail: 'Add 15+ new customers at $80K+ each to reduce HHI from 2,472 to below 1,500', timeline: '18mo', severity: 'medium' },
+  { rank: 6, initiative: 'EBITDA Margin Improvement', valueMin: 100_000,  valueMax: 250_000,   detail: 'EBITDA margin ~41.5%. Further reduce equipment rental and overtime through fleet ownership and scheduling', timeline: '12mo', severity: 'medium' },
 ]
 
 export const advisoryWorkflowStages = [
@@ -91,24 +129,132 @@ export const advisoryWorkflowStages = [
   { stage: 2, name: 'Data Collection',        status: 'complete',     progress: 100 },
   { stage: 3, name: 'Financial Analysis',     status: 'complete',     progress: 100 },
   { stage: 4, name: 'Business Valuation',     status: 'complete',     progress: 100 },
-  { stage: 5, name: 'Value Gap Analysis',     status: 'in_progress',  progress: 65 },
+  { stage: 5, name: 'Value Gap Analysis',     status: 'in_progress',  progress: 40 },
   { stage: 6, name: 'Risk Mitigation Plan',   status: 'pending',      progress: 0 },
   { stage: 7, name: 'Buyer Readiness',        status: 'pending',      progress: 0 },
   { stage: 8, name: 'Process Preparation',    status: 'pending',      progress: 0 },
   { stage: 9, name: 'Exit Execution',         status: 'pending',      progress: 0 },
 ]
 
-export const recentActivity = [
-  { event: 'DRS updated: 78.4 -> 81.7 (Investment Grade)',    detail: 'Revenue consistency resolved — CV 42% reduced to 10.6% after retainer normalization', time: 'Mar 18' },
-  { event: 'QuickBooks transaction list ingested',             detail: '1,942 rows · 36 months · $11.5M total revenue',                                     time: 'Mar 17' },
-  { event: 'Gusto payroll report ingested',                    detail: '12 active employees · $1.46M annual payroll · $190K above-market owner comp flagged', time: 'Mar 17' },
-  { event: 'HubSpot deals ingested — 13 active contracts',     detail: '$1.74M ARR under contract · avg 26 months remaining',                               time: 'Mar 16' },
+export const engagementTimeline = [
+  {
+    id: 1,
+    milestone: 'Onboarding',
+    date: 'Jan 15, 2025',
+    stage: 'onboarding',
+    status: 'complete',
+    drs: null,
+    drs_tier: null,
+    ebitda: null,
+    ev_floor: null,
+    ev_ceiling: null,
+    ev_midpoint: null,
+    multiple_floor: null,
+    multiple_ceiling: null,
+    notes: 'Initial engagement signed. Financial data package requested. Owner debrief complete — 25 employees, field services, $4M+ revenue base.',
+  },
+  {
+    id: 2,
+    milestone: 'Data Ingestion',
+    date: 'Feb 3, 2025',
+    stage: 'data_collection',
+    status: 'complete',
+    drs: null,
+    drs_tier: null,
+    ebitda: 1_743_357,
+    ev_floor: null,
+    ev_ceiling: null,
+    ev_midpoint: null,
+    multiple_floor: null,
+    multiple_ceiling: null,
+    notes: '3 years QuickBooks P&L, payroll register, and customer data ingested. Reported EBITDA proxy: ~$1.74M. Gross margin ~44%.',
+  },
+  {
+    id: 3,
+    milestone: 'Baseline Valuation',
+    date: 'Feb 14, 2025',
+    stage: 'baseline',
+    status: 'complete',
+    drs: 72.0,
+    drs_tier: 'INVESTMENT',
+    ebitda: 1_743_357,
+    ev_floor: 8_320_000,
+    ev_ceiling: 11_320_000,
+    ev_midpoint: 9_810_000,
+    multiple_floor: 4.8,
+    multiple_ceiling: 6.5,
+    notes: 'INVESTMENT tier with blended DRS (5.0x–7.0x) and curated field_services market band (4.55x–6.0x). EV midpoint ~$9.81M on normalized EBITDA.',
+  },
+  {
+    id: 4,
+    milestone: 'EBITDA Recast',
+    date: 'Mar 1, 2025',
+    stage: 'ebitda_recast',
+    status: 'complete',
+    drs: 72.0,
+    drs_tier: 'INVESTMENT',
+    ebitda: 1_825_578,
+    ev_floor: 8_700_000,
+    ev_ceiling: 11_850_000,
+    ev_midpoint: 10_275_000,
+    multiple_floor: 4.8,
+    multiple_ceiling: 6.5,
+    notes: 'Owner comp normalized to market rate ($120K vs $202K actual). ~$82K addback. Defensible EBITDA ~$1.83M; EV midpoint moves up modestly.',
+  },
+  {
+    id: 5,
+    milestone: 'Value Gap Analysis',
+    date: 'Mar 27, 2025',
+    stage: 'value_gap',
+    status: 'current',
+    drs: 72.0,
+    drs_tier: 'INVESTMENT',
+    ebitda: 1_825_578,
+    ev_floor: 8_700_000,
+    ev_ceiling: 11_850_000,
+    ev_midpoint: 10_275_000,
+    multiple_floor: 4.8,
+    multiple_ceiling: 6.5,
+    notes: 'Value levers focus on concentration, contract formalization, and documentation — upside to ceiling multiple band on execution.',
+  },
+  {
+    id: 6,
+    milestone: '90-Day Quick Wins',
+    date: 'Jun 15, 2025',
+    stage: 'projected_90d',
+    status: 'projected',
+    drs: 74.0,
+    drs_tier: 'INVESTMENT',
+    ebitda: 1_880_000,
+    ev_floor: 9_020_000,
+    ev_ceiling: 12_200_000,
+    ev_midpoint: 10_610_000,
+    multiple_floor: 4.8,
+    multiple_ceiling: 6.5,
+    notes: 'Projected upon MSAs with top accounts, CPA review sign-off, and KPI dashboard deployment.',
+  },
+  {
+    id: 7,
+    milestone: 'Investment Grade Target',
+    date: 'Q1 2027',
+    stage: 'target',
+    status: 'projected',
+    drs: 78.0,
+    drs_tier: 'INVESTMENT',
+    ebitda: 2_050_000,
+    ev_floor: 10_250_000,
+    ev_ceiling: 14_350_000,
+    ev_midpoint: 12_300_000,
+    multiple_floor: 5.0,
+    multiple_ceiling: 7.0,
+    notes: 'Target upon resolving high-priority initiatives: customer concentration <40%, stronger recurring mix, documented ops.',
+  },
 ]
 
-export const marketBenchmarks = [
-  { metric: 'Revenue Growth',    median: 8,  company: 7.9,  direction: 'higher_better', unit: '%' },
-  { metric: 'EBITDA Margin',     median: 22, company: 57.5, direction: 'higher_better', unit: '%' },
-  { metric: 'Payroll Ratio',     median: 55, company: 43,   direction: 'lower_better',  unit: '%' },
-  { metric: 'Recurring Rev.',    median: 55, company: 68,   direction: 'higher_better', unit: '%' },
-  { metric: 'Contract Coverage', median: 45, company: 47,   direction: 'higher_better', unit: '%' },
+export const recentActivity = [
+  { event: 'DRS scored: 72.0/100 — Investment tier',                  detail: 'Blended category scores; recurring revenue still a focus area.', time: 'Mar 27' },
+  { event: 'QuickBooks P&L ingested — 3 fiscal years',               detail: '2023: $2.79M — 2024: $2.75M — 2025: $4.20M — EBITDA proxy ~$1.74M — gross margin ~44%', time: 'Mar 27' },
+  { event: 'EBITDA recast — Officers salary addback $82K',   detail: '$202,221 actual vs $120,000 market rate — defensible EBITDA ~$1.83M', time: 'Mar 27' },
+  { event: 'EV range ~$8.3M–$11.3M (mid ~$9.81M)',   detail: 'Blended DRS + field_services $1M–$5M market band. TTM: COMPANY 1 = 49.4%, top-2 = 68.4%', time: 'Mar 27' },
 ]
+

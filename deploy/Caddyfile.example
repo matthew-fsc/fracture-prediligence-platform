@@ -1,0 +1,7 @@
+# Example Caddy v2 — automatic HTTPS with Let's Encrypt.
+# Run: caddy run --config Caddyfile
+# Point DNS for app.example.com to this host; replace the upstream port if needed.
+
+app.example.com {
+    reverse_proxy 127.0.0.1:8000
+}

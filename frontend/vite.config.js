@@ -9,8 +9,9 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Dev-only: same-origin /api to local FastAPI. For split-origin production builds, set VITE_API_BASE_URL instead.
     proxy: {
-      '/api': { target: 'http://127.0.0.1:8002', changeOrigin: true },
+      '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
     },
   },
 })

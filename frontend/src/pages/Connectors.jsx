@@ -1,9 +1,17 @@
 import { useState, useRef } from 'react'
-import { Upload, AlertCircle, FileText, RefreshCw, ChevronRight, CheckCircle, Circle, Database } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Upload, AlertCircle, FileText, RefreshCw, ChevronRight, Trash2, RotateCcw, Info, Plug, CheckCircle2, XCircle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
+import { useCompanyId } from '../context/CompanyContext'
+import { apiClient } from '../lib/apiClient'
+import { toast } from '../lib/notify'
 
-const COMPANY_ID = 1
+function useSiblingPath(segment) {
+  const { pathname } = useLocation()
+  return pathname.replace(/\/[^/]*$/, '') + '/' + segment
+}
 
 const SOURCE_TYPES = [
   { value: 'quickbooks_pl',  label: 'QuickBooks — P&L' },
@@ -17,19 +25,11 @@ const SOURCE_TYPES = [
   { value: 'unknown',        label: 'Unknown / Other' },
 ]
 
-const MOCK_CONNECTORS = [
-  { type: 'quickbooks', name: 'QuickBooks Online', category: 'accounting', status: 'connected', records: 1917, lastSync: '1h ago', icon: '📊' },
-  { type: 'gusto',      name: 'Gusto Payroll',     category: 'payroll',    status: 'connected', records: 379,  lastSync: '1h ago', icon: '👥' },
-  { type: 'hubspot',    name: 'HubSpot CRM',       category: 'crm',        status: 'connected', records: 31,   lastSync: '1h ago', icon: '🔗' },
-  { type: 'plaid',      name: 'Plaid Banking',     category: 'banking',    status: 'available', records: 0,    lastSync: null,     icon: '🏦' },
-  { type: 'xero',       name: 'Xero',              category: 'accounting', status: 'available', records: 0,    lastSync: null,     icon: '📋' },
-  { type: 'salesforce', name: 'Salesforce',        category: 'crm',        status: 'available', records: 0,    lastSync: null,     icon: '☁️' },
-]
-
-const CATEGORIES = ['all', 'accounting', 'payroll', 'crm', 'banking']
-
-function statusVariant(status) {
-  return { COMPLETE: 'adequate', AWAITING_REVIEW: 'watch', QUARANTINED: 'critical', FAILED: 'critical' }[status] ?? 'medium'
+function jobNeedsPolling(jobs) {
+  if (!Array.isArray(jobs) || jobs.length === 0) return false
+  return jobs.some(j =>
+    j.status === 'RUNNING' || j.status === 'PENDING' || j.status === 'AWAITING_REVIEW',
+  )
 }
 
 function phaseLabel(phase, status) {
@@ -41,204 +41,419 @@ function phaseLabel(phase, status) {
 }
 
 export default function Connectors() {
-  const [jobs, setJobs]             = useState([])
+  const companyId = useCompanyId()
+  const { pathname } = useLocation()
+  const isDemo = pathname.startsWith('/demo')
+
+  const qc = useQueryClient()
+  const fieldMappingBase = useSiblingPath('field-mapping')
   const [uploading, setUploading]   = useState(false)
   const [dragOver, setDragOver]     = useState(false)
   const [sourceType, setSourceType] = useState('unknown')
   const [error, setError]           = useState(null)
-  const [activeCategory, setActiveCategory] = useState('all')
+  const [retryingId, setRetryingId] = useState(null)
+  const [qbFetching, setQbFetching] = useState(false)
   const fileRef = useRef()
 
+  const companyReady = companyId != null && companyId >= 1
+
+  const { data: qbStatus } = useQuery({
+    queryKey: ['qb-status', companyId],
+    queryFn: () => apiClient.get(`/api/qb/status/${companyId}`),
+    enabled: companyReady && !isDemo,
+    staleTime: 60_000,
+  })
+
+  async function connectQuickBooks() {
+    if (!companyReady) return
+    try {
+      const { authorize_url } = await apiClient.get(`/api/qb/authorize/${companyId}`)
+      // Open OAuth consent page; callback will redirect back to this page
+      window.location.href = authorize_url
+    } catch (e) {
+      toast.error(e.message || 'Could not start QuickBooks connection')
+    }
+  }
+
+  async function fetchFromQuickBooks() {
+    if (!companyReady) return
+    setQbFetching(true)
+    try {
+      const result = await apiClient.post(`/api/qb/fetch/${companyId}`, {})
+      await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
+      const count = result.jobs_created?.length ?? 0
+      toast.success(`QuickBooks sync complete — ${count} dataset${count !== 1 ? 's' : ''} ingested`)
+      if (result.errors?.length) {
+        result.errors.forEach(e => toast.error(`QB fetch error: ${e}`))
+      }
+    } catch (e) {
+      toast.error(e.message || 'QuickBooks fetch failed')
+    } finally {
+      setQbFetching(false)
+    }
+  }
+
+  async function disconnectQuickBooks() {
+    try {
+      await apiClient.del(`/api/qb/disconnect/${companyId}`)
+      await qc.invalidateQueries({ queryKey: ['qb-status', companyId] })
+      toast.success('QuickBooks disconnected')
+    } catch (e) {
+      toast.error(e.message || 'Disconnect failed')
+    }
+  }
+
+  const {
+    data: jobs = [],
+    isLoading: jobsLoading,
+  } = useQuery({
+    queryKey: ['ingestion-jobs', companyId],
+    queryFn: () => apiClient.get(`/api/ingestion/jobs/${companyId}`),
+    enabled: companyReady,
+    refetchInterval: (query) => (jobNeedsPolling(query.state.data) ? 2500 : 8000),
+  })
+
+  /** Demo tour: ABC file is pre-seeded server-side; no uploads; no delete. */
+  const demoReadOnly = isDemo
+  const demoDeleteDisabled = isDemo
+
   async function uploadFile(file) {
+    if (!companyReady) {
+      toast.error('Select or create a client in the header before uploading.')
+      return
+    }
+    if (demoReadOnly) {
+      toast.error('Uploads are disabled in the demo — data is pre-loaded for ABC Company Inc.')
+      return
+    }
     setUploading(true)
     setError(null)
     const form = new FormData()
     form.append('file', file)
     form.append('source_type', sourceType)
     try {
-      const res = await fetch(`/api/ingestion/upload/${COMPANY_ID}`, { method: 'POST', body: form })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.detail || 'Upload failed')
-      setJobs(prev => [json, ...prev])
+      await apiClient.postMultipart(`/api/ingestion/upload/${companyId}`, form)
+      await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
+      toast.success('File uploaded — pipeline finished')
     } catch (e) {
-      setError(e.message)
+      const msg = e.message || 'Upload failed'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setUploading(false)
     }
   }
 
-  const connectedCount = MOCK_CONNECTORS.filter(c => c.status === 'connected').length
-  const totalRecords = MOCK_CONNECTORS.reduce((s, c) => s + c.records, 0)
-  const filtered = activeCategory === 'all' ? MOCK_CONNECTORS : MOCK_CONNECTORS.filter(c => c.category === activeCategory)
+  async function deleteJob(jobId) {
+    try {
+      await apiClient.del(`/api/ingestion/jobs/${companyId}/${jobId}`)
+      await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
+    } catch (e) {
+      toast.error('Could not delete job')
+    }
+  }
+
+  async function retryJob(jobId) {
+    setRetryingId(jobId)
+    try {
+      await apiClient.post(`/api/ingestion/jobs/${companyId}/${jobId}/retry`, {})
+      await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
+      await qc.invalidateQueries({ queryKey: ['ingestion-job', companyId, jobId] })
+      toast.success('Pipeline re-run started')
+    } catch (e) {
+      toast.error(e.message || 'Retry failed')
+    } finally {
+      setRetryingId(null)
+    }
+  }
+
+  const totalRecords = jobs.reduce((s, j) => s + (j.row_count ?? 0), 0)
+  const completeJobs = jobs.filter(j => j.status === 'COMPLETE').length
+  const pipelineStatus = jobs.length === 0
+    ? 'No uploads yet'
+    : jobs.some(j => j.status === 'FAILED') ? 'Has errors'
+    : jobs.some(j => j.status === 'AWAITING_REVIEW') ? 'Needs review'
+    : 'Processing'
+  const pipelineColor = jobs.length === 0 || jobs.some(j => j.status === 'FAILED') ? 'red'
+    : jobs.some(j => j.status === 'AWAITING_REVIEW') ? 'amber'
+    : 'emerald'
 
   return (
     <div className="space-y-5 max-w-[1400px]">
+      {isDemo && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 flex gap-3 items-start">
+          <Info className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-card-foreground space-y-1">
+            <p className="font-medium">Demo mode — ABC Company Inc.</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              QuickBooks P&amp;L sample is pre-loaded for this client. Uploads are turned off so the tour stays read-only.
+            </p>
+          </div>
+        </div>
+      )}
+
       <SectionHeader
         title="Data Sources"
-        subtitle="Upload raw files — QuickBooks exports, CRM exports, payroll registers, contracts"
+        subtitle={
+          isDemo
+            ? 'Demo: pre-loaded QuickBooks-style P&L for ABC Company Inc. (full product supports uploads)'
+            : 'Upload raw files — QuickBooks exports, CRM exports, payroll registers, contracts'
+        }
         action={
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-semibold hover:bg-primary/90 transition-colors"
-          >
-            <Upload className="w-3.5 h-3.5" /> Upload CSV
-          </button>
+          demoReadOnly ? null : (
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => fileRef.current?.click()}
+              className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            >
+              <Upload className="w-3.5 h-3.5" /> Upload CSV
+            </button>
+          )
         }
       />
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: 'Connected Sources', value: `${connectedCount}`, sub: 'of 6 available', color: 'emerald' },
-          { label: 'Total Records',     value: totalRecords.toLocaleString(), sub: 'ingested & mapped', color: 'blue' },
-          { label: 'Pipeline Status',   value: 'Healthy', sub: 'last sync 1h ago', color: 'emerald' },
-        ].map(c => (
-          <div key={c.label} className={cn('rounded-xl border p-4',
-            c.color === 'emerald' ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-blue-500/20 bg-blue-500/5')}>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{c.label}</p>
-            <p className={cn('text-xl font-bold', c.color === 'emerald' ? 'text-emerald-400' : 'text-blue-400')}>{c.value}</p>
-            <p className="text-[10px] text-muted-foreground">{c.sub}</p>
-          </div>
-        ))}
+        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Files Uploaded</p>
+          <p className="text-xl font-bold text-blue-400">{jobsLoading ? '—' : jobs.length}</p>
+          <p className="text-[11px] text-muted-foreground">{completeJobs} complete</p>
+        </div>
+        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Total Records</p>
+          <p className="text-xl font-bold text-blue-400">{jobsLoading ? '—' : totalRecords.toLocaleString()}</p>
+          <p className="text-[11px] text-muted-foreground">across all uploads</p>
+        </div>
+        <div className={cn('rounded-xl border p-4',
+          pipelineColor === 'emerald' ? 'border-emerald-500/20 bg-emerald-500/5'
+          : pipelineColor === 'amber' ? 'border-amber-500/20 bg-amber-500/5'
+          : 'border-red-500/20 bg-red-500/5')}>
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Pipeline Status</p>
+          <p className={cn('text-xl font-bold',
+            pipelineColor === 'emerald' ? 'text-emerald-400'
+            : pipelineColor === 'amber' ? 'text-amber-400'
+            : 'text-red-400')}>{pipelineStatus}</p>
+          <p className="text-[11px] text-muted-foreground">{jobs.length} job{jobs.length !== 1 ? 's' : ''} total</p>
+        </div>
       </div>
 
-      {/* Category filter */}
-      <div className="flex items-center gap-2">
-        {CATEGORIES.map(cat => (
-          <button key={cat} onClick={() => setActiveCategory(cat)}
-            className={cn('text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors capitalize',
-              activeCategory === cat ? 'border-primary/20 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted/30')}>
-            {cat}
-          </button>
-        ))}
-      </div>
 
-      {/* Connector grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        {filtered.map(c => (
-          <div key={c.type} className={cn('rounded-xl border bg-card p-4',
-            c.status === 'connected' ? 'border-emerald-500/20' : 'border-border')}>
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">{c.icon}</span>
-                <div>
-                  <p className="text-sm font-semibold text-card-foreground">{c.name}</p>
-                  <p className="text-[10px] text-muted-foreground capitalize">{c.category}</p>
-                </div>
-              </div>
-              <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase',
-                c.status === 'connected' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400' : 'border-border bg-muted text-muted-foreground')}>
-                {c.status}
+      {/* QuickBooks Direct Connection */}
+      {!demoReadOnly && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <Plug className="w-4 h-4 text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-card-foreground">Connect QuickBooks</p>
+              <p className="text-xs text-muted-foreground">Pull P&amp;L, invoices, and customers directly via OAuth — no export needed</p>
+            </div>
+            {qbStatus?.connected && (
+              <span className="ml-auto flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Connected
               </span>
-            </div>
-            {c.status === 'connected' ? (
-              <div className="space-y-1 text-[11px] text-muted-foreground">
-                <div className="flex justify-between">
-                  <span>Records</span>
-                  <span className="font-semibold text-card-foreground">{c.records.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Last sync</span>
-                  <span className="font-semibold text-emerald-400">{c.lastSync}</span>
-                </div>
-              </div>
-            ) : (
-              <button className="w-full text-xs text-center py-1.5 rounded-lg border border-border hover:bg-muted/30 transition-colors text-muted-foreground">
-                Connect
-              </button>
             )}
           </div>
-        ))}
+
+          {qbStatus?.connected ? (
+            <div className="flex items-center gap-3">
+              <div className="flex-1 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+                <p className="text-xs text-muted-foreground">Realm ID: <span className="font-mono text-card-foreground">{qbStatus.realm_id}</span></p>
+                {qbStatus.expires_at && (
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Token expires: {new Date(qbStatus.expires_at).toLocaleString()}</p>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={fetchFromQuickBooks}
+                  disabled={qbFetching}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors"
+                >
+                  {qbFetching ? <RefreshCw className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  {qbFetching ? 'Syncing...' : 'Sync Now'}
+                </button>
+                <button
+                  type="button"
+                  onClick={disconnectQuickBooks}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-red-500/30 text-red-400 rounded-lg text-xs font-semibold hover:bg-red-500/10 transition-colors"
+                >
+                  <XCircle className="w-3 h-3" /> Disconnect
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={connectQuickBooks}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              <Plug className="w-4 h-4" /> Connect QuickBooks
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-border" />
+        <span className="text-[11px] text-muted-foreground uppercase tracking-widest font-semibold">or upload manually</span>
+        <div className="flex-1 h-px bg-border" />
       </div>
 
-      {/* Upload area */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <p className="text-sm font-semibold text-card-foreground mb-4">Manual CSV Upload</p>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="col-span-2">
-            <div
-              onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) uploadFile(f) }}
-              onClick={() => fileRef.current?.click()}
-              className={cn('border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer transition-colors',
-                dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/20')}
-            >
-              <input ref={fileRef} type="file" className="hidden" accept=".csv,.xlsx,.xls,.tsv"
-                onChange={e => { const f = e.target.files[0]; if (f) uploadFile(f) }} />
-              {uploading
-                ? <RefreshCw className="w-8 h-8 text-primary animate-spin mb-3" />
-                : <Upload className="w-8 h-8 text-muted-foreground mb-3" />}
-              <p className="text-sm font-medium text-card-foreground">
-                {uploading ? 'Running pipeline P2–P6...' : 'Drop file here or click to upload'}
-              </p>
-              <p className="text-[11px] text-muted-foreground mt-1">CSV · Excel (.xlsx / .xls) · TSV</p>
-            </div>
-            {error && (
-              <div className="mt-2 flex items-center gap-2 text-xs text-red-400">
-                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
+      {/* Upload area — full uploader only outside demo */}
+      {demoReadOnly ? (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-sm font-semibold text-card-foreground mb-2">Pre-loaded source file</p>
+          <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+            The demo includes a completed QuickBooks P&amp;L export for <span className="text-card-foreground font-medium">ABC Company Inc.</span> No
+            manual upload is required.
+          </p>
+          <div className="rounded-lg border border-border bg-muted/20 p-4">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-semibold mb-2">Pipeline Phases</p>
+            {['P2 Raw Storage', 'P3 Validation', 'P4 Schema Profiling', 'P5 Column Mapping', 'P6 Row Extraction'].map(p => (
+              <div key={p} className="flex items-center gap-1.5 mb-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                <span className="text-[11px] text-muted-foreground">{p}</span>
               </div>
-            )}
+            ))}
           </div>
-
-          <div className="rounded-lg border border-border bg-muted/20 p-4 flex flex-col gap-3">
-            <p className="text-xs font-semibold text-card-foreground">Source Type</p>
-            <select
-              value={sourceType}
-              onChange={e => setSourceType(e.target.value)}
-              className="bg-muted border border-border rounded-md px-3 py-2 text-xs text-card-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              {SOURCE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-            <div className="mt-auto pt-3 border-t border-border">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-2">Pipeline Phases</p>
-              {['P2 Raw Storage', 'P3 Validation', 'P4 Schema Profiling', 'P5 Column Mapping', 'P6 Row Extraction'].map(p => (
-                <div key={p} className="flex items-center gap-1.5 mb-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
-                  <span className="text-[10px] text-muted-foreground">{p}</span>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="text-sm font-semibold text-card-foreground mb-4">Manual CSV Upload</p>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-2">
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={e => {
+                  e.preventDefault()
+                  setDragOver(false)
+                  const f = e.dataTransfer.files[0]
+                  if (f) uploadFile(f)
+                }}
+                onClick={() => fileRef.current?.click()}
+                className={cn('border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer transition-colors',
+                  dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/20')}
+              >
+                <input ref={fileRef} type="file" className="hidden" accept=".csv,.xlsx,.xls,.tsv"
+                  onChange={e => { const f = e.target.files[0]; if (f) uploadFile(f) }} />
+                {uploading
+                  ? <RefreshCw className="w-8 h-8 text-primary animate-spin mb-3" />
+                  : <Upload className="w-8 h-8 text-muted-foreground mb-3" />}
+                <p className="text-sm font-medium text-card-foreground">
+                  {uploading ? 'Running pipeline P2–P11...' : 'Drop file here or click to upload'}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1">CSV · Excel (.xlsx / .xls) · TSV</p>
+              </div>
+              {error && (
+                <div className="mt-2 flex items-center gap-2 text-xs text-red-400">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
                 </div>
-              ))}
+              )}
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/20 p-4 flex flex-col gap-3">
+              <p className="text-xs font-semibold text-card-foreground">Source Type</p>
+              <select
+                value={sourceType}
+                onChange={e => setSourceType(e.target.value)}
+                className="bg-muted border border-border rounded-md px-3 py-2 text-xs text-card-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                {SOURCE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+              <div className="mt-auto pt-3 border-t border-border">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-semibold mb-2">Pipeline Phases</p>
+                {['P2 Raw Storage', 'P3 Validation', 'P4 Schema Profiling', 'P5 Column Mapping', 'P6 Row Extraction'].map(p => (
+                  <div key={p} className="flex items-center gap-1.5 mb-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                    <span className="text-[11px] text-muted-foreground">{p}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Jobs list */}
       {jobs.length > 0 && (
         <div className="space-y-2">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Ingestion Jobs</p>
-          {jobs.map((job, i) => (
-            <div key={i} className="rounded-xl border border-border bg-card p-4">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Ingestion Jobs</p>
+          {jobs.map(job => (
+            <div key={job.job_id} className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-center gap-3 mb-2">
                 <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm font-medium text-card-foreground flex-1 truncate">{job.filename}</span>
-                <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase',
+                <span className={cn('text-[11px] font-bold px-1.5 py-0.5 rounded border uppercase',
                   job.status === 'COMPLETE' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400' :
                   job.status === 'AWAITING_REVIEW' ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' :
                   'border-red-500/20 bg-red-500/10 text-red-400')}>
                   {job.status}
                 </span>
+                {(job.status === 'FAILED' || job.status === 'QUARANTINED') && !demoReadOnly && (
+                  <button
+                    type="button"
+                    onClick={() => retryJob(job.job_id)}
+                    disabled={retryingId === job.job_id}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold border border-border bg-muted/50 hover:bg-muted text-card-foreground disabled:opacity-50"
+                    title="Re-run pipeline from stored file"
+                  >
+                    {retryingId === job.job_id
+                      ? <RefreshCw className="w-3 h-3 animate-spin" />
+                      : <RotateCcw className="w-3 h-3" />}
+                    Retry
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => deleteJob(job.job_id)}
+                  disabled={demoDeleteDisabled}
+                  className="p-1 rounded text-muted-foreground/40 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-25 disabled:pointer-events-none disabled:hover:text-muted-foreground/40"
+                  title={demoDeleteDisabled ? 'Removing jobs is disabled in demo mode' : 'Delete job'}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
               <div className="flex items-center gap-5 text-[11px] text-muted-foreground flex-wrap">
                 <span>{job.row_count ?? '—'} rows</span>
                 <span>{job.mapped_count ?? '—'} columns mapped</span>
                 {job.error_count > 0 && <span className="text-amber-400">{job.error_count} parse errors</span>}
-                <span className="font-mono text-[10px] opacity-60">{job.ingestion_id}</span>
+                <span className="font-mono text-[11px] opacity-60">{job.ingestion_id}</span>
               </div>
               <p className="text-[11px] text-primary mt-1">{phaseLabel(job.phase, job.status)}</p>
               {job.status === 'AWAITING_REVIEW' && (
-                <a href="/DataMapping" className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary font-medium">
+                <Link
+                  to={`${fieldMappingBase}?jobId=${job.job_id}`}
+                  className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary font-medium"
+                >
                   Review column mappings <ChevronRight className="w-3 h-3" />
-                </a>
+                </Link>
               )}
             </div>
           ))}
         </div>
       )}
 
-      {jobs.length === 0 && !uploading && (
-        <div className="text-center py-8 text-muted-foreground text-sm">
-          No files ingested yet. Upload a QuickBooks P&amp;L export to start.
+      {jobs.length === 0 && !uploading && !jobsLoading && (
+        <div className="rounded-xl border border-border bg-card p-8 text-center space-y-3">
+          <p className="text-muted-foreground text-sm">No ingestion jobs yet.</p>
+          <p className="text-xs text-muted-foreground">
+            {isDemo
+              ? 'The demo API should pre-load a QuickBooks P&L job for ABC Company Inc. Restart the backend or run the seed script if this stays empty.'
+              : 'Upload a QuickBooks P&L export or other CSV above to start the pipeline.'}
+          </p>
+          {!demoReadOnly && (
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              Upload a file
+            </button>
+          )}
         </div>
       )}
     </div>
