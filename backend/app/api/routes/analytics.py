@@ -1940,7 +1940,7 @@ def get_engagement_profile(company: CompanyScoped, db: Session = Depends(get_db)
 
 @router.patch("/engagement-profile/{company_id}")
 def patch_engagement_profile(
-    company: CompanyWriteScoped,
+    company: CompanyScoped,
     body: EngagementProfilePayload,
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),

@@ -72,6 +72,9 @@ import EngagementIntake from './pages/EngagementIntake'
 import AdvisoryLibrary from './pages/AdvisoryLibrary'
 import EngagementView from './pages/EngagementView'
 
+// Owner onboarding
+import OwnerOnboardingWizard from './pages/owner/OwnerOnboardingWizard'
+
 // Client portal pages
 import ClientDashboard from './pages/client/ClientDashboard'
 import ClientReadiness from './pages/client/ClientReadiness'
@@ -258,6 +261,18 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <AdminDemos />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* ---------------------------------------------------------------- */}
+            {/* Owner onboarding wizard (require CLIENT role, standalone layout)  */}
+            {/* ---------------------------------------------------------------- */}
+            <Route
+              path="/owner-onboarding"
+              element={
+                <ProtectedRoute requireClient>
+                  <OwnerOnboardingWizard />
                 </ProtectedRoute>
               }
             />

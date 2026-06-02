@@ -45,6 +45,10 @@ def company_to_dict(row: Company) -> dict[str, Any]:
         "report_firm_name": row.report_firm_name,
         "report_cover_blurb": row.report_cover_blurb,
         "report_logo_url": row.report_logo_url,
+        "owner_onboarding_completed_at": (
+            row.owner_onboarding_completed_at.isoformat()
+            if row.owner_onboarding_completed_at else None
+        ),
     }
 
 

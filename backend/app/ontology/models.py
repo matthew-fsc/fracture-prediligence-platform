@@ -102,6 +102,9 @@ class Company(Base):
     report_cover_blurb: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     report_logo_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
 
+    # Owner self-onboarding timestamp; null = not yet completed
+    owner_onboarding_completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
     revenue_streams: Mapped[list[RevenueStream]] = relationship(back_populates="company")
     customers:       Mapped[list[Customer]]       = relationship(back_populates="company")
     employees:       Mapped[list[Employee]]        = relationship(back_populates="company")
