@@ -1,10 +1,12 @@
+import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Network, Building2, Shield, Target, BarChart2,
   ArrowRight, Activity, ListChecks, ChevronRight,
-  Zap, Clock, Loader2, NotebookPen, TrendingUp,
+  Zap, Clock, Loader2, NotebookPen, TrendingUp, Plus,
 } from 'lucide-react'
+import NewClientDialog from '../components/layout/NewClientDialog'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts'
 import { apiClient } from '../lib/apiClient'
 import { cn, fmtM } from '../lib/utils'
@@ -101,6 +103,7 @@ export default function Home() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const companyId = useCompanyId()
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
   const companyReady = companyId != null && companyId > 0
   const go = (appPath) => navigate(withCompanyQuery(resolvePath(appPath, pathname), companyId))
 
@@ -159,25 +162,27 @@ export default function Home() {
     }
     if (companies.length === 0) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
-          <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-            <Building2 className="w-6 h-6 text-primary" />
+        <>
+          <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-4">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <Building2 className="w-7 h-7 text-primary" />
+            </div>
+            <div className="space-y-2 max-w-sm">
+              <h2 className="text-xl font-semibold text-foreground">Welcome to Pre-Diligence</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Add your first client to start building their exit readiness profile.
+              </p>
+            </div>
+            <button
+              onClick={() => setAddDialogOpen(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              <Plus className="w-4 h-4" />
+              Add Your First Client
+            </button>
           </div>
-          <div className="space-y-2 max-w-sm">
-            <h2 className="text-xl font-semibold text-foreground">Welcome to Pre-Diligence</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Create your first client to get started. Use the company switcher in the top-left header to add a client name.
-            </p>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4 text-left max-w-sm w-full">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Getting started</p>
-            <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
-              <li>Click the <span className="text-foreground font-medium">company menu</span> in the header (top-left)</li>
-              <li>Type a client name and press <span className="text-foreground font-medium">+</span></li>
-              <li>Your dashboard will load automatically</li>
-            </ol>
-          </div>
-        </div>
+          <NewClientDialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} />
+        </>
       )
     }
     return workspaceLoadingUi('Preparing workspace…')

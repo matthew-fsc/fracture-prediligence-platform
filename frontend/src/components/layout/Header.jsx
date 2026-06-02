@@ -162,7 +162,7 @@ export default function Header({
     enabled: companyId != null && Number.isFinite(companyId) && companyId > 0,
   })
   const companyName =
-    companyRow?.name ?? (companyId != null ? `Company #${companyId}` : 'Select client')
+    companyRow?.name ?? (companyId != null ? `Company #${companyId}` : 'Add a client…')
 
   const drs = liveScores?.drs?.base
   const ev = liveScores?.enterprise_value?.midpoint ?? null

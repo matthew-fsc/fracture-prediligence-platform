@@ -1,18 +1,16 @@
 import { useState, useRef, useEffect } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Building2, ChevronDown, Loader2, Plus } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { apiClient } from '../../lib/apiClient'
-import { toast } from '../../lib/notify'
 import { useCompany } from '../../context/CompanyContext'
+import NewClientDialog from './NewClientDialog'
 
 export default function CompanySwitcher({ displayName }) {
   const { companyId, setCompanyId } = useCompany()
   const [open, setOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [newName, setNewName] = useState('')
+  const [dialogOpen, setDialogOpen] = useState(false)
   const wrapRef = useRef(null)
-  const qc = useQueryClient()
 
   const { data: companies = [], isLoading, isError } = useQuery({
     queryKey: ['companies'],
@@ -44,25 +42,6 @@ export default function CompanySwitcher({ displayName }) {
     return () => document.removeEventListener('mousedown', onDoc)
   }, [])
 
-  async function handleCreate(e) {
-    e.preventDefault()
-    const name = newName.trim()
-    if (!name) return
-    setCreating(true)
-    try {
-      const c = await apiClient.post('/api/companies', { name })
-      setNewName('')
-      await qc.invalidateQueries({ queryKey: ['companies'] })
-      await qc.invalidateQueries({ queryKey: ['company', c.id] })
-      setCompanyId(c.id)
-      setOpen(false)
-    } catch (e) {
-      toast.error(e?.message || 'Could not create client')
-    } finally {
-      setCreating(false)
-    }
-  }
-
   return (
     <div className="relative" ref={wrapRef}>
       <button
@@ -91,7 +70,7 @@ export default function CompanySwitcher({ displayName }) {
               <p className="text-[11px] text-destructive px-3 py-2">Could not load clients.</p>
             )}
             {!isLoading && !isError && companies.length === 0 && (
-              <p className="text-[11px] text-muted-foreground px-3 py-2">No clients yet — add one below.</p>
+              <p className="text-[11px] text-muted-foreground px-3 py-2 italic">No clients yet</p>
             )}
             {!isLoading &&
               companies.map((c) => (
@@ -113,24 +92,19 @@ export default function CompanySwitcher({ displayName }) {
                 </button>
               ))}
           </div>
-          <form onSubmit={handleCreate} className="border-t border-border p-2 flex gap-1.5 items-center">
-            <input
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="New client name"
-              className="flex-1 min-w-0 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground"
-            />
+          <div className="border-t border-border p-2">
             <button
-              type="submit"
-              disabled={creating || !newName.trim()}
-              className="p-1.5 rounded-md border border-border hover:bg-muted/50 disabled:opacity-50"
-              title="Add client"
+              type="button"
+              onClick={() => { setOpen(false); setDialogOpen(true) }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
             >
-              {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+              <Plus className="w-3.5 h-3.5 flex-shrink-0" />
+              New client…
             </button>
-          </form>
+          </div>
         </div>
       )}
+      <NewClientDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
     </div>
   )
 }
