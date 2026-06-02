@@ -76,6 +76,45 @@ Before ending any session Claude will:
 
 ---
 
+## Demo vs Live System
+
+**The demo system is complete and frozen. All new development targets the live advisor system only.**
+
+### Demo system (frozen — do not modify)
+
+| Concern | Location |
+|---------|----------|
+| Demo routes | `frontend/src/App.jsx` lines 207–254 — `/demo` and `/demo/:slug` |
+| Demo shell | `frontend/src/components/layout/DemoShell.jsx` |
+| Demo sidebar | `frontend/src/components/layout/DemoSidebar.jsx` |
+| Demo components | `frontend/src/components/demo/` (ConversionModal, DemoBanner, DemoDashboardExit) |
+| Demo backend | `backend/app/api/routes/demo.py` |
+| Demo seed data | `backend/scripts/seed_abc_company.py` |
+
+Demo uses a hardcoded company (ID 1 — ABC Company Inc). Routes are unauthenticated. Demo data is static and pre-seeded. The `DemoShell` pre-populates the React Query cache with company 1 so all pages render with demo data. **Do not add features to demo routes** — the demo is a sales/marketing artefact, not a development surface.
+
+### Live advisor system (all active development)
+
+| Concern | Location |
+|---------|----------|
+| Live routes | `frontend/src/App.jsx` lines 296–321 — auth-required advisor routes |
+| Live shell | `frontend/src/components/layout/AppShell.jsx` |
+| Company context | `frontend/src/context/CompanyContext.jsx` — manages active `companyId` |
+| Company switcher | `frontend/src/components/layout/CompanySwitcher.jsx` |
+| Add client dialog | `frontend/src/components/layout/NewClientDialog.jsx` |
+| Companies API | `backend/app/api/routes/companies.py` |
+
+Live companies are user-owned, auth-gated, and multi-tenant. Every backend route must use `Depends(get_company_scope)` — never bypass it. Advisor users create their own company records; there is no shared/demo company in the live system.
+
+### How to distinguish demo from live code
+
+- Demo: no `ProtectedRoute` wrapper, uses `DemoShell`, company is always ID 1
+- Live: wrapped in `ProtectedAdvisorShell`, uses `AppShell`, company from `CompanyContext`
+
+When in doubt: if the file lives under `components/demo/`, `routes/demo.py`, or is only imported by `DemoShell`, it is demo-only. Everything else is live.
+
+---
+
 ## Project Overview
 
 Enterprise M&A operating intelligence platform that transforms raw business data (QuickBooks, CRM, payroll, contracts) into investor-grade operational readiness assessments. Produces:
