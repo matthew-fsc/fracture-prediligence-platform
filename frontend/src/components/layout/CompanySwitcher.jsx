@@ -14,9 +14,10 @@ export default function CompanySwitcher({ displayName }) {
   const wrapRef = useRef(null)
   const qc = useQueryClient()
 
-  const { data: companies = [], isLoading } = useQuery({
+  const { data: companies = [], isLoading, isError } = useQuery({
     queryKey: ['companies'],
     queryFn: () => apiClient.get('/api/companies'),
+    retry: 1,
   })
 
   useEffect(() => {
@@ -85,7 +86,10 @@ export default function CompanySwitcher({ displayName }) {
                 <Loader2 className="w-4 h-4 animate-spin" />
               </div>
             )}
-            {!isLoading && companies.length === 0 && (
+            {isError && (
+              <p className="text-[11px] text-destructive px-3 py-2">Could not load clients.</p>
+            )}
+            {!isLoading && !isError && companies.length === 0 && (
               <p className="text-[11px] text-muted-foreground px-3 py-2">No clients yet — add one below.</p>
             )}
             {!isLoading &&

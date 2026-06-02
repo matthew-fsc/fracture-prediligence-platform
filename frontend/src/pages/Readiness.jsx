@@ -463,6 +463,7 @@ export default function Readiness() {
   }
 
   useEffect(() => {
+    if (!companyId) return
     const profileParam = buyerProfile ? `?buyer_profile=${buyerProfile}` : ''
     apiClient.get(`/api/analytics/scores/${companyId}${profileParam}`)
       .then(setData)
@@ -479,6 +480,20 @@ export default function Readiness() {
       .then(d => setSnapshots(d.snapshots ?? []))
       .catch(() => {})
   }, [refresh, companyId, buyerProfile])
+
+  if (!companyId) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="Diligence Readiness Score"
+          subtitle="Weighted scoring framework — Revenue Quality · Financial Integrity · Operational Independence · Customer Risk · Management · Growth"
+        />
+        <p className="text-sm text-muted-foreground">
+          Select or create a client in the header to load readiness data.
+        </p>
+      </div>
+    )
+  }
 
   if (data === null) {
     return (

@@ -145,8 +145,13 @@ function InviteClientModal({ companyId, onClose }) {
           </>
         ) : (
           <>
-            <p className="text-xs text-emerald-400 mb-3 font-medium">
+            <p className="text-xs text-emerald-400 mb-1 font-medium">
               ✓ Invite created for <strong>{result.invite_email}</strong>
+            </p>
+            <p className="text-[11px] text-muted-foreground mb-3">
+              {result.email_sent
+                ? 'An email was sent to the business owner.'
+                : 'Email delivery is not configured — share the link below manually.'}
             </p>
             <p className="text-xs text-muted-foreground mb-2">
               Share this link with the business owner:

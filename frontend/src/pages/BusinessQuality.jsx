@@ -3,7 +3,6 @@ import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
 import { AlertTriangle } from 'lucide-react'
 import { Skeleton } from '../components/ui/Skeleton'
-import { company as mockCompany } from '../lib/mockData'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell
@@ -64,6 +63,7 @@ export default function BusinessQuality() {
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   useEffect(() => {
+    if (!companyId) { setScores(null); setMetrics(null); return }
     setFetchError(null)
     Promise.all([
       apiClient.get(`/api/analytics/scores/${companyId}`),
@@ -72,6 +72,20 @@ export default function BusinessQuality() {
       .then(([s, m]) => { setScores(s); setMetrics(m) })
       .catch((err) => setFetchError(err?.message || 'Failed to load business quality data'))
   }, [companyId])
+
+  if (!companyId) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="Business Quality"
+          subtitle="Operating metrics benchmarked against industry peers"
+        />
+        <p className="text-sm text-muted-foreground">
+          Select or create a client in the header to load business quality data.
+        </p>
+      </div>
+    )
+  }
 
   if (fetchError) {
     return (
@@ -117,9 +131,8 @@ export default function BusinessQuality() {
   const recurringRate = recurringRateExplicit > 0 ? recurringRateExplicit : recurringRateBehavioral
   const recurringIsBehavioral = recurringRateExplicit === 0 && recurringRateBehavioral > 0
 
-  // Use API headcount when > 1; fall back to known company headcount from mockData
-  const headcount      = (metrics?.total_headcount ?? 0) > 1 ? metrics.total_headcount : mockCompany.employees
-  const revenuePerEmp  = totalRevenue > 0 && headcount > 0 ? totalRevenue / headcount : 0
+  const headcount      = (metrics?.total_headcount ?? 0) > 0 ? metrics.total_headcount : null
+  const revenuePerEmp  = totalRevenue > 0 && headcount != null ? totalRevenue / headcount : null
 
   // YoY growth from total_revenue_by_year
   const revByYear  = metrics?.total_revenue_by_year ?? {}
@@ -156,7 +169,7 @@ export default function BusinessQuality() {
   const ebitdaStatus    = ebitdaMargin >= 25 ? 'strong' : ebitdaMargin >= 15 ? 'adequate' : ebitdaMargin >= 8 ? 'watch' : 'concern'
   // Field services cost ratio benchmarks (includes COGS + OpEx)
   const costStatus      = costRatio <= 65 ? 'strong' : costRatio <= 75 ? 'adequate' : costRatio <= 85 ? 'watch' : 'concern'
-  const empStatus       = revenuePerEmp >= 220000 ? 'strong' : revenuePerEmp >= 130000 ? 'adequate' : 'watch'
+  const empStatus       = revenuePerEmp == null ? 'adequate' : revenuePerEmp >= 220000 ? 'strong' : revenuePerEmp >= 130000 ? 'adequate' : 'watch'
 
   return (
     <div className="space-y-5 max-w-[1400px]">
@@ -260,7 +273,7 @@ export default function BusinessQuality() {
           percentile={costRatio <= 65 ? 80 : costRatio <= 75 ? 55 : 35}
           status={costStatus}
           trendDir={costRatio <= 75 ? 'up' : 'down'}
-          trendLabel={`${costRatio.toFixed(0)}% of revenue to direct costs · ${headcount} employees`}
+          trendLabel={headcount != null ? `${costRatio.toFixed(0)}% of revenue to direct costs · ${headcount} employees` : `${costRatio.toFixed(0)}% of revenue to direct costs`}
         >
           <div className="space-y-1.5">
             <div>
@@ -288,17 +301,17 @@ export default function BusinessQuality() {
         {/* Revenue per Employee */}
         <MetricPanel
           label="Revenue per Employee"
-          displayValue={revenuePerEmp > 0 ? fmtM(revenuePerEmp) : '—'}
+          displayValue={revenuePerEmp != null ? fmtM(revenuePerEmp) : '—'}
           benchmark="Directional — strong = above $180K/employee, watch = below $100K"
-          percentile={revenuePerEmp >= 180000 ? 78 : revenuePerEmp >= 130000 ? 55 : 35}
+          percentile={revenuePerEmp != null ? (revenuePerEmp >= 180000 ? 78 : revenuePerEmp >= 130000 ? 55 : 35) : null}
           status={empStatus}
-          trendDir={revenuePerEmp >= 130000 ? 'up' : 'down'}
-          trendLabel={`${fmtM(revenuePerEmp)} per employee · ${headcount} headcount`}
+          trendDir={revenuePerEmp != null ? (revenuePerEmp >= 130000 ? 'up' : 'down') : 'flat'}
+          trendLabel={revenuePerEmp != null && headcount != null ? `${fmtM(revenuePerEmp)} per employee · ${headcount} headcount` : null}
         >
           <ResponsiveContainer width="100%" height={60}>
             <BarChart
               data={[
-                { n: 'This Co.', v: Math.round(revenuePerEmp / 1000) },
+                { n: 'This Co.', v: revenuePerEmp != null ? Math.round(revenuePerEmp / 1000) : 0 },
                 { n: 'Median',   v: 130 },
                 { n: 'UQ',       v: 180 },
               ]}
