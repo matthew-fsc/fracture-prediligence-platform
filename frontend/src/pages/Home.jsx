@@ -107,6 +107,7 @@ export default function Home() {
   const { data: companies = [], isLoading: companiesLoading } = useQuery({
     queryKey: ['companies'],
     queryFn: () => apiClient.get('/api/companies'),
+    meta: { suppressErrorToast: true },
   })
 
   const { data: liveData = null, isPending: scoresPending } = useQuery({

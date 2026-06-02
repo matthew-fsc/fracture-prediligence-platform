@@ -121,6 +121,9 @@ export function messageFromErrorBody(text, status) {
         .map((d) => (typeof d === 'string' ? d : d?.msg ?? JSON.stringify(d)))
         .join('; ')
     }
+    if (typeof j.detail === 'object' && j.detail !== null) {
+      if (typeof j.detail.message === 'string') return j.detail.message
+    }
     if (j.message && typeof j.message === 'string') return j.message
   } catch {
     /* not JSON */

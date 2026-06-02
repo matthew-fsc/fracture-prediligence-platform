@@ -7,7 +7,6 @@ import CommandPalette from './CommandPalette'
 import { fmtM, cn } from '../../lib/utils'
 import { useUser, useClerk } from '@clerk/react'
 import { apiClient } from '../../lib/apiClient'
-import { toast } from '../../lib/notify'
 
 const PUBLISHABLE_KEY = (import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim()
 
@@ -132,7 +131,6 @@ function StaticUserSection() {
 // UserSection — switches between Clerk and static based on key presence
 // ---------------------------------------------------------------------------
 function UserSection() {
-  const meToastOnce = useRef(false)
   const meQuery = useQuery({
     queryKey: ['me'],
     queryFn: () => apiClient.get('/api/user/subscription'),
@@ -140,16 +138,6 @@ function UserSection() {
     retry: false,
     meta: { suppressErrorToast: true },
   })
-
-  useEffect(() => {
-    if (meQuery.isSuccess) meToastOnce.current = false
-  }, [meQuery.isSuccess])
-
-  useEffect(() => {
-    if (!meQuery.isError || !meQuery.error || meToastOnce.current) return
-    meToastOnce.current = true
-    toast.error(meQuery.error.message || 'Could not load account')
-  }, [meQuery.isError, meQuery.error])
 
   const sub = meQuery.data
 

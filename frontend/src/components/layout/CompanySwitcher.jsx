@@ -18,6 +18,7 @@ export default function CompanySwitcher({ displayName }) {
     queryKey: ['companies'],
     queryFn: () => apiClient.get('/api/companies'),
     retry: 1,
+    meta: { suppressErrorToast: true },
   })
 
   useEffect(() => {
