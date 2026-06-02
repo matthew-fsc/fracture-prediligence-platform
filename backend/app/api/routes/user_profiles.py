@@ -2,12 +2,13 @@
 User profile routes — role management and client access invitations.
 
 Endpoints:
-  GET  /api/me                    — return current user's profile (role, linked company)
-  POST /api/me                    — set or update user role (ADVISOR | CLIENT)
-  POST /api/me/invite-client      — (ADVISOR) create a client invite for a company
-  GET  /api/me/invites            — (ADVISOR) list pending/accepted client invites per company
-  POST /api/me/accept-invite/{token} — (CLIENT) accept an invite, link account to company
-  DELETE /api/me/invites/{invite_id}  — (ADVISOR) revoke an invite
+  GET  /api/me                          — return current user's profile (role, linked company)
+  POST /api/me                          — set or update user role (ADVISOR | CLIENT)
+  POST /api/me/invite-client            — (ADVISOR) create a client invite for a company (sends email)
+  GET  /api/me/invites                  — (ADVISOR) list pending/accepted client invites per company
+  POST /api/me/invites/{id}/resend      — (ADVISOR) resend the invite email
+  POST /api/me/accept-invite/{token}    — (CLIENT) accept an invite, link account to company
+  DELETE /api/me/invites/{invite_id}    — (ADVISOR) revoke an invite
 """
 
 import secrets
@@ -18,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.middleware.auth import CurrentUser, get_current_user, get_current_user_optional
 from app.ontology.models import (
@@ -131,16 +133,18 @@ class InviteClientBody(BaseModel):
 
 
 @router.post("/me/invite-client")
-def invite_client(
+async def invite_client(
     body: InviteClientBody,
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Advisor creates an invite link for a business-owner client.
+    Advisor creates an invite link for a business-owner client and sends them an email.
     The invite is scoped to a specific company the advisor owns.
-    Returns the invite token (frontend constructs the full URL).
+    Returns the invite token and whether an email was dispatched.
     """
+    from app.core.email import send_invite_email
+
     # Verify the advisor owns this company
     company = db.query(Company).filter(Company.id == body.company_id).first()
     if not company:
@@ -148,30 +152,42 @@ def invite_client(
     if company.owner_user_id != user.user_id:
         raise HTTPException(status_code=403, detail="You do not own this company")
 
+    normalized_email = body.invite_email.lower().strip()
+
     # Check if an active invite for this email+company already exists
     existing = (
         db.query(ClientAccess)
         .filter(
             ClientAccess.company_id == body.company_id,
-            ClientAccess.invite_email == body.invite_email.lower().strip(),
+            ClientAccess.invite_email == normalized_email,
             ClientAccess.status == ClientAccessStatus.PENDING,
         )
         .first()
     )
     if existing:
+        invite_url = f"{settings.FRONTEND_URL}/client-invite/{existing.invite_token}"
+        email_sent = await send_invite_email(
+            to=normalized_email,
+            invite_url=invite_url,
+            company_name=company.name,
+            advisor_name_or_firm=body.client_name or "Your M&A advisor",
+        )
         return {
             "invite_token": existing.invite_token,
             "invite_email": existing.invite_email,
+            "invite_url": invite_url,
             "company_id": existing.company_id,
+            "company_name": company.name,
             "status": existing.status,
             "already_existed": True,
+            "email_sent": email_sent,
         }
 
     token = secrets.token_urlsafe(32)
     invite = ClientAccess(
         company_id=body.company_id,
         invited_by_user_id=user.user_id,
-        invite_email=body.invite_email.lower().strip(),
+        invite_email=normalized_email,
         invite_token=token,
         status=ClientAccessStatus.PENDING,
     )
@@ -179,14 +195,55 @@ def invite_client(
     db.commit()
     db.refresh(invite)
 
+    invite_url = f"{settings.FRONTEND_URL}/client-invite/{token}"
+    email_sent = await send_invite_email(
+        to=normalized_email,
+        invite_url=invite_url,
+        company_name=company.name,
+        advisor_name_or_firm=body.client_name or "Your M&A advisor",
+    )
+
     return {
         "invite_token": invite.invite_token,
         "invite_email": invite.invite_email,
+        "invite_url": invite_url,
         "company_id": invite.company_id,
         "company_name": company.name,
         "status": invite.status,
         "already_existed": False,
+        "email_sent": email_sent,
     }
+
+
+# ---------------------------------------------------------------------------
+# POST /api/me/invites/{invite_id}/resend  — advisor resends invite email
+# ---------------------------------------------------------------------------
+
+@router.post("/me/invites/{invite_id}/resend")
+async def resend_invite(
+    invite_id: int,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Resend the invite email for an existing PENDING invite."""
+    from app.core.email import send_invite_email
+
+    invite = db.query(ClientAccess).filter(ClientAccess.id == invite_id).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    if invite.invited_by_user_id != user.user_id:
+        raise HTTPException(status_code=403, detail="Not your invite")
+    if invite.status != ClientAccessStatus.PENDING:
+        raise HTTPException(status_code=409, detail="Only PENDING invites can be resent")
+
+    company = db.query(Company).filter(Company.id == invite.company_id).first()
+    invite_url = f"{settings.FRONTEND_URL}/client-invite/{invite.invite_token}"
+    email_sent = await send_invite_email(
+        to=invite.invite_email,
+        invite_url=invite_url,
+        company_name=company.name if company else "",
+    )
+    return {"status": "resent", "email_sent": email_sent, "invite_url": invite_url}
 
 
 # ---------------------------------------------------------------------------
@@ -218,6 +275,7 @@ def list_invites(
             "company_name": company_names.get(r.company_id, ""),
             "invite_email": r.invite_email,
             "invite_token": r.invite_token,
+            "invite_url": f"{settings.FRONTEND_URL}/client-invite/{r.invite_token}",
             "client_user_id": r.client_user_id,
             "status": r.status,
             "created_at": r.created_at.isoformat() if r.created_at else None,

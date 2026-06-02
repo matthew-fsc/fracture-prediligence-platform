@@ -17,7 +17,7 @@ from app.api.routes import payments, webhooks
 from app.api.routes import copilot
 from app.api.routes import user_profiles
 from app.api.routes import admin_metrics, client_portal, firms, partners, referrals
-from app.api.routes import quickbooks, engagement
+from app.api.routes import quickbooks, engagement, owner_onboarding
 from app.core.config import settings
 from app.core.database import engine, SessionLocal, Base
 
@@ -217,7 +217,8 @@ app.include_router(firms.router,         prefix="/api/firms",         tags=["fir
 app.include_router(partners.router,      prefix="/api/partners",      tags=["partners"])
 app.include_router(admin_metrics.router, prefix="/api/admin",         tags=["admin"])
 app.include_router(quickbooks.router,    prefix="/api/qb",             tags=["quickbooks"])
-app.include_router(engagement.router,    prefix="/api/engagement",     tags=["engagement"])
+app.include_router(engagement.router,       prefix="/api/engagement",       tags=["engagement"])
+app.include_router(owner_onboarding.router, prefix="/api",                  tags=["owner-onboarding"])
 
 
 @app.api_route("/health", methods=["GET", "HEAD"])

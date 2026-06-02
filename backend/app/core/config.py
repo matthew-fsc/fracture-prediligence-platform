@@ -94,6 +94,12 @@ class Settings(BaseSettings):
     QB_REDIRECT_URI: str = "http://localhost:8000/api/qb/callback"
     QB_ENVIRONMENT: str = "sandbox"   # "sandbox" | "production"
 
+    # Email sending — optional. If SENDGRID_API_KEY is set, invite emails are delivered
+    # automatically. Otherwise the invite URL is logged and must be shared manually.
+    SENDGRID_API_KEY: str = ""
+    EMAIL_FROM_ADDRESS: str = "noreply@fracture.io"
+    EMAIL_FROM_NAME: str = "Fracture Platform"
+
     # Referral program — credit (in cents) applied to referrer on each conversion
     REFERRAL_CREDIT_CENTS: int = 2990   # $29.90 ≈ one month Pro
 

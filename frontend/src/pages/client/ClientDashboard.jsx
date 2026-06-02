@@ -9,7 +9,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
   Grid3x3, TrendingUp, Target, NotebookPen,
-  ArrowRight, Folder, AlertCircle, CheckCircle, Clock,
+  ArrowRight, Folder, AlertCircle, CheckCircle, Clock, Building2,
 } from 'lucide-react'
 import { apiClient } from '../../lib/apiClient'
 import { cn, fmtM } from '../../lib/utils'
@@ -57,6 +57,14 @@ export default function ClientDashboard() {
   const { clientCompany } = useUserRole()
   const companyId = clientCompany?.id
 
+  const { data: onboardingState } = useQuery({
+    queryKey: ['owner-onboarding', companyId],
+    queryFn: () => apiClient.get(`/api/owner-onboarding/${companyId}`),
+    enabled: companyId != null,
+    staleTime: 60_000,
+    meta: { suppressErrorToast: true },
+  })
+
   const { data: scores, isPending: scoresPending } = useQuery({
     queryKey: ['analytics-scores', companyId],
     queryFn: () => apiClient.get(`/api/analytics/scores/${companyId}`),
@@ -81,6 +89,8 @@ export default function ClientDashboard() {
     meta: { suppressErrorToast: true },
   })
 
+  const onboardingComplete = onboardingState?.onboarding_complete
+
   const drs = scores?.drs?.base
   const ev = scores?.enterprise_value?.midpoint
   const evFloor = scores?.enterprise_value?.floor
@@ -103,6 +113,28 @@ export default function ClientDashboard() {
         title={`Welcome back${clientCompany?.name ? `, ${clientCompany.name}` : ''}`}
         subtitle="Your exit-readiness dashboard — updated as your advisor refines the analysis."
       />
+
+      {/* ── Onboarding prompt ───────────────────────────────────── */}
+      {onboardingComplete === false && (
+        <div className="flex items-start gap-3 bg-primary/10 border border-primary/30 rounded-xl p-4">
+          <Building2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-primary mb-0.5">Complete your business profile</p>
+            <p className="text-[12px] text-primary/80 mb-3">
+              Your advisor has invited you to share your company details and exit goals.
+              It takes about 5 minutes and helps personalize your readiness analysis.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/owner-onboarding')}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-[12px] font-semibold hover:bg-primary/90 transition-colors"
+            >
+              Start Onboarding
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── KPI row ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

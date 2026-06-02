@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { ArrowRight, NotebookPen, Edit2, Check, X } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
+import InviteOwnerPanel from '../components/advisor/InviteOwnerPanel'
 import { cn, fmtM } from '../lib/utils'
 import { apiClient } from '../lib/apiClient'
 
@@ -301,6 +302,9 @@ export default function CompanyWorkspace() {
         </div>
 
       </div>
+
+      {/* Owner onboarding invite panel */}
+      <InviteOwnerPanel companyId={companyId} companyData={companyData} />
 
       {/* Intelligence cards */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
