@@ -64,6 +64,7 @@ export default function BusinessQuality() {
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   useEffect(() => {
+    if (!companyId) { setScores(null); setMetrics(null); return }
     setFetchError(null)
     Promise.all([
       apiClient.get(`/api/analytics/scores/${companyId}`),
@@ -72,6 +73,20 @@ export default function BusinessQuality() {
       .then(([s, m]) => { setScores(s); setMetrics(m) })
       .catch((err) => setFetchError(err?.message || 'Failed to load business quality data'))
   }, [companyId])
+
+  if (!companyId) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="Business Quality"
+          subtitle="Operating metrics benchmarked against industry peers"
+        />
+        <p className="text-sm text-muted-foreground">
+          Select or create a client in the header to load business quality data.
+        </p>
+      </div>
+    )
+  }
 
   if (fetchError) {
     return (
