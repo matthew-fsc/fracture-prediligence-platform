@@ -8,7 +8,7 @@
 import { useState, useEffect } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Bell, Menu, LogOut } from 'lucide-react'
+import { Menu, LogOut, Clock } from 'lucide-react'
 import { useUser, useClerk } from '@clerk/react'
 import ClientSidebar from './ClientSidebar'
 import { useUserRole } from '../../context/UserRoleContext'
@@ -85,16 +85,8 @@ function ClientHeader({ companyName, liveScores, onOpenMobileNav }) {
         </div>
       </div>
 
-      {/* Right — notifications + user */}
+      {/* Right — user */}
       <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
-        <button
-          type="button"
-          className="p-2.5 rounded-md hover:bg-muted/50 text-muted-foreground min-h-[44px] min-w-[44px] flex items-center justify-center"
-          disabled
-        >
-          <Bell className="w-4 h-4 opacity-60" />
-        </button>
-
         <div className="flex items-center gap-2 pl-2">
           {imageUrl ? (
             <img src={imageUrl} alt="" className="w-7 h-7 rounded-full object-cover" />
@@ -171,7 +163,7 @@ export default function ClientShell() {
   if (!clientCompany) {
     return (
       <div className="dark flex h-screen items-center justify-center bg-background flex-col gap-4 p-8 text-center">
-        <div className="text-amber-400 text-4xl mb-2">⏳</div>
+        <Clock className="w-10 h-10 text-warning mb-2" />
         <h2 className="text-lg font-semibold text-card-foreground">Waiting for your advisor</h2>
         <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">
           Your account isn't linked to a company yet. Your advisor needs to send you an invite link.
