@@ -45,6 +45,7 @@
   }
 
   .dark {
+    --gold: 38 56% 50%;
     --background: 220 20% 6%;
     --foreground: 220 10% 92%;
     --card: 220 18% 10%;
