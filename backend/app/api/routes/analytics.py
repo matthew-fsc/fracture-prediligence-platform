@@ -1244,6 +1244,16 @@ class InitiativeCreate(BaseModel):
     depends_on_initiative_id: Optional[int] = None
 
 
+class InitiativePatch(BaseModel):
+    title: Optional[str] = None
+    category: Optional[str] = None
+    status: Optional[str] = None
+    timeline: Optional[str] = None
+    cost_estimate: Optional[float] = None
+    ev_impact_estimate: Optional[float] = None
+    advisor_ev_override: Optional[float] = None
+
+
 @router.get("/initiatives/{company_id}")
 def list_initiatives(company: CompanyScoped, db: Session = Depends(get_db)):
     rows = (
@@ -1302,6 +1312,66 @@ def create_initiative(
         "depends_on_initiative_id": row.depends_on_initiative_id,
         "source": row.source,
     }
+
+
+def _initiative_to_dict(row: CompanyInitiative) -> dict:
+    return {
+        "id": row.id,
+        "title": row.title,
+        "category": row.category,
+        "status": row.status,
+        "timeline": row.timeline,
+        "cost_estimate": float(row.cost_estimate) if row.cost_estimate is not None else None,
+        "ev_impact_estimate": float(row.ev_impact_estimate) if row.ev_impact_estimate is not None else None,
+        "advisor_ev_override": float(row.advisor_ev_override) if row.advisor_ev_override is not None else None,
+        "depends_on_initiative_id": row.depends_on_initiative_id,
+        "source": row.source,
+    }
+
+
+@router.patch("/initiatives/{company_id}/{initiative_id}")
+def patch_initiative(
+    initiative_id: int,
+    body: InitiativePatch,
+    company: CompanyScoped,
+    db: Session = Depends(get_db),
+):
+    row = (
+        db.query(CompanyInitiative)
+        .filter(
+            CompanyInitiative.id == initiative_id,
+            CompanyInitiative.company_id == company.id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Initiative not found.")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(row, field, value)
+    db.commit()
+    db.refresh(row)
+    return _initiative_to_dict(row)
+
+
+@router.delete("/initiatives/{company_id}/{initiative_id}", status_code=204)
+def delete_initiative(
+    initiative_id: int,
+    company: CompanyScoped,
+    db: Session = Depends(get_db),
+):
+    row = (
+        db.query(CompanyInitiative)
+        .filter(
+            CompanyInitiative.id == initiative_id,
+            CompanyInitiative.company_id == company.id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Initiative not found.")
+    db.delete(row)
+    db.commit()
+    return None
 
 
 def _build_recast_payload(company_id: int, db: Session) -> dict:

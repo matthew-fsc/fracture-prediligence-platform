@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Sparkles, RefreshCw } from 'lucide-react'
 import { Skeleton } from '../components/ui/Skeleton'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -55,12 +55,54 @@ function MetricPanel({ label, displayValue, benchmark, percentile, status, trend
   )
 }
 
+const CAT_LABELS = {
+  revenue_quality: 'Revenue Quality',
+  financial_integrity: 'Financial Integrity',
+  operational_independence: 'Operational Independence',
+  customer_risk: 'Customer Risk',
+  management_team: 'Management & Team',
+  growth_drivers: 'Growth Drivers',
+}
+
 export default function BusinessQuality() {
   const companyId = useCompanyId()
   const [scores, setScores] = useState(null)
   const [metrics, setMetrics] = useState(null)
   const [fetchError, setFetchError] = useState(null)
   const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [aiInsights, setAiInsights] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState(null)
+
+  async function generateAiInterpretation() {
+    if (!scores || !companyId) return
+    setAiLoading(true)
+    setAiError(null)
+    const cats = scores?.category_scores ?? {}
+    const categoryPayload = {}
+    for (const [key, data] of Object.entries(cats)) {
+      const drivers = Object.entries(data?.sub_scores ?? {}).slice(0, 4).map(([k, v]) => ({
+        label: k.replace(/_/g, ' '),
+        value: typeof v?.value === 'number' ? (v.value > 1 ? `${v.value.toFixed(0)}%` : v.value.toFixed(2)) : String(v?.value ?? ''),
+      }))
+      categoryPayload[key] = { score: data?.composite ?? 0, drivers }
+    }
+    try {
+      const result = await apiClient.post(`/api/insights/${companyId}`, {
+        module: 'drs_interpretation',
+        payload: {
+          drs_score: scores.drs_score ?? 0,
+          drs_tier: scores.tier ?? '',
+          categories: categoryPayload,
+        },
+      })
+      if (result.result) setAiInsights(result.result)
+      else setAiError(result.error || 'AI analysis unavailable')
+    } catch (e) {
+      setAiError(e?.message || 'AI analysis unavailable')
+    }
+    setAiLoading(false)
+  }
 
   useEffect(() => {
     if (!companyId) { setScores(null); setMetrics(null); return }
@@ -354,6 +396,59 @@ export default function BusinessQuality() {
             ))}
           </div>
         </MetricPanel>
+      </div>
+
+      {/* AI DRS Score Interpretation */}
+      <div className="rounded-xl border border-violet-500/20 bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-violet-500/15 bg-violet-500/5">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-violet-400" />
+            <div>
+              <h3 className="text-sm font-semibold text-card-foreground">DRS Category Interpretation</h3>
+              <p className="text-[10px] text-muted-foreground">Plain-English explanation of what each score means and what to do about it</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-semibold text-violet-400/70 uppercase tracking-wider">AI-Generated Analysis</span>
+            <button
+              onClick={generateAiInterpretation}
+              disabled={aiLoading}
+              className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 disabled:opacity-50 transition-colors"
+            >
+              {aiLoading
+                ? <><RefreshCw className="w-3 h-3 animate-spin" /> Analyzing…</>
+                : <><Sparkles className="w-3 h-3" /> {aiInsights ? 'Regenerate' : 'Analyze with AI'}</>
+              }
+            </button>
+          </div>
+        </div>
+        <div className="p-5">
+          {!aiInsights && !aiLoading && !aiError && (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              Click "Analyze with AI" to generate plain-English interpretation of each category score.
+            </p>
+          )}
+          {aiLoading && (
+            <div className="space-y-3">
+              {[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+            </div>
+          )}
+          {aiError && !aiLoading && (
+            <p className="text-xs text-red-400/70 text-center py-4">{aiError}</p>
+          )}
+          {aiInsights && !aiLoading && (
+            <div className="space-y-3">
+              {Object.entries(aiInsights).map(([key, text]) => (
+                <div key={key} className="rounded-lg border border-border bg-muted/20 p-4">
+                  <p className="text-[10px] font-semibold text-violet-400/80 uppercase tracking-wider mb-1.5">
+                    {CAT_LABELS[key] ?? key.replace(/_/g, ' ')}
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Revenue chart */}
