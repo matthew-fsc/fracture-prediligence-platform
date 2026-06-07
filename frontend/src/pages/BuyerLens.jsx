@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { AlertCircle, AlertTriangle, Info, FileText, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Info, FileText, ChevronDown, ChevronRight, ExternalLink, Sparkles, RefreshCw } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -128,6 +128,10 @@ export default function BuyerLens() {
   const [draft, setDraft] = useState({ status: 'open', response_text: '', answer_draft: '', mitigating_initiative_id: '' })
   const [savingId, setSavingId] = useState(null)
   const [generatingDraftId, setGeneratingDraftId] = useState(null)
+  const [aiSimulation, setAiSimulation] = useState(null)
+  const [aiSimLoading, setAiSimLoading] = useState(false)
+  const [aiSimError, setAiSimError] = useState(null)
+  const [scores, setScores] = useState(null)
 
   const load = useCallback(() => {
     if (companyId == null || companyId < 1) {
@@ -141,9 +145,11 @@ export default function BuyerLens() {
       apiClient.get(`/api/analytics/buyer-questions/${companyId}`),
       apiClient.get(`/api/analytics/engagement-profile/${companyId}`).catch(() => ({ preferred_buyer_types: [] })),
       apiClient.get(`/api/analytics/initiatives/${companyId}`).catch(() => ({ initiatives: [] })),
+      apiClient.get(`/api/analytics/scores/${companyId}`).catch(() => null),
     ])
-      .then(([qData, profile, inits]) => {
+      .then(([qData, profile, inits, sc]) => {
         setData(qData)
+        setScores(sc)
         const prefs = Array.isArray(profile.preferred_buyer_types) ? profile.preferred_buyer_types : []
         setPreferredBuyers(prefs)
         if (prefs.length > 0) setFilterBuyer('preferred')
@@ -220,6 +226,49 @@ export default function BuyerLens() {
     setSavingId(null)
   }
 
+  async function runAiSimulation() {
+    if (!companyId || !scores) return
+    setAiSimLoading(true)
+    setAiSimError(null)
+    const catScores = {}
+    const cats = scores?.category_scores ?? {}
+    for (const [k, v] of Object.entries(cats)) {
+      catScores[k] = v?.composite ?? 0
+    }
+    const riskFlags = []
+    if (cats.customer_risk?.sub_scores?.concentration_score) {
+      const top = cats.customer_risk.sub_scores.concentration_score
+      riskFlags.push({ label: 'Customer concentration', value: `Top customers = ${top.value ?? '?'}% of revenue` })
+    }
+    if (cats.operational_independence?.sub_scores?.owner_dependency) {
+      const od = cats.operational_independence.sub_scores.owner_dependency
+      riskFlags.push({ label: 'Owner dependency', value: String(od.value ?? '') })
+    }
+    if (cats.revenue_quality?.sub_scores?.recurring_rate) {
+      const rr = cats.revenue_quality.sub_scores.recurring_rate
+      riskFlags.push({ label: 'Recurring revenue', value: `${rr.value ?? 0}%` })
+    }
+    try {
+      const result = await apiClient.post(`/api/insights/${companyId}`, {
+        module: 'buyer_questions',
+        payload: {
+          drs_score: scores.drs_score ?? 0,
+          drs_tier: scores.tier ?? '',
+          ebitda: scores.ev_data?.ebitda_base ?? 0,
+          ev_floor: scores.ev_data?.ev_floor ?? 0,
+          ev_ceiling: scores.ev_data?.ev_ceiling ?? 0,
+          category_scores: catScores,
+          risk_flags: riskFlags,
+        },
+      })
+      if (result.result) setAiSimulation(result.result)
+      else setAiSimError(result.error || 'AI simulation unavailable')
+    } catch (e) {
+      setAiSimError(e?.message || 'AI simulation unavailable')
+    }
+    setAiSimLoading(false)
+  }
+
   const questions = (data?.questions ?? []).filter(q => {
     if (filterCat !== 'all' && q.category !== filterCat) return false
     if (filterSev !== 'all' && q.severity !== filterSev) return false
@@ -275,6 +324,87 @@ export default function BuyerLens() {
       {error && (
         <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-8 text-center text-sm text-red-400">
           {error}
+        </div>
+      )}
+
+      {/* AI Buyer Question Simulation */}
+      {data && (
+        <div className="rounded-xl border border-violet-500/20 bg-card overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-violet-500/15 bg-violet-500/5">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-violet-400" />
+              <div>
+                <h3 className="text-sm font-semibold text-card-foreground">AI PE Diligence Simulation</h3>
+                <p className="text-[10px] text-muted-foreground">Questions a PE buyer would ask, anchored to this company's specific metrics</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-semibold text-violet-400/70 uppercase tracking-wider">AI-Generated Analysis</span>
+              <button
+                onClick={runAiSimulation}
+                disabled={aiSimLoading || !scores}
+                className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 disabled:opacity-50 transition-colors"
+              >
+                {aiSimLoading
+                  ? <><RefreshCw className="w-3 h-3 animate-spin" /> Simulating…</>
+                  : <><Sparkles className="w-3 h-3" /> {aiSimulation ? 'Regenerate' : 'Run AI Simulation'}</>
+                }
+              </button>
+            </div>
+          </div>
+          <div className="p-5">
+            {!aiSimulation && !aiSimLoading && !aiSimError && (
+              <p className="text-xs text-muted-foreground text-center py-4">
+                Click "Run AI Simulation" to generate PE-specific diligence questions anchored to this company's DRS score and risk flags.
+              </p>
+            )}
+            {aiSimLoading && (
+              <div className="space-y-3">
+                {[1,2,3].map(i => (
+                  <div key={i} className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
+                    <Skeleton className="h-3 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                    <Skeleton className="h-3 w-full" />
+                  </div>
+                ))}
+              </div>
+            )}
+            {aiSimError && !aiSimLoading && (
+              <p className="text-xs text-red-400/70 text-center py-4">{aiSimError}</p>
+            )}
+            {aiSimulation && !aiSimLoading && Array.isArray(aiSimulation) && (
+              <div className="space-y-3">
+                {aiSimulation.map((q, i) => (
+                  <div key={i} className="rounded-lg border border-border bg-muted/20 p-4">
+                    <div className="flex items-start gap-2 mb-2">
+                      <span className="text-[10px] font-bold text-violet-400/60 mt-0.5 flex-shrink-0">{String(i+1).padStart(2,'0')}</span>
+                      <p className="text-xs font-semibold text-card-foreground leading-snug flex-1">{q.question}</p>
+                    </div>
+                    <div className="flex items-center gap-2 mb-2 ml-5">
+                      <span className="text-[9px] font-semibold text-violet-400/70 uppercase tracking-wider border border-violet-500/20 bg-violet-500/5 rounded px-1.5 py-0.5">
+                        {(q.risk_category ?? '').replace(/_/g, ' ')}
+                      </span>
+                      {q.metric_anchor && (
+                        <span className="text-[10px] text-muted-foreground italic">↳ {q.metric_anchor}</span>
+                      )}
+                    </div>
+                    {Array.isArray(q.documentation_checklist) && q.documentation_checklist.length > 0 && (
+                      <div className="ml-5">
+                        <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Documentation needed</p>
+                        <ul className="space-y-0.5">
+                          {q.documentation_checklist.map((doc, j) => (
+                            <li key={j} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+                              <span className="text-muted-foreground/40 flex-shrink-0 mt-0.5">·</span>{doc}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

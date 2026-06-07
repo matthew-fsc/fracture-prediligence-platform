@@ -5,7 +5,7 @@ import { cn, fmtM } from '../lib/utils'
 import {
   TrendingUp, DollarSign, Zap, BarChart2, AlertTriangle,
   ExternalLink, Edit2, Check, X, Plus, Trash2, ChevronDown, ChevronRight,
-  Scale, ArrowRight, Info,
+  Scale, ArrowRight, Info, Sparkles, RefreshCw,
 } from 'lucide-react'
 import { apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
@@ -389,6 +389,9 @@ export default function Valuation() {
   const [prefillAddback, setPrefillAddback] = useState(null)
   const [cogsExpanded, setCogsExpanded] = useState(false)
   const [opexExpanded, setOpexExpanded] = useState(false)
+  const [aiDefensibility, setAiDefensibility] = useState(null)
+  const [aiDefLoading, setAiDefLoading] = useState(false)
+  const [aiDefError, setAiDefError] = useState(null)
 
   const companyReady = companyId != null && companyId > 0
 
@@ -546,6 +549,35 @@ export default function Valuation() {
 
   function updateRecastCache(data) {
     queryClient.setQueryData(['ebitda-recast', companyId], data)
+  }
+
+  async function generateAiDefensibility() {
+    const schedule = Array.isArray(recast?.addback_schedule) ? recast.addback_schedule : []
+    if (!schedule.length || !companyId) return
+    setAiDefLoading(true)
+    setAiDefError(null)
+    try {
+      const result = await apiClient.post(`/api/insights/${companyId}`, {
+        module: 'addback_defensibility',
+        payload: {
+          ebitda_base: Number(recast?.reported_ebitda ?? 0),
+          addbacks: schedule.map(ab => ({
+            addback_key: ab.addback_key,
+            description: ab.description,
+            amount: Number(ab.amount ?? 0),
+            category: ab.category,
+            challenge: ab.challenge,
+            documented: ab.documented ?? false,
+            notes: ab.notes ?? '',
+          })),
+        },
+      })
+      if (result.result) setAiDefensibility(result.result)
+      else setAiDefError(result.error || 'AI analysis unavailable')
+    } catch (e) {
+      setAiDefError(e?.message || 'AI analysis unavailable')
+    }
+    setAiDefLoading(false)
   }
 
   function invalidateValuationQueries() {
@@ -841,6 +873,73 @@ export default function Valuation() {
         )}
         </div>
       </div>
+
+      {/* AI Addback Defensibility Narratives */}
+      {addbackSchedule.length > 0 && (
+        <div className="rounded-xl border border-violet-500/20 bg-card overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-violet-500/15 bg-violet-500/5">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-violet-400" />
+              <div>
+                <h3 className="text-sm font-semibold text-card-foreground">Addback Defensibility Narratives</h3>
+                <p className="text-[10px] text-muted-foreground">QofE-ready explanation for each addback item</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-semibold text-violet-400/70 uppercase tracking-wider">AI-Generated Analysis</span>
+              <button
+                onClick={generateAiDefensibility}
+                disabled={aiDefLoading}
+                className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 disabled:opacity-50 transition-colors"
+              >
+                {aiDefLoading
+                  ? <><RefreshCw className="w-3 h-3 animate-spin" /> Analyzing…</>
+                  : <><Sparkles className="w-3 h-3" /> {aiDefensibility ? 'Regenerate' : 'Generate Narratives'}</>
+                }
+              </button>
+            </div>
+          </div>
+          <div className="p-5">
+            {!aiDefensibility && !aiDefLoading && !aiDefError && (
+              <p className="text-xs text-muted-foreground text-center py-4">
+                Click "Generate Narratives" to get a QofE-ready defense for each addback item.
+              </p>
+            )}
+            {aiDefLoading && (
+              <div className="space-y-3">
+                {addbackSchedule.slice(0, 3).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+              </div>
+            )}
+            {aiDefError && !aiDefLoading && (
+              <p className="text-xs text-red-400/70 text-center py-4">{aiDefError}</p>
+            )}
+            {aiDefensibility && !aiDefLoading && (
+              <div className="space-y-3">
+                {addbackSchedule.map(ab => {
+                  const narrative = aiDefensibility[ab.addback_key]
+                  if (!narrative) return null
+                  const challengeMeta = {
+                    LOW: 'text-emerald-400', MEDIUM: 'text-amber-400',
+                    HIGH: 'text-red-400', NOT_DEFENSIBLE: 'text-zinc-400'
+                  }
+                  return (
+                    <div key={ab.addback_key} className="rounded-lg border border-border bg-muted/20 p-4">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <p className="text-xs font-semibold text-card-foreground flex-1">{ab.description}</p>
+                        <span className={cn('text-[10px] font-bold', challengeMeta[ab.challenge] ?? 'text-muted-foreground')}>
+                          {ab.challenge} risk
+                        </span>
+                        <span className="text-xs font-mono text-muted-foreground">{fmtM(Number(ab.amount))}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{narrative}</p>
+                    </div>
+                  )
+                }).filter(Boolean)}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* EV Range — uses base EBITDA from recast */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">

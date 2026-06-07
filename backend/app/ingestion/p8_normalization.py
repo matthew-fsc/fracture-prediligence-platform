@@ -290,9 +290,15 @@ def normalize_records(
         try:
             norm = normalizer(record)
             result.normalized_records.append(norm)
-        except Exception:
-            # Normalization errors are non-fatal; keep raw record
-            result.normalized_records.append(dict(record))
+        except Exception as exc:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "P8 normalization error (entity=%s row=%s): %s",
+                entity_type, record.get("_row_index", "?"), exc,
+            )
+            flagged = dict(record)
+            flagged["_normalization_error"] = str(exc)
+            result.normalized_records.append(flagged)
 
     result.record_count = len(result.normalized_records)
     return result
