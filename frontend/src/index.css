@@ -364,3 +364,60 @@
   color: #E8ECF2 !important;
 }
 
+/* Force card / container width to not clip */
+.cl-rootBox {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.cl-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+/* Catch-all: any remaining white backgrounds inside Clerk */
+[class^="cl-"],
+[class*=" cl-"] {
+  --cl-color-background: #0E1420;
+}
+
+/* Profile section item rows */
+.cl-profileSectionItem,
+.cl-profileSectionItemContent {
+  color: #E8ECF2 !important;
+}
+
+/* Connected account / passkey rows */
+.cl-userPreview,
+.cl-userPreviewAvatarContainer {
+  background: transparent !important;
+}
+
+/* Any modal Clerk opens internally */
+.cl-modalContent,
+.cl-modal {
+  background-color: #0E1420 !important;
+  border-color: #1E2A3A !important;
+  color: #E8ECF2 !important;
+}
+.cl-modalCloseButton {
+  color: #A0AEBE !important;
+}
+
+/* Steps / verifications */
+.cl-verificationLinkStatusBox {
+  background-color: #121824 !important;
+  border-color: #1E2A3A !important;
+  color: #E8ECF2 !important;
+}
+
+/* Tab navigation inside profile */
+.cl-navbarMobileMenuList {
+  background-color: #0E1420 !important;
+  border-color: #1E2A3A !important;
+}
+.cl-navbarMobileMenuButtonIcon {
+  color: #A0AEBE !important;
+}
+
+

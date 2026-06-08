@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
-import { Target, ChevronDown, ChevronRight, AlertTriangle, ArrowRight, TrendingUp, Info, BookOpen, CheckCircle, Clock, Circle, Plus, Trash2 } from 'lucide-react'
+import { Target, ChevronDown, ChevronRight, AlertTriangle, ArrowRight, TrendingUp, Info, BookOpen, CheckCircle, Clock, Circle, Plus, Trash2, HelpCircle } from 'lucide-react'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useCompanyId } from '../context/CompanyContext'
 import { apiClient } from '../lib/apiClient'
@@ -414,6 +414,31 @@ export default function ValueGap() {
           >
             Retry
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (liveData?.has_data === false) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="Value Gap Analysis"
+          subtitle="The difference between what the business is worth today and what it could be worth with targeted improvements"
+        />
+        <div className="rounded-xl border border-border bg-card p-12 text-center space-y-4">
+          <div className="w-16 h-16 rounded-full border-2 border-dashed border-border flex items-center justify-center mx-auto">
+            <HelpCircle className="w-7 h-7 text-muted-foreground/40" />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-card-foreground mb-1">No financial data uploaded yet</p>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+              Upload financial files to generate enterprise value estimates and value gap analysis.
+            </p>
+          </div>
+          <a href="/Connectors" className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+            Upload financial data
+          </a>
         </div>
       </div>
     )

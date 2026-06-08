@@ -239,7 +239,7 @@ export default function BuyerLens() {
   }
 
   async function runAiSimulation() {
-    if (!companyId || !scores) return
+    if (!companyId || !scores || scores.has_data === false) return
     setAiSimLoading(true)
     setAiSimError(null)
     const catScores = {}
@@ -417,7 +417,7 @@ export default function BuyerLens() {
               <span className="text-[9px] font-semibold text-violet-400/70 uppercase tracking-wider">AI-Generated Analysis</span>
               <button
                 onClick={runAiSimulation}
-                disabled={aiSimLoading || !scores}
+                disabled={aiSimLoading || !scores || scores.has_data === false}
                 className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 disabled:opacity-50 transition-colors"
               >
                 {aiSimLoading

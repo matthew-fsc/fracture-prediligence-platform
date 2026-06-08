@@ -235,7 +235,7 @@ export default function SettingsPage() {
       </div>
 
       {tab === 'account' && (
-        <div className="rounded-xl border border-border bg-[#0E1420] overflow-hidden w-full">
+        <div className="rounded-xl border border-border bg-[#0E1420] overflow-auto w-full min-h-[600px]">
           <UserProfile
             routing="virtual"
             appearance={{
@@ -252,16 +252,22 @@ export default function SettingsPage() {
                 borderRadius: '8px',
                 fontFamily: 'inherit',
                 fontSize: '14px',
+                spacingUnit: '16px',
+              },
+              layout: {
+                shimmer: false,
               },
               elements: {
-                rootBox: { width: '100%', background: '#0E1420' },
-                card: { width: '100%', background: '#0E1420', boxShadow: 'none', border: 'none' },
-                navbar: { background: '#121824', borderRight: '1px solid #1E2A3A' },
+                rootBox: { width: '100%', maxWidth: '100%', background: '#0E1420' },
+                card: { width: '100%', maxWidth: '100%', background: '#0E1420', boxShadow: 'none', border: 'none', borderRadius: 0 },
+                navbar: { background: '#121824', borderRight: '1px solid #1E2A3A', minWidth: '160px' },
                 scrollBox: { background: '#0E1420' },
-                pageScrollBox: { background: '#0E1420' },
+                pageScrollBox: { background: '#0E1420', padding: '24px' },
                 page: { background: '#0E1420' },
                 profilePage: { background: '#0E1420' },
                 profileSection: { borderColor: '#1E2A3A' },
+                main: { background: '#0E1420' },
+                content: { background: '#0E1420' },
               },
             }}
           />

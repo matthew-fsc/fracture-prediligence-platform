@@ -31,9 +31,10 @@ function ClientHeader({ companyName, liveScores, onOpenMobileNav }) {
     : 'O'
   const imageUrl = user?.imageUrl
 
-  const drs = liveScores?.drs?.base
-  const ev = liveScores?.enterprise_value?.midpoint
-  const tier = liveScores?.drs?.tier
+  const hasData = liveScores?.has_data === true
+  const drs = hasData ? liveScores?.drs?.base : null
+  const ev = hasData ? liveScores?.enterprise_value?.midpoint : null
+  const tier = hasData ? liveScores?.drs?.tier : null
 
   const drsColor = drs == null
     ? 'text-muted-foreground'

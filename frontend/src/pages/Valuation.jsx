@@ -484,9 +484,10 @@ export default function Valuation() {
   const midpoint       = Number(ev?.midpoint) || 0
   const ceiling        = Number(ev?.ceiling) || 0
   const multipleUsed   = ev?.multiple_used ?? '—'
-  const drs            = Number(scores?.drs?.base)
-  const drsSafe        = Number.isFinite(drs) ? drs : 0
-  const tier           = scores?.drs?.tier ?? '—'
+  const hasData        = scores?.has_data === true
+  const drs            = hasData ? Number(scores?.drs?.base) : null
+  const drsSafe        = drs != null && Number.isFinite(drs) ? drs : null
+  const tier           = hasData ? (scores?.drs?.tier ?? null) : null
 
   const totalRevenueTTM = parseFloat(metrics?.total_revenue_ttm ?? 0)
   const grossProfit     = parseFloat(metrics?.gross_profit ?? 0)
@@ -587,10 +588,9 @@ export default function Valuation() {
     queryClient.invalidateQueries({ queryKey: ['advisory-workflow', companyId] })
   }
 
-  const tierBadge = drsSafe >= 70
-    ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
-    : drsSafe >= 55
-    ? 'border-amber-500/20 bg-amber-500/10 text-amber-400'
+  const tierBadge = drsSafe == null ? 'border-border bg-muted/30 text-muted-foreground'
+    : drsSafe >= 70 ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
+    : drsSafe >= 55 ? 'border-amber-500/20 bg-amber-500/10 text-amber-400'
     : 'border-red-500/20 bg-red-500/10 text-red-400'
 
   // Normalization setup check — D&A and income tax both null means advisor hasn't configured the basis yet
@@ -623,9 +623,11 @@ export default function Valuation() {
                 Advisor Overrides Active
               </span>
             )}
-            <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full border', tierBadge)}>
-              DRS {drsSafe.toFixed(1)} · {tier.replace(/_/g, ' ')}
-            </span>
+            {drsSafe != null && tier != null && (
+              <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full border', tierBadge)}>
+                DRS {drsSafe.toFixed(1)} · {tier.replace(/_/g, ' ')}
+              </span>
+            )}
           </div>
         }
       />
