@@ -496,7 +496,7 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
                 d["adjustment"] = float(o.adjustment)
                 d["rationale"] = o.rationale
                 d["advisor_id"] = o.advisor_id
-                d["adjusted_at"] = o.updated_at.isoformat()
+                d["adjusted_at"] = o.updated_at.isoformat() if o.updated_at else None
             else:
                 d["adjustment"] = 0
                 d["rationale"] = None
@@ -707,8 +707,20 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
                 "low_confidence_optimistic_multiplier": settings.DRS_CONFIDENCE_LOW_OPTIMISTIC_MULTIPLIER,
             },
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning("get_all_scores error company_id=%s: %s", company.id, e, exc_info=True)
+        return {
+            "company_id": company.id,
+            "drs": None,
+            "category_scores": None,
+            "enterprise_value": None,
+            "owner_readiness": None,
+            "rules": None,
+            "methodology": None,
+            "error": str(e),
+        }
 
     track("drs_score_fetched", user_id=company.owner_user_id or "anon", properties={
         "company_id": company.id,
@@ -1230,7 +1242,7 @@ async def generate_buyer_question_draft(
     return {
         "question_id": question_id,
         "answer_draft": row.answer_draft,
-        "ai_draft_generated_at": row.ai_draft_generated_at.isoformat(),
+        "ai_draft_generated_at": row.ai_draft_generated_at.isoformat() if row.ai_draft_generated_at else None,
     }
 
 
@@ -1604,7 +1616,7 @@ def get_overrides(company: CompanyScoped, db: Session = Depends(get_db)):
                 "adjustment": float(o.adjustment),
                 "rationale":  o.rationale,
                 "advisor_id": o.advisor_id,
-                "updated_at": o.updated_at.isoformat(),
+                "updated_at": o.updated_at.isoformat() if o.updated_at else None,
             }
             for o in rows
         ],
@@ -1769,7 +1781,7 @@ def get_qualitative(company: CompanyScoped, db: Session = Depends(get_db)):
             "non_compete_pct":       row.non_compete_pct,
             "voluntary_turnover":    row.voluntary_turnover,
             "comp_vs_market":        row.comp_vs_market,
-            "updated_at":             row.updated_at.isoformat(),
+            "updated_at":             row.updated_at.isoformat() if row.updated_at else None,
         },
     }
 
@@ -1872,7 +1884,7 @@ def _snap_to_dict(s: EngagementSnapshot) -> dict:
         "multiple_ceiling": float(s.multiple_ceiling) if s.multiple_ceiling is not None else None,
         "notes":            s.notes,
         "sort_order":       s.sort_order,
-        "created_at":       s.created_at.isoformat(),
+        "created_at":       s.created_at.isoformat() if s.created_at else None,
     }
 
 
