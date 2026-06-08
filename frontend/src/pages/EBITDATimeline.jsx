@@ -476,7 +476,7 @@ function todayLabel() {
 }
 
 function extractLiveState(scores) {
-  if (!scores) return null
+  if (!scores || scores.has_data === false) return null
   const ev = scores.enterprise_value
   const drs = scores.drs
   if (!ev || !drs) return null

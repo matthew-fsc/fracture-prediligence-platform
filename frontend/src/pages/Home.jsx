@@ -61,7 +61,7 @@ function buildActivity(jobs, liveData, bqData, gapData) {
     const time = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'
     items.push({ event: `${label} ingested`, detail: detail || j.status, time })
   }
-  if (liveData?.drs?.base != null) {
+  if (liveData?.has_data === true && liveData?.drs?.base != null) {
     const tier = liveData.drs.tier ?? ''
     items.push({
       event: `DRS scored: ${liveData.drs.base.toFixed(1)}/100${tier ? ` — ${tier} tier` : ''}`,
@@ -188,9 +188,10 @@ export default function Home() {
     return workspaceLoadingUi('Preparing workspace…')
   }
 
-  const drs       = liveData?.drs?.base ?? 0
-  const currentEV  = liveData?.enterprise_value?.midpoint ?? 0
-  const potentialEV = gapData?.potential_ev_midpoint ?? liveData?.enterprise_value?.ceiling ?? 0
+  const hasData    = liveData?.has_data === true
+  const drs        = hasData ? (liveData?.drs?.base ?? null) : null
+  const currentEV  = hasData ? (liveData?.enterprise_value?.midpoint ?? 0) : 0
+  const potentialEV = hasData ? (gapData?.potential_ev_midpoint ?? liveData?.enterprise_value?.ceiling ?? 0) : 0
   const valueGap   = Math.max(0, potentialEV - currentEV)
 
   const criticalCount = bqData?.questions?.filter(q => q.severity === 'CRITICAL').length ?? 0
@@ -225,7 +226,7 @@ export default function Home() {
         ) : (
           [
             { label: 'Active Engagements', value: '1',                   sub: companies[0]?.name ?? 'No client selected', color: 'blue'    },
-            { label: 'Readiness Score',    value: `${drs}/100`,           sub: liveData?.drs?.tier ? `${liveData.drs.tier} Tier` : 'Score pending', color: 'amber'   },
+            { label: 'Readiness Score',    value: drs != null ? `${drs.toFixed(1)}/100` : '—',  sub: hasData && liveData?.drs?.tier ? `${liveData.drs.tier} Tier` : 'Upload data to score', color: 'amber' },
             { label: 'Open Blockers',      value: String(blockerCount),   sub: `${criticalCount} critical flags`, color: 'red' },
             { label: 'Value Opportunity',  value: `+${fmtM(valueGap)}`,  sub: 'if all gaps resolved',   color: 'emerald' },
           ].map(c => (

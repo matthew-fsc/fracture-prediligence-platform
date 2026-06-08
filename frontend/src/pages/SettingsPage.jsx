@@ -1,11 +1,96 @@
 import { useState, useEffect } from 'react'
-import { UserProfile } from '@clerk/react'
-import { Link } from 'react-router-dom'
+import { useUser, useClerk } from '@clerk/react'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
-import { Copy, Check } from 'lucide-react'
+import { Copy, Check, User, Mail, Shield, ExternalLink, LogOut } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
+
+const HAS_CLERK = Boolean((import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim())
+
+// ---------------------------------------------------------------------------
+// Account tab — shows user info and links to Clerk-hosted account management
+// ---------------------------------------------------------------------------
+function AccountSection() {
+  const { user } = useUser()
+  const { signOut } = useClerk()
+
+  const displayName = user
+    ? [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'Your account'
+    : 'Your account'
+  const email = user?.primaryEmailAddress?.emailAddress ?? null
+  const initials = user
+    ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase() || '?'
+    : '?'
+  const imageUrl = user?.imageUrl
+
+  const fields = [
+    { icon: User,   label: 'Display name',  value: displayName },
+    { icon: Mail,   label: 'Email',          value: email ?? 'Not available' },
+    { icon: Shield, label: 'Account ID',     value: user?.id ? `${user.id.slice(0, 16)}…` : '—' },
+  ]
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-6 space-y-6">
+      {/* Avatar row */}
+      <div className="flex items-center gap-4">
+        {imageUrl ? (
+          <img src={imageUrl} alt="" className="w-16 h-16 rounded-full object-cover border border-border" />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center text-primary text-xl font-bold">
+            {initials}
+          </div>
+        )}
+        <div>
+          <p className="text-base font-semibold text-card-foreground">{displayName}</p>
+          {email && <p className="text-sm text-muted-foreground">{email}</p>}
+          <p className="text-xs text-muted-foreground/60 mt-0.5">M&A Advisory Platform</p>
+        </div>
+      </div>
+
+      {/* Fields */}
+      <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
+        {fields.map(({ icon: Icon, label, value }) => (
+          <div key={label} className="flex items-center gap-3 px-4 py-3 bg-muted/10">
+            <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+            <span className="text-xs text-muted-foreground w-28 flex-shrink-0">{label}</span>
+            <span className="text-xs font-medium text-card-foreground truncate">{value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-wrap gap-3">
+        {HAS_CLERK && (
+          <a
+            href="https://accounts.clerk.dev/user"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-muted/60 border border-border rounded-lg text-sm font-medium text-card-foreground hover:bg-muted transition-colors"
+          >
+            Edit profile
+            <ExternalLink className="w-3 h-3 text-muted-foreground" />
+          </a>
+        )}
+        {HAS_CLERK && signOut && (
+          <button
+            onClick={() => signOut()}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Sign out
+          </button>
+        )}
+      </div>
+
+      {!HAS_CLERK && (
+        <p className="text-xs text-muted-foreground/60">
+          Clerk authentication is not configured in this environment. User profile management is unavailable.
+        </p>
+      )}
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Referral section
@@ -32,7 +117,7 @@ function ReferralSection() {
   return (
     <div className="rounded-xl border border-border bg-card p-6 space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-card-foreground">Refer an advisor</h2>
+        <h2 className="text-base font-semibold text-card-foreground">Refer an advisor</h2>
         <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
           Share your referral link. When an advisor subscribes using your link, you receive a credit on your next invoice.
         </p>
@@ -59,8 +144,8 @@ function ReferralSection() {
 
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'Clicks', value: data.total_clicks },
-              { label: 'Conversions', value: data.total_conversions },
+              { label: 'Clicks',        value: data.total_clicks },
+              { label: 'Conversions',   value: data.total_conversions },
               { label: 'Credits earned', value: data.credit_balance_display },
             ].map(({ label, value }) => (
               <div key={label} className="rounded-lg border border-border bg-muted/20 p-3 text-center">
@@ -108,7 +193,7 @@ function FirmSection() {
   return (
     <div className="rounded-xl border border-border bg-card p-6 space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-card-foreground">Firm — {firm.name}</h2>
+        <h2 className="text-base font-semibold text-card-foreground">Firm — {firm.name}</h2>
         <p className="text-sm text-muted-foreground mt-1">{firm.seats_used} of {firm.max_seats} seats used</p>
       </div>
 
@@ -164,7 +249,7 @@ function ClientInviteSection() {
   return (
     <div className="rounded-xl border border-border bg-card p-6 space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-card-foreground">Client portal access</h2>
+        <h2 className="text-base font-semibold text-card-foreground">Client portal access</h2>
         <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
           Give an SMB owner read-only access to their engagement summary. They'll see their DRS score, EV range, and top initiatives.
         </p>
@@ -210,7 +295,7 @@ export default function SettingsPage() {
   ]
 
   return (
-    <div className="space-y-5 max-w-[1400px]">
+    <div className="space-y-5 max-w-2xl">
       <PageHeader
         section="Settings"
         title="Account settings"
@@ -218,7 +303,7 @@ export default function SettingsPage() {
       />
 
       {/* Tab bar */}
-      <div className="flex gap-1 p-1 bg-muted/40 border border-border rounded-xl w-fit">
+      <div className="flex gap-1 p-1 bg-muted/30 border border-border rounded-xl w-fit">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -234,49 +319,10 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {tab === 'account' && (
-        <div className="rounded-xl border border-border bg-[#0E1420] overflow-auto w-full min-h-[600px]">
-          <UserProfile
-            routing="virtual"
-            appearance={{
-              variables: {
-                colorPrimary: '#17a773',
-                colorBackground: '#0E1420',
-                colorSurface: '#121824',
-                colorText: '#E8ECF2',
-                colorTextSecondary: '#A0AEBE',
-                colorInputBackground: '#12151A',
-                colorInputText: '#E8ECF2',
-                colorDanger: '#ef4444',
-                colorShimmer: '#1A2538',
-                borderRadius: '8px',
-                fontFamily: 'inherit',
-                fontSize: '14px',
-                spacingUnit: '16px',
-              },
-              layout: {
-                shimmer: false,
-              },
-              elements: {
-                rootBox: { width: '100%', maxWidth: '100%', background: '#0E1420' },
-                card: { width: '100%', maxWidth: '100%', background: '#0E1420', boxShadow: 'none', border: 'none', borderRadius: 0 },
-                navbar: { background: '#121824', borderRight: '1px solid #1E2A3A', minWidth: '160px' },
-                scrollBox: { background: '#0E1420' },
-                pageScrollBox: { background: '#0E1420', padding: '24px' },
-                page: { background: '#0E1420' },
-                profilePage: { background: '#0E1420' },
-                profileSection: { borderColor: '#1E2A3A' },
-                main: { background: '#0E1420' },
-                content: { background: '#0E1420' },
-              },
-            }}
-          />
-        </div>
-      )}
-
+      {tab === 'account'  && <AccountSection />}
       {tab === 'referral' && <ReferralSection />}
-      {tab === 'portal' && <ClientInviteSection />}
-      {tab === 'firm' && <FirmSection />}
+      {tab === 'portal'   && <ClientInviteSection />}
+      {tab === 'firm'     && <FirmSection />}
     </div>
   )
 }
