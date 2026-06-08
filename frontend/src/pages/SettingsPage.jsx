@@ -4,14 +4,11 @@ import { Link } from 'react-router-dom'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
-
-const COLORS = {
-  bg: '#0A1628', gold: '#C9973A', muted: '#8A9BB0',
-  offWhite: '#F0EDE8', border: '#1E3A5F', card: '#0F2040',
-}
+import { Copy, Check } from 'lucide-react'
+import PageHeader from '../components/ui/PageHeader'
 
 // ---------------------------------------------------------------------------
-// Referral section (3B)
+// Referral section
 // ---------------------------------------------------------------------------
 function ReferralSection() {
   const [data, setData] = useState(null)
@@ -33,61 +30,53 @@ function ReferralSection() {
   }
 
   return (
-    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: '24px 20px', marginBottom: 24 }}>
-      <h2 style={{ color: COLORS.offWhite, fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, margin: '0 0 6px 0' }}>
-        Refer an advisor
-      </h2>
-      <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13, margin: '0 0 20px 0', lineHeight: 1.6 }}>
-        Share your referral link. When an advisor subscribes using your link, you receive a credit on your next invoice.
-      </p>
+    <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold text-card-foreground">Refer an advisor</h2>
+        <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+          Share your referral link. When an advisor subscribes using your link, you receive a credit on your next invoice.
+        </p>
+      </div>
 
-      {loading && <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>Loading...</p>}
+      {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
 
       {data && (
-        <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <div className="space-y-4">
+          <div className="flex gap-2">
             <input
               readOnly
               value={data.referral_url}
-              style={{
-                flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`,
-                borderRadius: 8, padding: '10px 14px', color: COLORS.offWhite,
-                fontFamily: "'DM Sans', sans-serif", fontSize: 13,
-              }}
+              className="flex-1 bg-muted/40 border border-border rounded-lg px-3 py-2 text-sm text-card-foreground focus:outline-none"
             />
             <button
               onClick={copy}
-              style={{
-                background: copied ? '#16a34a' : COLORS.gold, color: COLORS.bg,
-                border: 'none', borderRadius: 8, padding: '10px 18px',
-                fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 13,
-                cursor: 'pointer', whiteSpace: 'nowrap',
-              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-muted/40 text-sm font-medium text-card-foreground hover:bg-muted transition-colors whitespace-nowrap"
             >
-              {copied ? 'Copied ✓' : 'Copy link'}
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? 'Copied' : 'Copy link'}
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          <div className="grid grid-cols-3 gap-3">
             {[
               { label: 'Clicks', value: data.total_clicks },
               { label: 'Conversions', value: data.total_conversions },
               { label: 'Credits earned', value: data.credit_balance_display },
             ].map(({ label, value }) => (
-              <div key={label} style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: '12px 14px', textAlign: 'center' }}>
-                <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 11, margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</p>
-                <p style={{ color: COLORS.gold, fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 700, margin: 0 }}>{value}</p>
+              <div key={label} className="rounded-lg border border-border bg-muted/20 p-3 text-center">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
+                <p className="text-xl font-bold text-primary">{value}</p>
               </div>
             ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Firm management section (3C — Team tier)
+// Firm management section
 // ---------------------------------------------------------------------------
 function FirmSection() {
   const [firm, setFirm] = useState(null)
@@ -114,43 +103,29 @@ function FirmSection() {
     setInviting(false)
   }
 
-  if (loading) return null
-  if (!firm) return null  // Only show for Team tier
+  if (loading || !firm) return null
 
   return (
-    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: '24px 20px', marginBottom: 24 }}>
-      <h2 style={{ color: COLORS.offWhite, fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, margin: '0 0 6px 0' }}>
-        Firm — {firm.name}
-      </h2>
-      <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13, margin: '0 0 20px 0' }}>
-        {firm.seats_used} of {firm.max_seats} seats used
-      </p>
+    <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold text-card-foreground">Firm — {firm.name}</h2>
+        <p className="text-sm text-muted-foreground mt-1">{firm.seats_used} of {firm.max_seats} seats used</p>
+      </div>
 
       {firm.is_owner && (
-        <div>
-          <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13, margin: '0 0 8px 0' }}>
-            Invite an associate (enter their Clerk user ID):
-          </p>
-          <div style={{ display: 'flex', gap: 8 }}>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">Invite an associate (enter their Clerk user ID):</p>
+          <div className="flex gap-2">
             <input
               value={inviteId}
               onChange={e => setInviteId(e.target.value)}
               placeholder="user_2abc..."
-              style={{
-                flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`,
-                borderRadius: 8, padding: '10px 14px', color: COLORS.offWhite,
-                fontFamily: "'DM Sans', sans-serif", fontSize: 13,
-              }}
+              className="flex-1 bg-muted/40 border border-border rounded-lg px-3 py-2 text-sm text-card-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary/50"
             />
             <button
               onClick={inviteMember}
               disabled={inviting || !inviteId.trim()}
-              style={{
-                background: COLORS.gold, color: COLORS.bg, border: 'none',
-                borderRadius: 8, padding: '10px 18px',
-                fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 13,
-                cursor: inviting ? 'not-allowed' : 'pointer', opacity: inviting ? 0.7 : 1,
-              }}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               {inviting ? 'Inviting...' : 'Invite'}
             </button>
@@ -162,7 +137,7 @@ function FirmSection() {
 }
 
 // ---------------------------------------------------------------------------
-// Client portal invite section (2D)
+// Client portal invite section
 // ---------------------------------------------------------------------------
 function ClientInviteSection() {
   const [companyId, setCompanyId] = useState('')
@@ -187,36 +162,31 @@ function ClientInviteSection() {
   }
 
   return (
-    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: '24px 20px', marginBottom: 24 }}>
-      <h2 style={{ color: COLORS.offWhite, fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 600, margin: '0 0 6px 0' }}>
-        Client portal access
-      </h2>
-      <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 13, margin: '0 0 20px 0', lineHeight: 1.6 }}>
-        Give an SMB owner read-only access to their engagement summary. They'll see their DRS score, EV range, and top initiatives.
-      </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold text-card-foreground">Client portal access</h2>
+        <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+          Give an SMB owner read-only access to their engagement summary. They'll see their DRS score, EV range, and top initiatives.
+        </p>
+      </div>
+      <div className="space-y-2">
         <input
           type="number"
           value={companyId}
           onChange={e => setCompanyId(e.target.value)}
           placeholder="Company ID"
-          style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: '10px 14px', color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
+          className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2 text-sm text-card-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary/50"
         />
         <input
           value={clientUserId}
           onChange={e => setClientUserId(e.target.value)}
           placeholder="Client Clerk user ID (user_2abc...)"
-          style={{ background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: '10px 14px', color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
+          className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2 text-sm text-card-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary/50"
         />
         <button
           onClick={invite}
           disabled={submitting || !companyId || !clientUserId}
-          style={{
-            background: COLORS.gold, color: COLORS.bg, border: 'none',
-            borderRadius: 8, padding: '11px 0',
-            fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 14,
-            cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.7 : 1,
-          }}
+          className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
           {submitting ? 'Granting access...' : 'Grant client access'}
         </button>
@@ -240,85 +210,78 @@ export default function SettingsPage() {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.bg, padding: '24px 16px 48px' }}>
-      <div style={{ maxWidth: 1024, margin: '0 auto' }}>
-        <Link to="/Home" style={{ display: 'inline-block', color: COLORS.gold, fontFamily: "'DM Sans', sans-serif", fontSize: 13, textDecoration: 'none', marginBottom: 24 }}>
-          ← Back to dashboard
-        </Link>
-        <h1 style={{ color: COLORS.offWhite, fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 28, fontWeight: 600, margin: '0 0 24px 0' }}>
-          Settings
-        </h1>
+    <div className="space-y-5 max-w-3xl">
+      <PageHeader
+        section="Settings"
+        title="Account settings"
+        subtitle="Manage your profile, referrals, client access, and firm"
+      />
 
-        {/* Tab bar */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 28, background: COLORS.card, padding: 4, borderRadius: 10, border: `1px solid ${COLORS.border}`, width: 'fit-content' }}>
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                background: tab === t.id ? COLORS.gold : 'transparent',
-                color: tab === t.id ? COLORS.bg : COLORS.muted,
-                border: 'none', borderRadius: 7,
-                fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 13,
-                padding: '7px 16px', cursor: 'pointer',
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {tab === 'account' && (
-          <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 16 }}>
-            <UserProfile
-              path="/settings"
-              routing="path"
-              appearance={{
-                variables: {
-                  colorPrimary: COLORS.gold,
-                  colorBackground: COLORS.card,
-                  colorSurface: COLORS.bg,
-                  colorNeutral: COLORS.border,
-                  colorText: COLORS.offWhite,
-                  colorTextSecondary: COLORS.muted,
-                  colorTextOnPrimaryBackground: COLORS.bg,
-                  colorInputBackground: COLORS.bg,
-                  colorInputText: COLORS.offWhite,
-                  colorDanger: '#ef4444',
-                  borderRadius: '8px',
-                },
-                elements: {
-                  rootBox: { background: COLORS.card },
-                  card: { background: COLORS.card, boxShadow: 'none', border: 'none' },
-                  pageScrollBox: { background: COLORS.card },
-                  navbar: { background: COLORS.bg, borderColor: COLORS.border },
-                  navbarButton: { color: COLORS.offWhite },
-                  navbarButtonIcon: { color: COLORS.muted },
-                  headerTitle: { color: COLORS.offWhite },
-                  headerSubtitle: { color: COLORS.muted },
-                  formFieldLabel: { color: COLORS.muted },
-                  formFieldInput: {
-                    background: COLORS.bg,
-                    color: COLORS.offWhite,
-                    borderColor: COLORS.border,
-                  },
-                  formButtonPrimary: { background: COLORS.gold, color: COLORS.bg },
-                  badge: { background: COLORS.bg, borderColor: COLORS.border, color: COLORS.muted },
-                  profileSectionTitleText: { color: COLORS.offWhite },
-                  profileSectionContent: { color: COLORS.offWhite },
-                  accordionTriggerButton: { color: COLORS.offWhite },
-                  menuItem: { color: COLORS.offWhite },
-                  menuItemIcon: { color: COLORS.muted },
-                },
-              }}
-            />
-          </div>
-        )}
-
-        {tab === 'referral' && <ReferralSection />}
-        {tab === 'portal' && <ClientInviteSection />}
-        {tab === 'firm' && <FirmSection />}
+      {/* Tab bar */}
+      <div className="flex gap-1 p-1 bg-muted/40 border border-border rounded-xl w-fit">
+        {tabs.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              tab === t.id
+                ? 'bg-card border border-border text-card-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-card-foreground'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
+
+      {tab === 'account' && (
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <UserProfile
+            path="/settings"
+            routing="path"
+            appearance={{
+              variables: {
+                colorPrimary: 'hsl(var(--primary))',
+                colorBackground: 'hsl(var(--card))',
+                colorSurface: 'hsl(var(--muted))',
+                colorText: 'hsl(var(--card-foreground))',
+                colorTextSecondary: 'hsl(var(--muted-foreground))',
+                colorInputBackground: 'hsl(var(--muted))',
+                colorInputText: 'hsl(var(--card-foreground))',
+                colorDanger: 'hsl(var(--destructive))',
+                borderRadius: '8px',
+              },
+              elements: {
+                rootBox: { background: 'transparent' },
+                card: { background: 'transparent', boxShadow: 'none', border: 'none' },
+                pageScrollBox: { background: 'transparent' },
+                navbar: { background: 'hsl(var(--muted))', borderColor: 'hsl(var(--border))' },
+                navbarButton: { color: 'hsl(var(--card-foreground))' },
+                navbarButtonIcon: { color: 'hsl(var(--muted-foreground))' },
+                headerTitle: { color: 'hsl(var(--card-foreground))' },
+                headerSubtitle: { color: 'hsl(var(--muted-foreground))' },
+                formFieldLabel: { color: 'hsl(var(--muted-foreground))' },
+                formFieldInput: {
+                  background: 'hsl(var(--muted))',
+                  color: 'hsl(var(--card-foreground))',
+                  borderColor: 'hsl(var(--border))',
+                },
+                formButtonPrimary: { background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' },
+                badge: { background: 'hsl(var(--muted))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--muted-foreground))' },
+                profileSectionTitleText: { color: 'hsl(var(--card-foreground))' },
+                profileSectionContent: { color: 'hsl(var(--card-foreground))' },
+                accordionTriggerButton: { color: 'hsl(var(--card-foreground))' },
+                menuItem: { color: 'hsl(var(--card-foreground))' },
+                menuItemIcon: { color: 'hsl(var(--muted-foreground))' },
+              },
+            }}
+          />
+        </div>
+      )}
+
+      {tab === 'referral' && <ReferralSection />}
+      {tab === 'portal' && <ClientInviteSection />}
+      {tab === 'firm' && <FirmSection />}
     </div>
   )
 }

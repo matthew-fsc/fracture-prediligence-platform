@@ -636,9 +636,13 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
             IngestionJob.current_status == PhaseStatus.COMPLETE,
         ).first() is not None
 
+        from app.analytics.market_benchmarks import resolve_industry_slug as _resolve_slug
+        industry_slug = _resolve_slug(company.industry, naics_code=company.naics_code)
+
         return {
             "company_id": company.id,
             "has_data": has_data,
+            "industry_slug": industry_slug,
             "drs": {
                 "base":               drs.base_drs,
                 "conservative":       drs.conservative_drs,

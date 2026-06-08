@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
-import { AlertTriangle, Sparkles, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Sparkles, RefreshCw, HelpCircle } from 'lucide-react'
 import { Skeleton } from '../components/ui/Skeleton'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -156,6 +156,36 @@ export default function BusinessQuality() {
           <div className="col-span-12 lg:col-span-4 space-y-3">
             {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── No-data disclaimer (same gate as Readiness page) ────────────────────
+  if (scores?.has_data === false) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="Business Quality"
+          subtitle="Operating metrics benchmarked against industry peers"
+        />
+        <div className="rounded-xl border border-border bg-card p-12 text-center space-y-4">
+          <div className="w-16 h-16 rounded-full border-2 border-dashed border-border flex items-center justify-center mx-auto">
+            <HelpCircle className="w-7 h-7 text-muted-foreground/40" />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-card-foreground mb-1">No financial data uploaded yet</p>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+              Upload QuickBooks exports, bank statements, or other financial files to populate business quality metrics.
+              Revenue trends, EBITDA margins, and DRS category scores will appear here once real data has been ingested.
+            </p>
+          </div>
+          <a
+            href="/Connectors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            Upload financial data
+          </a>
         </div>
       </div>
     )

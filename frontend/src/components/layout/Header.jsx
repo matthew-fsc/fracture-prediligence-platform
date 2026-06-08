@@ -164,13 +164,12 @@ export default function Header({
   const companyName =
     companyRow?.name ?? (companyId != null ? `Company #${companyId}` : 'Add a client…')
 
-  const drs = liveScores?.drs?.base
-  const ev = liveScores?.enterprise_value?.midpoint ?? null
-  const tier = liveScores?.drs?.tier ?? null
+  const hasData = liveScores?.has_data === true
+  const drs = hasData ? (liveScores?.drs?.base ?? null) : null
+  const ev = hasData ? (liveScores?.enterprise_value?.midpoint ?? null) : null
+  const tier = hasData ? (liveScores?.drs?.tier ?? null) : null
 
-  const hasScoreData =
-    liveScores != null &&
-    (drs != null || (ev != null && ev > 0) || liveScores?.drs != null)
+  const hasScoreData = hasData && liveScores != null && (drs != null || (ev != null && ev > 0))
 
   const drsColor = drs == null
     ? 'text-muted-foreground'
