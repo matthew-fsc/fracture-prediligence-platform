@@ -235,44 +235,33 @@ export default function SettingsPage() {
       </div>
 
       {tab === 'account' && (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="rounded-xl border border-border bg-[#0E1420] overflow-hidden w-full">
           <UserProfile
-            path="/settings"
-            routing="path"
+            routing="virtual"
             appearance={{
               variables: {
-                colorPrimary: 'hsl(160,84%,39%)',
-                colorBackground: 'hsl(220,18%,10%)',
-                colorSurface: 'hsl(220,18%,14%)',
-                colorText: 'hsl(220,10%,92%)',
-                colorTextSecondary: 'hsl(220,10%,70%)',
-                colorInputBackground: 'hsl(220,18%,14%)',
-                colorInputText: 'hsl(220,10%,92%)',
-                colorDanger: 'hsl(0,72%,51%)',
+                colorPrimary: '#17a773',
+                colorBackground: '#0E1420',
+                colorSurface: '#121824',
+                colorText: '#E8ECF2',
+                colorTextSecondary: '#A0AEBE',
+                colorInputBackground: '#12151A',
+                colorInputText: '#E8ECF2',
+                colorDanger: '#ef4444',
+                colorShimmer: '#1A2538',
                 borderRadius: '8px',
+                fontFamily: 'inherit',
+                fontSize: '14px',
               },
               elements: {
-                rootBox: { background: 'hsl(220,18%,10%)' },
-                card: { background: 'hsl(220,18%,10%)', boxShadow: 'none', border: 'none' },
-                pageScrollBox: { background: 'hsl(220,18%,10%)' },
-                navbar: { background: 'hsl(220,18%,14%)', borderColor: 'hsl(220,18%,16%)' },
-                navbarButton: { color: 'hsl(220,10%,92%)' },
-                navbarButtonIcon: { color: 'hsl(220,10%,70%)' },
-                headerTitle: { color: 'hsl(220,10%,92%)' },
-                headerSubtitle: { color: 'hsl(220,10%,70%)' },
-                formFieldLabel: { color: 'hsl(220,10%,70%)' },
-                formFieldInput: {
-                  background: 'hsl(220,18%,14%)',
-                  color: 'hsl(220,10%,92%)',
-                  borderColor: 'hsl(220,18%,16%)',
-                },
-                formButtonPrimary: { background: 'hsl(160,84%,39%)', color: '#ffffff' },
-                badge: { background: 'hsl(220,18%,14%)', borderColor: 'hsl(220,18%,16%)', color: 'hsl(220,10%,70%)' },
-                profileSectionTitleText: { color: 'hsl(220,10%,92%)' },
-                profileSectionContent: { color: 'hsl(220,10%,92%)' },
-                accordionTriggerButton: { color: 'hsl(220,10%,92%)' },
-                menuItem: { color: 'hsl(220,10%,92%)' },
-                menuItemIcon: { color: 'hsl(220,10%,70%)' },
+                rootBox: { width: '100%', background: '#0E1420' },
+                card: { width: '100%', background: '#0E1420', boxShadow: 'none', border: 'none' },
+                navbar: { background: '#121824', borderRight: '1px solid #1E2A3A' },
+                scrollBox: { background: '#0E1420' },
+                pageScrollBox: { background: '#0E1420' },
+                page: { background: '#0E1420' },
+                profilePage: { background: '#0E1420' },
+                profileSection: { borderColor: '#1E2A3A' },
               },
             }}
           />

@@ -157,25 +157,210 @@
 }
 
 /*
- * Clerk embedded UI — force light text in inputs regardless of browser UA stylesheet.
- * Clerk's appearance API sets colorInputText but some browsers override with native form color.
- * These rules target Clerk's generated class names directly with !important.
+ * Clerk embedded UI — full dark mode override for UserProfile.
+ * Clerk renders inside the same DOM so class selectors work directly.
+ * Using !important throughout because Clerk injects its own inline styles.
  */
+
+/* Layout / containers */
+.cl-rootBox,
+.cl-card,
+.cl-scrollBox,
+.cl-pageScrollBox,
+.cl-page,
+.cl-profilePage,
+.cl-main {
+  background-color: #0E1420 !important;
+  color: #E8ECF2 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* Navbar / sidebar */
+.cl-navbar,
+.cl-navbarMobileMenuButton {
+  background-color: #121824 !important;
+  border-color: #1E2A3A !important;
+}
+.cl-navbarButton,
+.cl-navbarButtonIcon {
+  color: #A0AEBE !important;
+}
+.cl-navbarButton:hover {
+  background-color: #1A2538 !important;
+  color: #E8ECF2 !important;
+}
+.cl-navbarButton.cl-active,
+.cl-navbarButton[aria-current="page"] {
+  background-color: #1A2538 !important;
+  color: #E8ECF2 !important;
+}
+
+/* Section titles & content */
+.cl-profileSectionTitle,
+.cl-profileSectionTitleText,
+.cl-profileSectionContent,
+.cl-headerTitle,
+.cl-headerSubtitle,
+.cl-formHeader,
+.cl-formHeaderTitle,
+.cl-formHeaderSubtitle,
+.cl-breadcrumbsItem,
+.cl-breadcrumbsItemDivider {
+  color: #E8ECF2 !important;
+}
+
+/* Section dividers */
+.cl-profileSectionTitle {
+  border-color: #1E2A3A !important;
+}
+
+/* Forms */
+.cl-formFieldLabel,
+.cl-formFieldHintText,
+.cl-formFieldAction {
+  color: #A0AEBE !important;
+}
 .cl-formFieldInput,
 .cl-formFieldInput:focus,
-.cl-formFieldInput:hover {
-  color: #F2F4F7 !important;
-  -webkit-text-fill-color: #F2F4F7 !important;
+.cl-formFieldInput:hover,
+.cl-phoneInputBox,
+.cl-formFieldInputGroup {
   background-color: #12151A !important;
-  caret-color: #C9973A !important;
+  color: #E8ECF2 !important;
+  border-color: #1E2A3A !important;
+  caret-color: #2ecc71 !important;
+  -webkit-text-fill-color: #E8ECF2 !important;
 }
-/* Autofill overrides — browser autofill ignores background/color; use box-shadow trick */
 .cl-formFieldInput:-webkit-autofill,
 .cl-formFieldInput:-webkit-autofill:hover,
 .cl-formFieldInput:-webkit-autofill:focus,
 .cl-formFieldInput:-webkit-autofill:active {
-  -webkit-text-fill-color: #F2F4F7 !important;
+  -webkit-text-fill-color: #E8ECF2 !important;
   -webkit-box-shadow: 0 0 0 30px #12151A inset !important;
   box-shadow: 0 0 0 30px #12151A inset !important;
-  caret-color: #C9973A !important;
 }
+.cl-formFieldInputShowPasswordButton {
+  color: #A0AEBE !important;
+}
+
+/* Buttons */
+.cl-formButtonPrimary {
+  background-color: #17a773 !important;
+  color: #ffffff !important;
+}
+.cl-formButtonPrimary:hover {
+  background-color: #13956a !important;
+}
+.cl-formButtonReset,
+.cl-formResendCodeLink {
+  color: #A0AEBE !important;
+}
+.cl-formButtonReset:hover {
+  color: #E8ECF2 !important;
+}
+
+/* Badges */
+.cl-badge,
+.cl-badgeLabel {
+  background-color: #1A2538 !important;
+  border-color: #1E2A3A !important;
+  color: #A0AEBE !important;
+}
+.cl-badge__primary {
+  background-color: #163328 !important;
+  border-color: #1e4d3a !important;
+  color: #17a773 !important;
+}
+.cl-badge__danger {
+  background-color: #2a1515 !important;
+  color: #f87171 !important;
+}
+
+/* Avatar / user preview */
+.cl-avatarBox {
+  border-color: #1E2A3A !important;
+}
+.cl-userPreviewMainIdentifier,
+.cl-userPreviewSecondaryIdentifier,
+.cl-userButtonOuterIdentifier {
+  color: #E8ECF2 !important;
+}
+
+/* Menus / dropdowns */
+.cl-menuList,
+.cl-menuItem,
+.cl-menuItemButton {
+  background-color: #0E1420 !important;
+  color: #E8ECF2 !important;
+  border-color: #1E2A3A !important;
+}
+.cl-menuItem:hover,
+.cl-menuItemButton:hover {
+  background-color: #1A2538 !important;
+}
+
+/* Accordion */
+.cl-accordionTriggerButton {
+  color: #E8ECF2 !important;
+  border-color: #1E2A3A !important;
+}
+.cl-accordionContent {
+  background-color: #0E1420 !important;
+}
+
+/* Dividers */
+.cl-dividerLine {
+  background-color: #1E2A3A !important;
+}
+.cl-dividerText {
+  color: #A0AEBE !important;
+  background-color: #0E1420 !important;
+}
+
+/* Alerts / verifications */
+.cl-alert {
+  background-color: #1A2538 !important;
+  border-color: #1E2A3A !important;
+}
+.cl-alertText {
+  color: #E8ECF2 !important;
+}
+
+/* Identity preview (connected accounts, passkeys, etc.) */
+.cl-identityPreview,
+.cl-identityPreviewText {
+  color: #E8ECF2 !important;
+  border-color: #1E2A3A !important;
+}
+.cl-identityPreviewEditButtonIcon {
+  color: #A0AEBE !important;
+}
+
+/* OTP / verification inputs */
+.cl-otpCodeFieldInput {
+  background-color: #12151A !important;
+  color: #E8ECF2 !important;
+  border-color: #1E2A3A !important;
+}
+
+/* Active device list */
+.cl-activeDeviceListItem,
+.cl-activeDevice {
+  background-color: #121824 !important;
+  border-color: #1E2A3A !important;
+  color: #E8ECF2 !important;
+}
+
+/* Social connection buttons */
+.cl-socialButtonsBlockButton {
+  background-color: #121824 !important;
+  border-color: #1E2A3A !important;
+  color: #E8ECF2 !important;
+}
+.cl-socialButtonsBlockButtonText {
+  color: #E8ECF2 !important;
+}
+

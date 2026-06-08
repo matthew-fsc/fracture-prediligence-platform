@@ -84,8 +84,8 @@ export default function CompanySwitcher({ displayName }) {
                     setOpen(false)
                   }}
                   className={cn(
-                    'w-full text-left px-3 py-2 text-xs rounded-md hover:bg-muted/60',
-                    c.id === companyId && 'bg-muted/40 font-medium',
+                    'w-full text-left px-3 py-2 text-xs rounded-md text-card-foreground hover:bg-muted/60 hover:text-card-foreground',
+                    c.id === companyId ? 'bg-muted/40 font-semibold text-card-foreground' : 'text-muted-foreground',
                   )}
                 >
                   {c.name}
