@@ -10,8 +10,8 @@ Changes:
   NULL = not yet completed.
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0019"
 down_revision = "0018"
@@ -20,11 +20,17 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column(
-        "companies",
-        sa.Column("owner_onboarding_completed_at", sa.DateTime(), nullable=True),
-    )
+    conn = op.get_bind()
+    existing_cols = {col["name"] for col in sa.inspect(conn).get_columns("companies")}
+    if "owner_onboarding_completed_at" not in existing_cols:
+        op.add_column(
+            "companies",
+            sa.Column("owner_onboarding_completed_at", sa.DateTime(), nullable=True),
+        )
 
 
 def downgrade():
-    op.drop_column("companies", "owner_onboarding_completed_at")
+    conn = op.get_bind()
+    existing_cols = {col["name"] for col in sa.inspect(conn).get_columns("companies")}
+    if "owner_onboarding_completed_at" in existing_cols:
+        op.drop_column("companies", "owner_onboarding_completed_at")
