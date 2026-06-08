@@ -515,8 +515,9 @@ export default function Readiness() {
     )
   }
 
-  const drs = data?.drs?.base ?? 0
-  const tier = tierLabel(drs)
+  const hasData = data?.has_data !== false  // false only when backend explicitly returns has_data: false
+  const drs = hasData ? (data?.drs?.base ?? 0) : null
+  const tier = drs != null ? tierLabel(drs) : null
   const cats = data?.category_scores ?? {}
   const qualComplete = data?.drs?.qualitative_complete
   const hasOverrides = data?.drs?.has_overrides
@@ -525,8 +526,10 @@ export default function Readiness() {
   const confidenceSummary = data?.drs?.confidence_summary ?? null
 
   // Dynamic colors for overall score display
-  const arcStroke   = drs >= 70 ? 'hsl(160,84%,39%)' : drs >= 55 ? 'hsl(43,96%,56%)' : 'hsl(0,72%,51%)'
-  const scoreBadge  = drs >= 70
+  const arcStroke   = drs == null ? 'hsl(215,20%,40%)' : drs >= 70 ? 'hsl(160,84%,39%)' : drs >= 55 ? 'hsl(43,96%,56%)' : 'hsl(0,72%,51%)'
+  const scoreBadge  = drs == null
+    ? 'border-muted-foreground/20 bg-muted/20 text-muted-foreground'
+    : drs >= 70
     ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
     : drs >= 55
     ? 'border-amber-500/20 bg-amber-500/10 text-amber-400'
@@ -548,9 +551,38 @@ export default function Readiness() {
   const radarData = breakdown.map(b => ({ subject: b.abbr, score: b.score, fullMark: 100 }))
   const meth = data?.methodology
 
+  if (!hasData) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="Diligence Readiness Score"
+          subtitle="Weighted scoring framework — Revenue Quality · Financial Integrity · Operational Independence · Customer Risk · Management · Growth"
+        />
+        <div className="rounded-xl border border-border bg-card p-12 text-center space-y-4">
+          <div className="w-16 h-16 rounded-full border-2 border-dashed border-border flex items-center justify-center mx-auto">
+            <HelpCircle className="w-7 h-7 text-muted-foreground/40" />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-card-foreground mb-1">No financial data uploaded yet</p>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+              Upload QuickBooks exports, bank statements, or other financial files to generate your Diligence Readiness Score.
+              The DRS will remain blank until real data has been ingested.
+            </p>
+          </div>
+          <a
+            href="/Connectors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+          >
+            Upload Data Sources
+          </a>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5 max-w-[1400px]">
-      {drs < 40 && (
+      {drs != null && drs < 40 && (
         <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-5 py-4 flex items-start gap-3" role="alert">
           <Shield className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
           <div>
@@ -602,7 +634,7 @@ export default function Readiness() {
               </span>
             )}
             <span className={cn('text-xs font-semibold px-2.5 py-1 rounded-full border', scoreBadge)}>
-              DRS: {drs.toFixed(1)} / 100
+              {drs != null ? `DRS: ${drs.toFixed(1)} / 100` : 'DRS: — / 100'}
             </span>
           </div>
         }
@@ -778,17 +810,21 @@ export default function Readiness() {
               <div className="relative w-32 h-32">
                 <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
                   <circle cx="60" cy="60" r="50" fill="none" stroke="hsl(220,18%,15%)" strokeWidth="10" />
-                  <circle cx="60" cy="60" r="50" fill="none" stroke={arcStroke} strokeWidth="10"
-                    strokeDasharray={`${2 * Math.PI * 50 * drs / 100} ${2 * Math.PI * 50 * (1 - drs / 100)}`}
-                    strokeLinecap="round" />
+                  {drs != null && (
+                    <circle cx="60" cy="60" r="50" fill="none" stroke={arcStroke} strokeWidth="10"
+                      strokeDasharray={`${2 * Math.PI * 50 * drs / 100} ${2 * Math.PI * 50 * (1 - drs / 100)}`}
+                      strokeLinecap="round" />
+                  )}
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className={cn('text-3xl font-bold', scoreColor(drs))}>{Math.round(drs)}</span>
-                  <span className="text-[11px] text-muted-foreground">/ 100</span>
+                  {drs != null
+                    ? <><span className={cn('text-3xl font-bold', scoreColor(drs))}>{Math.round(drs)}</span><span className="text-[11px] text-muted-foreground">/ 100</span></>
+                    : <span className="text-2xl font-bold text-muted-foreground/40">—</span>
+                  }
                 </div>
               </div>
-              <span className={cn('text-sm font-bold', tier.color === 'emerald' ? 'text-emerald-400' : tier.color === 'amber' ? 'text-amber-400' : 'text-red-400')}>
-                {tier.label}
+              <span className={cn('text-sm font-bold', tier ? (tier.color === 'emerald' ? 'text-emerald-400' : tier.color === 'amber' ? 'text-amber-400' : 'text-red-400') : 'text-muted-foreground')}>
+                {tier ? tier.label : 'No data yet'}
               </span>
             </div>
 

@@ -18,7 +18,7 @@ import { apiClient } from '../lib/apiClient'
 
 export default function AuthRedirectPage() {
   const navigate = useNavigate()
-  const { role, loading } = useUserRole()
+  const { role, loading, clientCompany } = useUserRole()
   const isAdvisor = role === 'ADVISOR'
   const { data: companies = [], isLoading: companiesLoading } = useQuery({
     queryKey: ['companies'],
@@ -41,7 +41,13 @@ export default function AuthRedirectPage() {
     if (role === null) {
       navigate('/role-select', { replace: true })
     } else if (role === 'CLIENT') {
-      navigate('/client/dashboard', { replace: true })
+      // Route new clients through owner onboarding wizard before the dashboard
+      // clientCompany.owner_onboarding_completed comes from GET /api/me
+      if (clientCompany && !clientCompany.owner_onboarding_completed) {
+        navigate('/owner-onboarding', { replace: true })
+      } else {
+        navigate('/client/dashboard', { replace: true })
+      }
     } else {
       if (companiesLoading) return
       if (!Array.isArray(companies) || companies.length === 0) {
@@ -50,7 +56,7 @@ export default function AuthRedirectPage() {
       }
       navigate('/Home', { replace: true })
     }
-  }, [role, loading, navigate, companies, companiesLoading])
+  }, [role, loading, navigate, companies, companiesLoading, clientCompany])
 
   return (
     <div className="min-h-screen bg-background dark flex items-center justify-center">

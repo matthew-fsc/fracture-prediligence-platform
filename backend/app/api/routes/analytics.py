@@ -48,6 +48,7 @@ from app.ontology.models import (
     EngagementSnapshot,
     ScoreSnapshot,
 )
+from app.ontology.ingestion_models import IngestionJob, PhaseStatus
 from app.services.advisory_workflow import build_advisory_workflow
 from app.services.analytics_service import compute_category_modules
 from app.services.company_logo_storage import (
@@ -629,8 +630,15 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
             drs_optimistic=drs.optimistic_drs,
         )
 
+        # has_data: true if any ingestion job has completed for this company
+        has_data = db.query(IngestionJob).filter(
+            IngestionJob.company_id == company.id,
+            IngestionJob.current_status == PhaseStatus.COMPLETE,
+        ).first() is not None
+
         return {
             "company_id": company.id,
+            "has_data": has_data,
             "drs": {
                 "base":               drs.base_drs,
                 "conservative":       drs.conservative_drs,
@@ -713,6 +721,7 @@ def get_all_scores(company: CompanyScoped, db: Session = Depends(get_db)):
         logger.warning("get_all_scores error company_id=%s: %s", company.id, e, exc_info=True)
         return {
             "company_id": company.id,
+            "has_data": False,
             "drs": None,
             "category_scores": None,
             "enterprise_value": None,

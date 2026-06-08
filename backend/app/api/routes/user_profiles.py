@@ -53,7 +53,12 @@ def _client_company(db: Session, user_id: str) -> Optional[dict]:
     company = db.query(Company).filter(Company.id == access.company_id).first()
     if not company:
         return None
-    return {"id": company.id, "name": company.name, "industry": company.industry}
+    return {
+        "id": company.id,
+        "name": company.name,
+        "industry": company.industry,
+        "owner_onboarding_completed": company.owner_onboarding_completed_at is not None,
+    }
 
 
 def _profile_response(profile: Optional[UserProfile], db: Session) -> dict:

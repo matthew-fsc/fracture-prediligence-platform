@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Cloud, CheckCircle, Circle, AlertTriangle } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '../lib/apiClient'
 import { withCompanyQuery } from '../lib/navLinks'
 import { marketingColors as COLORS } from '../theme/marketingColors'
@@ -656,17 +657,34 @@ function Success({ companyId }) {
 // ---------------------------------------------------------------------------
 export default function OnboardingPage() {
   const navigate = useNavigate()
-  const [step, setStep] = useState(() => {
-    const s = readOnboarding().step
-    return typeof s === 'number' && s >= 1 && s <= 3 ? s : 1
-  })
-  const [done, setDone] = useState(false)
+  const queryClient = useQueryClient()
 
   // Company created in Step 1 — passed as prop to Step 3 for qualitative save.
   const [createdCompanyId, setCreatedCompanyId] = useState(() => {
     const saved = readOnboarding().createdCompanyId
     return typeof saved === 'number' ? saved : null
   })
+
+  // Only restore step > 1 if we have a valid company from a previous session
+  const [step, setStep] = useState(() => {
+    const saved = readOnboarding()
+    const s = saved.step
+    const hasCompany = typeof saved.createdCompanyId === 'number'
+    if (typeof s === 'number' && s >= 1 && s <= 3 && (s === 1 || hasCompany)) return s
+    return 1
+  })
+  const [done, setDone] = useState(false)
+
+  // If the advisor already has companies (e.g. returning after completion), skip to dashboard
+  useEffect(() => {
+    apiClient.get('/api/companies').then((companies) => {
+      if (Array.isArray(companies) && companies.length > 0) {
+        try { localStorage.removeItem(ONBOARDING_STORAGE_KEY) } catch { /* ignore */ }
+        navigate('/Home', { replace: true })
+      }
+    }).catch(() => { /* ignore - let onboarding proceed */ })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Step 1 state
   const [step1Saving, setStep1Saving] = useState(false)
@@ -696,6 +714,8 @@ export default function OnboardingPage() {
       const newId = company?.id ?? null
       setCreatedCompanyId(newId)
       writeOnboarding({ createdCompanyId: newId })
+      // Bust the companies cache so AuthRedirectPage won't loop back to onboarding
+      queryClient.invalidateQueries({ queryKey: ['companies'] })
       setStep(2)
     } catch (err) {
       setStep1Error(err?.message ?? 'Failed to create client. Please try again.')
