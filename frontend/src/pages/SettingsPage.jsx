@@ -210,7 +210,7 @@ export default function SettingsPage() {
   ]
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5 max-w-[1400px]">
       <PageHeader
         section="Settings"
         title="Account settings"
@@ -241,38 +241,38 @@ export default function SettingsPage() {
             routing="path"
             appearance={{
               variables: {
-                colorPrimary: 'hsl(var(--primary))',
-                colorBackground: 'hsl(var(--card))',
-                colorSurface: 'hsl(var(--muted))',
-                colorText: 'hsl(var(--card-foreground))',
-                colorTextSecondary: 'hsl(var(--muted-foreground))',
-                colorInputBackground: 'hsl(var(--muted))',
-                colorInputText: 'hsl(var(--card-foreground))',
-                colorDanger: 'hsl(var(--destructive))',
+                colorPrimary: 'hsl(160,84%,39%)',
+                colorBackground: 'hsl(220,18%,10%)',
+                colorSurface: 'hsl(220,18%,14%)',
+                colorText: 'hsl(220,10%,92%)',
+                colorTextSecondary: 'hsl(220,10%,70%)',
+                colorInputBackground: 'hsl(220,18%,14%)',
+                colorInputText: 'hsl(220,10%,92%)',
+                colorDanger: 'hsl(0,72%,51%)',
                 borderRadius: '8px',
               },
               elements: {
-                rootBox: { background: 'transparent' },
-                card: { background: 'transparent', boxShadow: 'none', border: 'none' },
-                pageScrollBox: { background: 'transparent' },
-                navbar: { background: 'hsl(var(--muted))', borderColor: 'hsl(var(--border))' },
-                navbarButton: { color: 'hsl(var(--card-foreground))' },
-                navbarButtonIcon: { color: 'hsl(var(--muted-foreground))' },
-                headerTitle: { color: 'hsl(var(--card-foreground))' },
-                headerSubtitle: { color: 'hsl(var(--muted-foreground))' },
-                formFieldLabel: { color: 'hsl(var(--muted-foreground))' },
+                rootBox: { background: 'hsl(220,18%,10%)' },
+                card: { background: 'hsl(220,18%,10%)', boxShadow: 'none', border: 'none' },
+                pageScrollBox: { background: 'hsl(220,18%,10%)' },
+                navbar: { background: 'hsl(220,18%,14%)', borderColor: 'hsl(220,18%,16%)' },
+                navbarButton: { color: 'hsl(220,10%,92%)' },
+                navbarButtonIcon: { color: 'hsl(220,10%,70%)' },
+                headerTitle: { color: 'hsl(220,10%,92%)' },
+                headerSubtitle: { color: 'hsl(220,10%,70%)' },
+                formFieldLabel: { color: 'hsl(220,10%,70%)' },
                 formFieldInput: {
-                  background: 'hsl(var(--muted))',
-                  color: 'hsl(var(--card-foreground))',
-                  borderColor: 'hsl(var(--border))',
+                  background: 'hsl(220,18%,14%)',
+                  color: 'hsl(220,10%,92%)',
+                  borderColor: 'hsl(220,18%,16%)',
                 },
-                formButtonPrimary: { background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' },
-                badge: { background: 'hsl(var(--muted))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--muted-foreground))' },
-                profileSectionTitleText: { color: 'hsl(var(--card-foreground))' },
-                profileSectionContent: { color: 'hsl(var(--card-foreground))' },
-                accordionTriggerButton: { color: 'hsl(var(--card-foreground))' },
-                menuItem: { color: 'hsl(var(--card-foreground))' },
-                menuItemIcon: { color: 'hsl(var(--muted-foreground))' },
+                formButtonPrimary: { background: 'hsl(160,84%,39%)', color: '#ffffff' },
+                badge: { background: 'hsl(220,18%,14%)', borderColor: 'hsl(220,18%,16%)', color: 'hsl(220,10%,70%)' },
+                profileSectionTitleText: { color: 'hsl(220,10%,92%)' },
+                profileSectionContent: { color: 'hsl(220,10%,92%)' },
+                accordionTriggerButton: { color: 'hsl(220,10%,92%)' },
+                menuItem: { color: 'hsl(220,10%,92%)' },
+                menuItemIcon: { color: 'hsl(220,10%,70%)' },
               },
             }}
           />
