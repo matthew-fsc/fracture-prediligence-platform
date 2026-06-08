@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { AlertCircle, AlertTriangle, Info, FileText, ChevronDown, ChevronRight, ExternalLink, Sparkles, RefreshCw } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Info, FileText, ChevronDown, ChevronRight, ExternalLink, Sparkles, RefreshCw, MessageSquare, X } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -9,6 +9,7 @@ import { apiClient } from '../lib/apiClient'
 import { withCompanyQuery, resolvePath } from '../lib/navLinks'
 import { toast } from '../lib/notify'
 import { drsCategoryBadgeClass } from '../lib/drsCategoryColors'
+import CopilotChat from '../components/copilot/CopilotChat'
 
 const CATEGORY_LABELS = {
   revenue_quality:          'Revenue Quality',
@@ -132,6 +133,9 @@ export default function BuyerLens() {
   const [aiSimLoading, setAiSimLoading] = useState(false)
   const [aiSimError, setAiSimError] = useState(null)
   const [scores, setScores] = useState(null)
+  const [copilotOpen, setCopilotOpen] = useState(false)
+  const [copilotSeed, setCopilotSeed] = useState(null)  // pre-filled message for context
+  const [copilotHint, setCopilotHint] = useState('')
 
   const load = useCallback(() => {
     if (companyId == null || companyId < 1) {
@@ -176,6 +180,14 @@ export default function BuyerLens() {
       answer_draft: q.answer_draft ?? '',
       mitigating_initiative_id: q.mitigating_initiative_id != null ? String(q.mitigating_initiative_id) : '',
     })
+  }
+
+  function openCopilotForQuestion(q) {
+    const hint = `User is reviewing buyer diligence questions. Currently focused on a ${q.severity} severity ${q.buyer_type} buyer question in the ${CATEGORY_LABELS[q.category] ?? q.category} category.`
+    const seed = `A ${q.buyer_type} buyer is asking: "${q.question}". How should we prepare to answer this? What documentation do we need and what are the risks if we can't answer it well?`
+    setCopilotHint(hint)
+    setCopilotSeed(seed)
+    setCopilotOpen(true)
   }
 
   async function generateDraft(q) {
@@ -296,16 +308,79 @@ export default function BuyerLens() {
     )
   }
 
+  const BUYER_SUGGESTED_QUESTIONS = [
+    'Which buyer questions are highest risk for our deal?',
+    'What documentation do PE buyers typically require for EBITDA addbacks?',
+    'How do we prepare for questions about customer concentration?',
+    'What does a PE buyer need to see about management independence?',
+    'Which open questions could cause our LOI to be retraded?',
+    'How does our DRS score affect which buyer questions get focused on?',
+  ]
+
   return (
-    <div className="space-y-5 max-w-[1400px]">
+    <div className="space-y-5 max-w-[1400px] relative">
+      {/* Copilot slide-in drawer */}
+      {copilotOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]"
+            onClick={() => setCopilotOpen(false)}
+          />
+          {/* Panel */}
+          <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md flex flex-col bg-card border-l border-border shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/20 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-primary/15 border border-primary/20 flex items-center justify-center">
+                  <MessageSquare className="w-3 h-3 text-primary" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-card-foreground">AI Copilot</p>
+                  <p className="text-[10px] text-muted-foreground">Buyer questions & diligence prep</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCopilotOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+                aria-label="Close copilot"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0">
+              <CopilotChat
+                companyId={companyId}
+                suggestedQuestions={BUYER_SUGGESTED_QUESTIONS}
+                contextHint={copilotHint || 'User is reviewing buyer diligence questions in the Buyer Lens view'}
+                scores={scores}
+                compact
+                initialMessage={copilotSeed}
+                onInitialSent={() => setCopilotSeed(null)}
+              />
+            </div>
+          </div>
+        </>
+      )}
+
       <SectionHeader
         title="Buyer Risk Profile"
         subtitle="Simulated due diligence questions a buyer would raise — prioritized by DRS weakness"
-        action={data ? (
-          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-border bg-muted text-muted-foreground">
-            {data.total} questions
-          </span>
-        ) : null}
+        action={
+          <div className="flex items-center gap-2">
+            {data && (
+              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-border bg-muted text-muted-foreground">
+                {data.total} questions
+              </span>
+            )}
+            <button
+              onClick={() => { setCopilotSeed(null); setCopilotHint(''); setCopilotOpen(true) }}
+              className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Ask AI Copilot
+            </button>
+          </div>
+        }
       />
 
       {loading && (
@@ -662,14 +737,24 @@ export default function BuyerLens() {
                             className="w-full text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-muted-foreground placeholder:text-muted-foreground/45 focus:text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/40"
                           />
                         </div>
-                        <button
-                          type="button"
-                          disabled={savingId === q.id}
-                          onClick={() => saveTracking(q)}
-                          className="text-xs font-semibold px-3 py-2 rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
-                        >
-                          {savingId === q.id ? 'Saving…' : 'Save tracking'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={savingId === q.id}
+                            onClick={() => saveTracking(q)}
+                            className="text-xs font-semibold px-3 py-2 rounded-lg bg-primary text-primary-foreground disabled:opacity-50"
+                          >
+                            {savingId === q.id ? 'Saving…' : 'Save tracking'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openCopilotForQuestion(q)}
+                            className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-2 rounded-lg border border-primary/25 bg-primary/8 text-primary hover:bg-primary/15 transition-colors"
+                          >
+                            <MessageSquare className="w-3 h-3" />
+                            Ask AI how to answer this
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
