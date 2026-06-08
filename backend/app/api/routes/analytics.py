@@ -2055,3 +2055,18 @@ def patch_engagement_profile(
     db.commit()
     db.refresh(row)
     return _engagement_profile_dict(row)
+
+
+# ---------------------------------------------------------------------------
+# Buyer Universe — active acquirer matching
+# ---------------------------------------------------------------------------
+
+@router.get("/buyer-universe/{company_id}")
+def get_buyer_universe(
+    company: CompanyScoped,
+    buyer_type: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Return ranked active acquirers matched to this company's industry and EBITDA size."""
+    from app.analytics.buyer_universe import resolve_buyer_universe
+    return resolve_buyer_universe(db, company.id, buyer_type_filter=buyer_type)
