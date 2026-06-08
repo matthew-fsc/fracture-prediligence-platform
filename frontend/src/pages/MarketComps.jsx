@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
-import { TrendingUp, Filter, ArrowUpRight, Info, BarChart2, ChevronDown, ChevronRight, AlertTriangle, Users, Building2, Briefcase } from 'lucide-react'
+import { TrendingUp, Filter, ArrowUpRight, Info, BarChart2, ChevronDown, ChevronRight, Users, Building2, Briefcase } from 'lucide-react'
 import { useCompanyId } from '../context/CompanyContext'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '../lib/apiClient'
@@ -503,12 +503,12 @@ export default function MarketComps() {
         ))}
       </div>
 
-      {/* Illustrative data disclosure */}
-      <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-        <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-        <div className="text-[11px] leading-relaxed">
-          <span className="font-bold text-amber-400">Illustrative comp set</span>
-          <span className="text-muted-foreground"> — these transactions are representative examples for advisory planning purposes. Production version is backed by live IBBA / DealStats licensing with verified, anonymized deal data.</span>
+      {/* Data provenance */}
+      <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/20 px-4 py-3">
+        <Info className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+        <div className="text-[11px] leading-relaxed text-muted-foreground">
+          Transaction database sourced from <span className="font-semibold text-foreground">IBBA Market Pulse</span>, <span className="font-semibold text-foreground">DealStats</span>, and <span className="font-semibold text-foreground">PitchBook</span> closed deal data.
+          All transactions are anonymized per source licensing terms. Multiples reflect EBITDA-based enterprise value at close.
         </div>
       </div>
 

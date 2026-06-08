@@ -12,12 +12,16 @@ Every mapping gets a confidence score (0–100). Below 80 → flagged for human 
 """
 
 from __future__ import annotations
+import json
+import logging
 import re
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from typing import Optional
 
 from app.ingestion.p4_schema_profiling import ColumnProfile, InferredType
+
+logger = logging.getLogger(__name__)
 
 
 # ── Ontology Field Registry (Blueprint I §P5.1) ────────────────────────────
@@ -351,6 +355,59 @@ def _infer_from_profile(profile: ColumnProfile) -> list[tuple[str, int, str]]:
     return sorted(candidates, key=lambda x: -x[1])
 
 
+_VALID_FIELDS = set(ONTOLOGY_REGISTRY.keys())
+
+_CLAUDE_MAPPING_SYSTEM = """You are a data schema expert helping map CSV column headers to a financial data ontology.
+Given a column header, sample values, and inferred data type, identify the most likely ontology field.
+
+Valid ontology fields:
+REVENUE_GROSS, REVENUE_TYPE, REVENUE_RECURRING_FLAG, REVENUE_PERIOD, REVENUE_CUSTOMER_ID, REVENUE_DESCRIPTION,
+CUSTOMER_NAME, CUSTOMER_TENURE_START, CUSTOMER_INDUSTRY, CUSTOMER_IS_ACTIVE, CUSTOMER_OWNER_CONTACT,
+EMPLOYEE_NAME, EMPLOYEE_ROLE, EMPLOYEE_DEPARTMENT, EMPLOYEE_HIRE_DATE, EMPLOYEE_STATUS, EMPLOYEE_COMP_ANNUAL,
+EMPLOYEE_IS_OWNER, EMPLOYEE_MANAGEMENT_LEVEL,
+EXPENSE_AMOUNT, EXPENSE_CATEGORY, EXPENSE_DESCRIPTION, EXPENSE_PERIOD, EXPENSE_VENDOR,
+CONTRACT_START_DATE, CONTRACT_END_DATE, CONTRACT_ANNUAL_VALUE, CONTRACT_TYPE, CONTRACT_CUSTOMER_ID, CONTRACT_IS_ACTIVE
+
+Output ONLY a JSON object with keys: field (string or null), confidence (0-100 int), reason (string, max 15 words).
+If no field fits, set field to null."""
+
+
+def _claude_suggest_mapping(raw_header: str, profile: ColumnProfile) -> Optional[tuple[str, int, str]]:
+    """Ask Claude to suggest an ontology field for an ambiguous column. Returns (field, confidence, reason) or None."""
+    try:
+        from app.core.ai_client import call_claude, make_cached_system
+        from app.core.config import settings
+
+        if not settings.ANTHROPIC_API_KEY:
+            return None
+
+        samples = profile.sample_values[:5] if profile.sample_values else []
+        user_msg = (
+            f"Column header: {raw_header!r}\n"
+            f"Inferred type: {profile.inferred_type.value if profile.inferred_type else 'unknown'}\n"
+            f"Sample values: {samples}\n"
+            f"Is currency: {profile.is_currency}\n"
+            f"Unique value count: {profile.unique_count}"
+        )
+        result = call_claude(
+            system=make_cached_system(_CLAUDE_MAPPING_SYSTEM),
+            messages=[{"role": "user", "content": user_msg}],
+            max_tokens=128,
+            model=settings.ANTHROPIC_HAIKU_MODEL,
+            timeout=15.0,
+            max_retries=1,
+        )
+        parsed = json.loads(result["text"].strip())
+        field = parsed.get("field")
+        confidence = int(parsed.get("confidence", 0))
+        reason = str(parsed.get("reason", "Claude suggestion"))
+        if field in _VALID_FIELDS and confidence >= 30:
+            return field, confidence, reason
+    except Exception as exc:
+        logger.debug("Claude column mapping suggestion failed for %r: %s", raw_header, exc)
+    return None
+
+
 def classify_columns(
     profiles: list[ColumnProfile],
     ingestion_id: str,
@@ -433,16 +490,30 @@ def classify_columns(
                 ))
                 result.review_required += 1
             else:
-                # Could not map — flag for manual assignment
-                result.mappings.append(ColumnMapping(
-                    source_column=profile.raw_header,
-                    ontology_field=None,
-                    entity_type=None,
-                    confidence=0,
-                    match_method="unmatched",
-                    match_detail="No ontology field matched. Manual assignment required.",
-                    requires_review=True,
-                ))
+                # Try Claude-assisted mapping for truly ambiguous columns
+                claude_result = _claude_suggest_mapping(profile.raw_header, profile)
+                if claude_result:
+                    cl_field, cl_confidence, cl_reason = claude_result
+                    entity_type = ONTOLOGY_REGISTRY[cl_field][0]
+                    result.mappings.append(ColumnMapping(
+                        source_column=profile.raw_header,
+                        ontology_field=cl_field,
+                        entity_type=entity_type,
+                        confidence=cl_confidence,
+                        match_method="claude_assisted",
+                        match_detail=f"Claude suggestion: {cl_reason}",
+                        requires_review=True,
+                    ))
+                else:
+                    result.mappings.append(ColumnMapping(
+                        source_column=profile.raw_header,
+                        ontology_field=None,
+                        entity_type=None,
+                        confidence=0,
+                        match_method="unmatched",
+                        match_detail="No ontology field matched. Manual assignment required.",
+                        requires_review=True,
+                    ))
                 result.review_required += 1
 
     return result

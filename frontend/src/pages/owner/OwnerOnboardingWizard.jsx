@@ -638,9 +638,9 @@ export default function OwnerOnboardingWizard() {
     }
   }
 
-  function goToDashboard() {
-    refreshProfile?.()
-    navigate('/client/dashboard')
+  async function goToDashboard() {
+    await refreshProfile?.()
+    navigate('/client/dashboard', { replace: true })
   }
 
   if (!companyId || loading) {

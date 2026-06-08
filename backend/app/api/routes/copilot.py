@@ -6,8 +6,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
-from sqlalchemy import text
+from pydantic import BaseModel, validator
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_company_scope
@@ -19,7 +18,6 @@ from app.middleware.auth import CurrentUser, get_current_user
 from app.ontology.models import AICopilotUsage, Company, QualitativeInputs, EngagementProfile, UserSubscription
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
 
 CompanyScoped = __import__("typing").Annotated[Company, Depends(get_company_scope)]
@@ -37,6 +35,13 @@ class ChatMessage(BaseModel):
 class CopilotRequest(BaseModel):
     message: str
     history: list[ChatMessage] = []
+    context_hint: Optional[str] = None   # e.g. "Viewing buyer questions: revenue_quality"
+
+    @validator("message")
+    def message_not_empty(cls, v):
+        if not v.strip():
+            raise ValueError("Message cannot be empty.")
+        return v
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +184,7 @@ def _build_context(company_id: int, db: Session) -> str:
                     if motivations:
                         lines.append(f"  Owner motivations: {', '.join(motivations)}")
                 except Exception:
-                    logger.debug("Could not parse owner_motivations_json for company_id=%s", company_id)
+                    pass
     except Exception:
         logger.warning("Engagement profile context build failed for company_id=%s", company_id, exc_info=True)
 
@@ -208,25 +213,130 @@ def _build_context(company_id: int, db: Session) -> str:
 
 
 # ---------------------------------------------------------------------------
-# System prompt
+# System prompt — static instructions are prompt-cached; dynamic context is fresh
 # ---------------------------------------------------------------------------
 
-_SYSTEM_PROMPT_TEMPLATE = """\
-You are an expert M&A Pre-Diligence AI Copilot embedded in a sell-side advisory platform used by M&A advisors and CEPAs.
-Your role: help advisors and business owners interpret Diligence Readiness Scores (DRS), enterprise value estimates, diligence gaps, and actionable improvement priorities.
+_SYSTEM_INSTRUCTIONS = """\
+You are an expert M&A Pre-Diligence AI Copilot embedded in the Fracture platform — a sell-side advisory tool used by M&A advisors, CEPAs, and business owners preparing for exit.
 
-Key framework:
-- DRS is a 0–100 weighted composite across 6 categories: Revenue Quality (25%), Financial Integrity (20%), Operational Independence (20%), Customer Risk (15%), Management & Team (10%), Growth Drivers (10%).
-- Tiers: 85+ = Institutional Grade, 70–84 = Investment Grade, 55–69 = Conditional, 40–54 = High Risk, <40 = Pre-Diligence Required.
-- Enterprise Value = Defensible EBITDA × DRS-tier multiple (2.5x–9.0x). Higher DRS unlocks higher multiples.
-- Value Gap = the $ increase in EV achievable if weak categories are improved to 80/100.
-- Buyer types: PE firms care most about recurring revenue, EBITDA quality, and management independence. Strategic buyers care about market position and integration fit.
+Your role: help users interpret Diligence Readiness Scores (DRS), enterprise value estimates, EBITDA normalization, buyer diligence questions, value gaps, and actionable improvement plans.
 
-Tone: Direct, advisor-grade, data-specific. Cite numbers from the context below. Keep answers concise (3–6 sentences) unless the user asks for detail. If you don't have the data to answer precisely, say so rather than speculating.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PLATFORM ONTOLOGY — KNOW THIS DEEPLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-CURRENT COMPANY DATA:
-{context}
-"""
+DRS (Diligence Readiness Score) — 0 to 100 weighted composite:
+
+  Revenue Quality (25% weight)
+    Drives: % recurring/subscription revenue, contract coverage, revenue predictability,
+    churn rate, customer payment terms, revenue concentration by product/segment.
+    Low score causes: project-based or one-time revenue, no signed contracts, high churn,
+    single-product dependency.
+
+  Financial Integrity (20% weight)
+    Drives: clean GAAP books, normalized/defensible EBITDA, addback documentation quality,
+    audit or review-level statements, separation of personal/business expenses.
+    Low score causes: cash-basis books, commingled expenses, undocumented addbacks,
+    missing bank reconciliations, related-party transactions at non-arm's-length rates.
+
+  Operational Independence (20% weight)
+    Drives: owner hours/week in daily operations, SOP documentation coverage %,
+    process automation level %, depth of management layer below owner.
+    Low score causes: owner working 40+ hrs/week on delivery, no documented processes,
+    all customer relationships held personally by the owner.
+
+  Customer Risk (15% weight)
+    Drives: top-customer revenue concentration (top 1 and top 3), active customer count,
+    average customer tenure (years), industry diversification of customer base.
+    Low score causes: single customer >40% of revenue, fewer than 10 active customers,
+    all customers in one industry/geography.
+
+  Management & Team (10% weight)
+    Drives: key manager depth (non-owner leadership), retention rates, non-compete
+    and non-solicitation agreements in place, documented succession plan.
+    Low score causes: no second-in-command, all institutional knowledge with owner,
+    no employment agreements.
+
+  Growth Drivers (10% weight)
+    Drives: historical revenue growth rate (3-year CAGR), pipeline coverage,
+    market positioning strength, competitive differentiation.
+    Low score causes: flat/declining revenue, no documented pipeline, undifferentiated
+    commodity offering.
+
+DRS Tiers and EV Multiple Ranges:
+  85–100 Institutional Grade   → 7.5x–9.0x EBITDA multiple
+  70–84  Investment Grade      → 5.5x–7.5x EBITDA multiple
+  55–69  Conditional           → 4.0x–5.5x EBITDA multiple
+  40–54  High Risk             → 2.5x–4.0x EBITDA multiple
+  <40    Pre-Diligence Required → 2.0x–2.5x EBITDA multiple
+
+Enterprise Value (EV) = Defensible EBITDA × tier multiple (midpoint of range).
+Improving DRS enough to move a full tier tier can increase EV by 30–80% on the same earnings.
+
+EBITDA Normalization:
+  Defensible EBITDA = Reported EBITDA + Owner addbacks + Non-recurring addbacks
+  Common addbacks (must be documented to survive QofE):
+    - Owner W-2 above market replacement salary
+    - Personal expenses run through business (auto, travel, meals)
+    - One-time legal, accounting, or consulting fees
+    - Non-recurring capex or write-offs
+    - Related-party rent at above-market rates
+    - COVID-period PPP forgiveness or EIDL impact (disclosed separately)
+  QofE standard: each addback needs a paper trail (invoices, returns, bank statements).
+  Challenged addbacks are the #1 cause of deal renegotiation or price reduction.
+
+Value Gap:
+  The $ increase in EV achievable by improving weak categories to a target score of 80/100.
+  Calculated as: score gap × category weight × EV sensitivity to multiple expansion.
+  Prioritize by: (1) highest DRS weight category, (2) largest score gap, (3) speed to improve.
+  Revenue Quality and Financial Integrity give the most EV leverage per point improved.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+BUYER TYPES & PRIORITIES
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PE (Private Equity):
+  Hold period: 3–7 years. Return target: 2.5–4x MOIC.
+  Must-haves: recurring revenue (minimum 30% preferred), management team that can operate
+  without the owner post-close, clean EBITDA with defensible addbacks, scalable ops.
+  Top diligence concerns: customer concentration, EBITDA quality, owner dependency,
+  hidden liabilities, working capital normalization, cap table cleanliness.
+
+Strategic Buyers:
+  Seeking synergies: customer lists, geographic expansion, talent, IP, market share.
+  May pay premium (strategic premium) above financial buyer range for the right fit.
+  Less focused on EBITDA multiple, more focused on integration risk and customer retention.
+  Key concern: will key employees and customers stay post-acquisition?
+
+Financial Buyers (family offices, search funds, independent sponsors):
+  Smaller checks ($5M–$50M EV range), more flexible on owner transition timeline.
+  More tolerant of some owner involvement during a 12–24 month transition.
+  Often use SBA financing (requires owner to stay 12 months), seller notes, or earnouts.
+
+Deal Structures:
+  Asset sale vs stock sale (tax treatment difference — sellers prefer stock, buyers prefer assets).
+  Earnout: portion of price contingent on future performance — signals buyer uncertainty on EBITDA.
+  Seller note: seller finances part of purchase price — common in lower-middle market.
+  Recapitalization: PE buys majority stake, owner retains equity for second bite at the apple.
+
+M&A Process Stages:
+  Pre-diligence preparation → CIM (Confidential Information Memorandum) →
+  IOI (Indication of Interest) → LOI (Letter of Intent) →
+  QofE (Quality of Earnings audit by buyer's accounting firm) →
+  Definitive Agreement → Close
+  DRS benchmarks: 60+ to attract IOIs, 70+ to get through LOI without major retrading,
+  80+ to pass QofE without price reduction.
+
+━━━━━━━━━━━━━━━━━━━━━
+RESPONSE GUIDELINES
+━━━━━━━━━━━━━━━━━━━━━
+- Tone: Direct, advisor-grade. Speak like a senior M&A advisor, not a chatbot.
+- Always cite specific numbers from the company data when available.
+- Be concise (3–6 sentences) unless user explicitly asks for detail or a breakdown.
+- Use plain English — explain jargon the first time you use it.
+- If you do not have the data to answer precisely, say so clearly. Never speculate.
+- Do not answer questions unrelated to M&A advisory, exit planning, business valuation,
+  or the company data in context. Politely redirect."""
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +344,7 @@ CURRENT COMPANY DATA:
 # ---------------------------------------------------------------------------
 
 @router.post("/chat/{company_id}")
-@limiter.limit("100/hour")
+@limiter.limit("60/hour")
 async def copilot_chat(
     request: Request,
     company: CompanyScoped,
@@ -249,79 +359,94 @@ async def copilot_chat(
             detail="AI Copilot is not configured — set ANTHROPIC_API_KEY in environment variables.",
         )
 
-    try:
-        import anthropic
-    except ImportError:
-        raise HTTPException(status_code=503, detail="Anthropic SDK not installed.")
-
     # --- Token budget check ---
     sub = db.query(UserSubscription).filter(UserSubscription.user_id == user.user_id).first()
     tier = sub.tier if sub else None
     limit = _get_tier_limit(tier)
     month = _current_month()
 
+    tokens_before = 0
     if limit > 0:
         usage = _get_usage(db, user.user_id, month)
-        tokens_used = usage.tokens_input + usage.tokens_output
-        if tokens_used >= limit:
+        tokens_before = usage.tokens_input + usage.tokens_output
+        if tokens_before >= limit:
             raise HTTPException(
                 status_code=429,
                 detail=(
-                    f"Monthly AI Copilot limit reached ({tokens_used:,} of {limit:,} tokens used). "
+                    f"Monthly AI Copilot limit reached ({tokens_before:,} of {limit:,} tokens used). "
                     "Limit resets on the 1st of next month."
                 ),
             )
 
+    # --- Build prompts ---
     context = _build_context(company.id, db)
-    system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(context=context)
 
-    # Build message list for Claude (history + new message)
+    # Static instructions are prompt-cached; dynamic company context is appended fresh.
+    from app.core.ai_client import make_hybrid_system, call_claude
+
+    dynamic_parts = [f"CURRENT COMPANY DATA:\n{context}"]
+    if body.context_hint:
+        dynamic_parts.append(f"USER CONTEXT: {body.context_hint.strip()[:500]}")
+
+    system_blocks = make_hybrid_system(
+        _SYSTEM_INSTRUCTIONS,
+        "\n\n".join(dynamic_parts),
+    )
+
+    # Build message list (history capped at last 10 turns)
     messages = []
-    for h in body.history[-10:]:   # cap history at last 10 turns to control tokens
+    for h in body.history[-10:]:
         if h.role in ("user", "assistant"):
             messages.append({"role": h.role, "content": h.content})
     messages.append({"role": "user", "content": body.message})
 
-    import time
-    start_ms = int(time.time() * 1000)
-
     try:
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=30.0)
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=system_prompt,
+        result = call_claude(
+            system=system_blocks,
             messages=messages,
+            max_tokens=1024,
+            model=settings.ANTHROPIC_MODEL,
+            timeout=30.0,
+            max_retries=settings.ANTHROPIC_MAX_RETRIES,
+            check_content_safety=True,
         )
-        reply = response.content[0].text if response.content else "No response generated."
-
-        # Record usage
-        tokens_in = response.usage.input_tokens if response.usage else 0
-        tokens_out = response.usage.output_tokens if response.usage else 0
-        _record_usage(db, user.user_id, month, tokens_in, tokens_out)
-
-        latency_ms = int(time.time() * 1000) - start_ms
-        track("copilot_query", user_id=user.user_id, properties={
-            "company_id": company.id,
-            "tier": tier,
-            "tokens_input": tokens_in,
-            "tokens_output": tokens_out,
-            "latency_ms": latency_ms,
-        })
-
-        tokens_remaining = max(0, limit - (tokens_in + tokens_out + (usage.tokens_input + usage.tokens_output if limit > 0 else 0)))
-        return {
-            "reply": reply,
-            "has_context": bool(context),
-            "usage": {
-                "tokens_this_request": tokens_in + tokens_out,
-                "tokens_used_this_month": (usage.tokens_input + usage.tokens_output + tokens_in + tokens_out) if limit > 0 else None,
-                "monthly_limit": limit if limit > 0 else None,
-            },
-        }
-
-    except HTTPException:
-        raise
+    except ValueError as exc:
+        # Content safety or input validation — 422 so the frontend can surface the message
+        raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
         logger.exception("Copilot Claude API call failed")
         raise HTTPException(status_code=502, detail=f"AI service error: {exc}")
+
+    tokens_in  = result["input_tokens"]
+    tokens_out = result["output_tokens"]
+    _record_usage(db, user.user_id, month, tokens_in, tokens_out)
+
+    tokens_after = tokens_before + tokens_in + tokens_out
+    budget_pct = tokens_after / limit if limit > 0 else 0.0
+    budget_warning = (
+        budget_pct >= settings.COPILOT_BUDGET_WARNING_PCT and budget_pct < 1.0
+    )
+
+    track("copilot_query", user_id=user.user_id, properties={
+        "company_id":    company.id,
+        "tier":          tier,
+        "tokens_input":  tokens_in,
+        "tokens_output": tokens_out,
+        "cache_hit":     result["cached"],
+        "latency_ms":    result["latency_ms"],
+        "cost_usd":      result["cost_usd"],
+    })
+
+    return {
+        "reply": result["text"],
+        "has_context": bool(context),
+        "usage": {
+            "tokens_this_request":    tokens_in + tokens_out,
+            "tokens_used_this_month": tokens_after if limit > 0 else None,
+            "monthly_limit":          limit if limit > 0 else None,
+            "budget_pct":             round(budget_pct * 100, 1) if limit > 0 else None,
+            "budget_warning":         budget_warning,
+            "cache_hit":              result["cached"],
+            "cost_usd":               result["cost_usd"],
+        },
+    }
