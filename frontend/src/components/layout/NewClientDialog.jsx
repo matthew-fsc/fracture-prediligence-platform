@@ -39,7 +39,7 @@ export default function NewClientDialog({ open, onClose }) {
     setSubmitting(true)
     setBillingError(null)
     try {
-      const company = await apiClient.post('/api/companies', { name: trimmed })
+      const company = await apiClient.post('/api/companies/', { name: trimmed })
       await qc.invalidateQueries({ queryKey: ['companies'] })
       await qc.invalidateQueries({ queryKey: ['company', company.id] })
       setCompanyId(company.id)

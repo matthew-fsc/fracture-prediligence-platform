@@ -14,8 +14,8 @@ migrated, causing advisory-workflow and buyer-questions endpoints to crash
 with 'no such column: buyer_question_states.answer_draft'.
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0020"
 down_revision = "0019"
@@ -24,21 +24,27 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column(
-        "buyer_question_states",
-        sa.Column("answer_draft", sa.Text(), nullable=True),
-    )
-    op.add_column(
-        "buyer_question_states",
-        sa.Column("ai_draft_generated_at", sa.DateTime(), nullable=True),
-    )
-    op.add_column(
-        "buyer_question_states",
-        sa.Column("reviewed_by", sa.String(256), nullable=True),
-    )
+    conn = op.get_bind()
+    tables = sa.inspect(conn).get_table_names()
+    if "buyer_question_states" not in tables:
+        return  # table doesn't exist yet — nothing to patch
+
+    existing_cols = {col["name"] for col in sa.inspect(conn).get_columns("buyer_question_states")}
+
+    if "answer_draft" not in existing_cols:
+        op.add_column("buyer_question_states", sa.Column("answer_draft", sa.Text(), nullable=True))
+    if "ai_draft_generated_at" not in existing_cols:
+        op.add_column("buyer_question_states", sa.Column("ai_draft_generated_at", sa.DateTime(), nullable=True))
+    if "reviewed_by" not in existing_cols:
+        op.add_column("buyer_question_states", sa.Column("reviewed_by", sa.String(256), nullable=True))
 
 
 def downgrade():
-    op.drop_column("buyer_question_states", "reviewed_by")
-    op.drop_column("buyer_question_states", "ai_draft_generated_at")
-    op.drop_column("buyer_question_states", "answer_draft")
+    conn = op.get_bind()
+    tables = sa.inspect(conn).get_table_names()
+    if "buyer_question_states" not in tables:
+        return
+    existing_cols = {col["name"] for col in sa.inspect(conn).get_columns("buyer_question_states")}
+    for col in ("reviewed_by", "ai_draft_generated_at", "answer_draft"):
+        if col in existing_cols:
+            op.drop_column("buyer_question_states", col)
