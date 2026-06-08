@@ -6,8 +6,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
-from sqlalchemy import text
+from pydantic import BaseModel, validator
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_company_scope
@@ -19,7 +18,6 @@ from app.middleware.auth import CurrentUser, get_current_user
 from app.ontology.models import AICopilotUsage, Company, QualitativeInputs, EngagementProfile, UserSubscription
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
 
 CompanyScoped = __import__("typing").Annotated[Company, Depends(get_company_scope)]
@@ -37,6 +35,12 @@ class ChatMessage(BaseModel):
 class CopilotRequest(BaseModel):
     message: str
     history: list[ChatMessage] = []
+
+    @validator("message")
+    def message_not_empty(cls, v):
+        if not v.strip():
+            raise ValueError("Message cannot be empty.")
+        return v
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +183,7 @@ def _build_context(company_id: int, db: Session) -> str:
                     if motivations:
                         lines.append(f"  Owner motivations: {', '.join(motivations)}")
                 except Exception:
-                    logger.debug("Could not parse owner_motivations_json for company_id=%s", company_id)
+                    pass
     except Exception:
         logger.warning("Engagement profile context build failed for company_id=%s", company_id, exc_info=True)
 
@@ -208,10 +212,10 @@ def _build_context(company_id: int, db: Session) -> str:
 
 
 # ---------------------------------------------------------------------------
-# System prompt
+# System prompt — static instructions are prompt-cached; dynamic context is fresh
 # ---------------------------------------------------------------------------
 
-_SYSTEM_PROMPT_TEMPLATE = """\
+_SYSTEM_INSTRUCTIONS = """\
 You are an expert M&A Pre-Diligence AI Copilot embedded in a sell-side advisory platform used by M&A advisors and CEPAs.
 Your role: help advisors and business owners interpret Diligence Readiness Scores (DRS), enterprise value estimates, diligence gaps, and actionable improvement priorities.
 
@@ -222,11 +226,9 @@ Key framework:
 - Value Gap = the $ increase in EV achievable if weak categories are improved to 80/100.
 - Buyer types: PE firms care most about recurring revenue, EBITDA quality, and management independence. Strategic buyers care about market position and integration fit.
 
-Tone: Direct, advisor-grade, data-specific. Cite numbers from the context below. Keep answers concise (3–6 sentences) unless the user asks for detail. If you don't have the data to answer precisely, say so rather than speculating.
-
-CURRENT COMPANY DATA:
-{context}
-"""
+Tone: Direct, advisor-grade, data-specific. Cite numbers from the context below. Keep answers concise (3–6 sentences) unless the user asks for detail.
+If you don't have the data to answer precisely, say so rather than speculating.
+Do not answer questions unrelated to M&A advisory, exit planning, business valuation, or the company data provided."""
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +236,7 @@ CURRENT COMPANY DATA:
 # ---------------------------------------------------------------------------
 
 @router.post("/chat/{company_id}")
-@limiter.limit("100/hour")
+@limiter.limit("60/hour")
 async def copilot_chat(
     request: Request,
     company: CompanyScoped,
@@ -249,79 +251,90 @@ async def copilot_chat(
             detail="AI Copilot is not configured — set ANTHROPIC_API_KEY in environment variables.",
         )
 
-    try:
-        import anthropic
-    except ImportError:
-        raise HTTPException(status_code=503, detail="Anthropic SDK not installed.")
-
     # --- Token budget check ---
     sub = db.query(UserSubscription).filter(UserSubscription.user_id == user.user_id).first()
     tier = sub.tier if sub else None
     limit = _get_tier_limit(tier)
     month = _current_month()
 
+    tokens_before = 0
     if limit > 0:
         usage = _get_usage(db, user.user_id, month)
-        tokens_used = usage.tokens_input + usage.tokens_output
-        if tokens_used >= limit:
+        tokens_before = usage.tokens_input + usage.tokens_output
+        if tokens_before >= limit:
             raise HTTPException(
                 status_code=429,
                 detail=(
-                    f"Monthly AI Copilot limit reached ({tokens_used:,} of {limit:,} tokens used). "
+                    f"Monthly AI Copilot limit reached ({tokens_before:,} of {limit:,} tokens used). "
                     "Limit resets on the 1st of next month."
                 ),
             )
 
+    # --- Build prompts ---
     context = _build_context(company.id, db)
-    system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(context=context)
 
-    # Build message list for Claude (history + new message)
+    # Static instructions are prompt-cached; dynamic company context is appended fresh.
+    from app.core.ai_client import make_hybrid_system, call_claude
+
+    system_blocks = make_hybrid_system(
+        _SYSTEM_INSTRUCTIONS,
+        f"CURRENT COMPANY DATA:\n{context}",
+    )
+
+    # Build message list (history capped at last 10 turns)
     messages = []
-    for h in body.history[-10:]:   # cap history at last 10 turns to control tokens
+    for h in body.history[-10:]:
         if h.role in ("user", "assistant"):
             messages.append({"role": h.role, "content": h.content})
     messages.append({"role": "user", "content": body.message})
 
-    import time
-    start_ms = int(time.time() * 1000)
-
     try:
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=30.0)
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=system_prompt,
+        result = call_claude(
+            system=system_blocks,
             messages=messages,
+            max_tokens=1024,
+            model=settings.ANTHROPIC_MODEL,
+            timeout=30.0,
+            max_retries=settings.ANTHROPIC_MAX_RETRIES,
+            check_content_safety=True,
         )
-        reply = response.content[0].text if response.content else "No response generated."
-
-        # Record usage
-        tokens_in = response.usage.input_tokens if response.usage else 0
-        tokens_out = response.usage.output_tokens if response.usage else 0
-        _record_usage(db, user.user_id, month, tokens_in, tokens_out)
-
-        latency_ms = int(time.time() * 1000) - start_ms
-        track("copilot_query", user_id=user.user_id, properties={
-            "company_id": company.id,
-            "tier": tier,
-            "tokens_input": tokens_in,
-            "tokens_output": tokens_out,
-            "latency_ms": latency_ms,
-        })
-
-        tokens_remaining = max(0, limit - (tokens_in + tokens_out + (usage.tokens_input + usage.tokens_output if limit > 0 else 0)))
-        return {
-            "reply": reply,
-            "has_context": bool(context),
-            "usage": {
-                "tokens_this_request": tokens_in + tokens_out,
-                "tokens_used_this_month": (usage.tokens_input + usage.tokens_output + tokens_in + tokens_out) if limit > 0 else None,
-                "monthly_limit": limit if limit > 0 else None,
-            },
-        }
-
-    except HTTPException:
-        raise
+    except ValueError as exc:
+        # Content safety or input validation — 422 so the frontend can surface the message
+        raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
         logger.exception("Copilot Claude API call failed")
         raise HTTPException(status_code=502, detail=f"AI service error: {exc}")
+
+    tokens_in  = result["input_tokens"]
+    tokens_out = result["output_tokens"]
+    _record_usage(db, user.user_id, month, tokens_in, tokens_out)
+
+    tokens_after = tokens_before + tokens_in + tokens_out
+    budget_pct = tokens_after / limit if limit > 0 else 0.0
+    budget_warning = (
+        budget_pct >= settings.COPILOT_BUDGET_WARNING_PCT and budget_pct < 1.0
+    )
+
+    track("copilot_query", user_id=user.user_id, properties={
+        "company_id":    company.id,
+        "tier":          tier,
+        "tokens_input":  tokens_in,
+        "tokens_output": tokens_out,
+        "cache_hit":     result["cached"],
+        "latency_ms":    result["latency_ms"],
+        "cost_usd":      result["cost_usd"],
+    })
+
+    return {
+        "reply": result["text"],
+        "has_context": bool(context),
+        "usage": {
+            "tokens_this_request":    tokens_in + tokens_out,
+            "tokens_used_this_month": tokens_after if limit > 0 else None,
+            "monthly_limit":          limit if limit > 0 else None,
+            "budget_pct":             round(budget_pct * 100, 1) if limit > 0 else None,
+            "budget_warning":         budget_warning,
+            "cache_hit":              result["cached"],
+            "cost_usd":               result["cost_usd"],
+        },
+    }

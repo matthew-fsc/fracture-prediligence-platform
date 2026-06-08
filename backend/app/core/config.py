@@ -12,6 +12,16 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8
 
     ANTHROPIC_API_KEY: str = ""
+    # Primary model for all advisory-grade tasks (copilot, insights, buyer Q&A).
+    ANTHROPIC_MODEL: str = "claude-sonnet-4-6"
+    # Lightweight model for bulk / lower-stakes tasks (column mapping assist).
+    ANTHROPIC_HAIKU_MODEL: str = "claude-haiku-4-5-20251001"
+    # Hard character limit on a single user message (prevents context stuffing / abuse).
+    ANTHROPIC_MAX_INPUT_CHARS: int = 8_000
+    # Max retry attempts on transient API errors (429 / 500 / 529 / network).
+    ANTHROPIC_MAX_RETRIES: int = 3
+    # Warn users when their monthly token usage reaches this fraction of the limit.
+    COPILOT_BUDGET_WARNING_PCT: float = 0.80
 
     CLERK_SECRET_KEY: str = ""
     CLERK_JWKS_URL: str = ""

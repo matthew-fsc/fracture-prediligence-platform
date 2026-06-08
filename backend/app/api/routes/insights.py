@@ -26,6 +26,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_company_scope
+from app.core.ai_client import call_claude, make_cached_system
 from app.core.config import settings
 from app.core.database import get_db
 from app.middleware.auth import CurrentUser, get_current_user
@@ -119,31 +120,22 @@ class InsightsResponse(BaseModel):
 def _call_claude(system_prompt: str, user_content: str, max_tokens: int = 2048) -> tuple[str, int, int, int]:
     """
     Returns (text, input_tokens, output_tokens, latency_ms).
-    Raises HTTPException on auth/config errors, returns empty string on generation failure.
+    Raises HTTPException on auth/config errors.
     """
     if not settings.ANTHROPIC_API_KEY:
         raise HTTPException(
             status_code=503,
             detail="AI insights are not configured — set ANTHROPIC_API_KEY in environment variables.",
         )
-    try:
-        import anthropic
-    except ImportError:
-        raise HTTPException(status_code=503, detail="Anthropic SDK not installed.")
-
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=60.0)
-    t0 = int(time.time() * 1000)
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=max_tokens,
-        system=system_prompt,
+    r = call_claude(
+        system=make_cached_system(system_prompt),
         messages=[{"role": "user", "content": user_content}],
+        max_tokens=max_tokens,
+        model=settings.ANTHROPIC_MODEL,
+        timeout=60.0,
+        max_retries=settings.ANTHROPIC_MAX_RETRIES,
     )
-    latency = int(time.time() * 1000) - t0
-    text = response.content[0].text if response.content else ""
-    tokens_in = response.usage.input_tokens if response.usage else 0
-    tokens_out = response.usage.output_tokens if response.usage else 0
-    return text, tokens_in, tokens_out, latency
+    return r["text"], r["input_tokens"], r["output_tokens"], r["latency_ms"], r["cached"]
 
 
 def _safe_parse_json(text: str) -> Any:
@@ -190,7 +182,7 @@ Specific Risk Flags:
 
 Generate the PE diligence questions for this specific company profile."""
 
-    raw, _, _, _ = _call_claude(_BUYER_QUESTIONS_SYSTEM, user_content, max_tokens=2048)
+    raw, _, _, _, _ = _call_claude(_BUYER_QUESTIONS_SYSTEM, user_content, max_tokens=2048)
     result = _safe_parse_json(raw)
     return result, raw
 
@@ -224,7 +216,7 @@ Addback Schedule:
 Generate the defensibility narrative for each addback item.
 Use each item's Key as the JSON key in your response."""
 
-    raw, _, _, _ = _call_claude(_ADDBACK_DEFENSIBILITY_SYSTEM, user_content, max_tokens=2048)
+    raw, _, _, _, _ = _call_claude(_ADDBACK_DEFENSIBILITY_SYSTEM, user_content, max_tokens=2048)
     result = _safe_parse_json(raw)
     return result, raw
 
@@ -257,7 +249,7 @@ Category Detail:
 Write a plain-English explanation for each category score.
 Use the category key (e.g. revenue_quality) as the JSON key in your response."""
 
-    raw, _, _, _ = _call_claude(_DRS_INTERPRETATION_SYSTEM, user_content, max_tokens=2048)
+    raw, _, _, _, _ = _call_claude(_DRS_INTERPRETATION_SYSTEM, user_content, max_tokens=2048)
     result = _safe_parse_json(raw)
     return result, raw
 
