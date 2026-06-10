@@ -74,6 +74,7 @@ export default function CompanyWorkspace() {
   const [headcountInput, setHeadcountInput] = useState('')
 
   useEffect(() => {
+    if (!companyId) return
     apiClient.get(`/api/analytics/scores/${companyId}`)
       .then(setLiveScores)
       .catch(() => {})

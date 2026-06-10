@@ -52,6 +52,7 @@ export default function ScenarioSimulator() {
   })
 
   useEffect(() => {
+    if (!companyId) return
     Promise.all([
       apiClient.get(`/api/analytics/metrics/${companyId}`),
       apiClient.get(`/api/analytics/scores/${companyId}`),

@@ -34,7 +34,6 @@ function Nav() {
               <Show when="signed-out">
                 <SignInButton
                   mode="redirect"
-                  forceRedirectUrl="/Home"
                   style={{
                     color: COLORS.offWhite,
                     fontFamily: "'DM Sans', sans-serif",
@@ -51,7 +50,6 @@ function Nav() {
                 </SignInButton>
                 <SignUpButton
                   mode="redirect"
-                  forceRedirectUrl="/dashboard/onboarding"
                   style={{
                     color: COLORS.bg,
                     fontFamily: "'DM Sans', sans-serif",

@@ -43,6 +43,7 @@ export default function InitiativeImpact() {
   const [newCat, setNewCat] = useState('revenue_quality')
 
   useEffect(() => {
+    if (!companyId) return
     apiClient.get(`/api/analytics/value-gap/${companyId}`)
       .then(setGapData)
       .catch((err) => {
