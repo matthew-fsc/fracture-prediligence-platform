@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { FileText, Download, RefreshCw, CheckCircle, Upload, Trash2 } from 'lucide-react'
+import { FileText, Download, RefreshCw, CheckCircle, Upload, Trash2, AlertTriangle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn, fmtM } from '../lib/utils'
 import { useCompanyId } from '../context/CompanyContext'
@@ -107,10 +107,11 @@ export default function Reports() {
   }, [companyId, companyReady])
 
   useEffect(() => {
+    if (!companyReady) return
     apiClient.get(`/api/analytics/scores/${companyId}`)
       .then(d => setScoreData(d))
       .catch(() => {})
-  }, [companyId])
+  }, [companyId, companyReady])
 
   useEffect(() => {
     loadHistory()
@@ -175,7 +176,7 @@ export default function Reports() {
       loadHistory()
     } catch (err) {
       console.error('Report generation failed:', err)
-      toast.error('Report generation failed')
+      toast.error(err?.message || 'Report generation failed')
     } finally {
       setGenerating(null)
     }
@@ -236,6 +237,8 @@ export default function Reports() {
   }
 
   const readyReports = REPORT_TEMPLATES.filter(t => t.status === 'ready')
+  // false only when the backend explicitly returns has_data: false (no completed ingestion)
+  const hasData = scoreData?.has_data !== false
 
   return (
     <div className="space-y-5 max-w-[1400px]">
@@ -354,6 +357,19 @@ export default function Reports() {
 
       <div>
         <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Available Reports</p>
+        {!hasData && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 mb-4 flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-400">No financial data uploaded yet</p>
+              <p className="text-xs text-amber-300/70 mt-0.5">
+                Reports require ingested client financials —{' '}
+                <a href="/Connectors" className="underline hover:text-amber-300">upload data sources</a>{' '}
+                before generating a report.
+              </p>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {readyReports.map(t => {
             const cl = colorMap[t.color] || colorMap.primary
@@ -379,7 +395,7 @@ export default function Reports() {
                 <button
                   type="button"
                   onClick={() => generateReport(t.id)}
-                  disabled={generating === t.id}
+                  disabled={generating === t.id || !hasData}
                   className={cn(
                     'w-full flex items-center justify-center gap-2 text-xs font-semibold py-2 rounded-lg transition-colors disabled:opacity-50 disabled:shadow-none',
                     cl.cta,

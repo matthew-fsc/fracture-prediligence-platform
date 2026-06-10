@@ -13,6 +13,7 @@ from app.core.analytics_events import track
 from app.core.database import get_db
 from app.analytics.a14_report_generator import generate_report_pdf, REPORT_BUILDERS
 from app.analytics.ebitda_basis import ebitda_basis_for_company
+from app.ontology.ingestion_models import IngestionJob, PhaseStatus
 from app.ontology.models import Company, GeneratedReport, ScoreSnapshot
 from app.services.analytics_service import compute_category_modules
 
@@ -85,6 +86,17 @@ def generate_report(
         raise HTTPException(
             status_code=400,
             detail=f"Unknown report type '{report_type}'. Valid: {list(REPORT_BUILDERS.keys())}",
+        )
+    # Mirror the analytics has_data signal: at least one completed ingestion job.
+    # (The demo seed also creates a COMPLETE IngestionJob, so company 1 still works.)
+    has_data = db.query(IngestionJob).filter(
+        IngestionJob.company_id == company.id,
+        IngestionJob.current_status == PhaseStatus.COMPLETE,
+    ).first() is not None
+    if not has_data:
+        raise HTTPException(
+            status_code=422,
+            detail="No ingested data yet — upload client financials before generating a report.",
         )
     try:
         pdf_bytes = generate_report_pdf(report_type, company.id, db)

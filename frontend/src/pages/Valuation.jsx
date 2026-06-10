@@ -5,7 +5,7 @@ import { cn, fmtM } from '../lib/utils'
 import {
   TrendingUp, DollarSign, Zap, BarChart2, AlertTriangle,
   ExternalLink, Edit2, Check, X, Plus, Trash2, ChevronDown, ChevronRight,
-  Scale, ArrowRight, Info, Sparkles, RefreshCw,
+  Scale, ArrowRight, Info, Sparkles, RefreshCw, HelpCircle,
 } from 'lucide-react'
 import { apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
@@ -473,6 +473,35 @@ export default function Valuation() {
           </div>
         )}
         <p className="text-sm text-muted-foreground">Valuation data could not be loaded.</p>
+      </div>
+    )
+  }
+
+  if (scores?.has_data === false) {
+    return (
+      <div className="space-y-5 max-w-[1400px]">
+        <SectionHeader
+          title="EBITDA / EV Calculation Engine"
+          subtitle="Reported EBITDA → Addback Schedule → Defensible EBITDA → Enterprise Value"
+        />
+        <div className="rounded-xl border border-border bg-card p-12 text-center space-y-4">
+          <div className="w-16 h-16 rounded-full border-2 border-dashed border-border flex items-center justify-center mx-auto">
+            <HelpCircle className="w-7 h-7 text-muted-foreground/40" />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-card-foreground mb-1">No financial data yet</p>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+              Valuation requires ingested financials. Upload QuickBooks exports, bank statements, or other
+              financial files to compute reported EBITDA, the addback schedule, and the enterprise value range.
+            </p>
+          </div>
+          <a
+            href="/Connectors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+          >
+            Upload Data Sources
+          </a>
+        </div>
       </div>
     )
   }
