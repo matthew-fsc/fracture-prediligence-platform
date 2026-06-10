@@ -3,16 +3,21 @@
 import hashlib
 from typing import Annotated
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, UploadFile, File, Form, HTTPException, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_company_scope
 from app.core.analytics_events import track
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.core.rate_limiting import limiter
 from app.ontology.models import Company
-from app.ingestion.pipeline import run_pipeline, rerun_pipeline_job, resume_pipeline_after_mapping_review
+from app.ingestion.pipeline import (
+    _run_from_p3_onward,
+    create_pipeline_job,
+    rerun_pipeline_job,
+    resume_pipeline_after_mapping_review,
+)
 from app.ontology.ingestion_models import IngestionJob, PhaseStatus
 
 router = APIRouter()
@@ -20,19 +25,53 @@ router = APIRouter()
 CompanyScoped = Annotated[Company, Depends(get_company_scope)]
 
 
+def _run_pipeline_background(job_id: int, company_id: int, filename: str, file_data: bytes):
+    """
+    Run P3–P11 for an already-committed job in a background task with its own
+    session. publish=True commits at each phase transition so the polling
+    endpoint (GET /jobs/{company_id}/{job_id}) sees live progress.
+    """
+    db = SessionLocal()
+    try:
+        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+        if not job:
+            return
+        _run_from_p3_onward(job, company_id, filename, file_data, db, publish=True)
+        db.commit()
+
+        company = db.query(Company).filter(Company.id == company_id).first()
+        track("file_uploaded", user_id=(company.owner_user_id if company else None) or "anon", properties={
+            "company_id": company_id,
+            "source_type": job.source_type,
+            "file_size_bytes": len(file_data),
+            "pipeline_status": job.current_status,
+            "row_count": job.row_count,
+        })
+    except Exception as e:
+        db.rollback()
+        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+        if job:
+            job.current_status = PhaseStatus.FAILED
+            job.validation_report = {"error": str(e)}
+            db.commit()
+    finally:
+        db.close()
+
+
 @router.post("/upload/{company_id}")
 @limiter.limit("10/hour")
 async def upload_file(
     request: Request,
     company: CompanyScoped,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     source_type: str = Form(default="unknown"),
     db: Session = Depends(get_db),
 ):
     """
-    P2–P6: Receive a raw file and run the full ingestion pipeline up to row extraction.
-    Returns the IngestionJob with validation report, schema profile, column mappings,
-    and extraction error summary.
+    Receive a raw file, store it (P2), and schedule P3–P11 in the background.
+    Returns immediately with the job in its P2/RUNNING state — clients poll
+    GET /jobs/{company_id}/{job_id} for live phase/status progress.
     """
     if settings.DEMO_BLOCK_INGESTION_UPLOAD_FOR_COMPANY_1 and company.id == 1:
         raise HTTPException(
@@ -63,7 +102,7 @@ async def upload_file(
             detail="This file was already ingested for this company (duplicate content).",
         )
 
-    job = run_pipeline(
+    job = create_pipeline_job(
         company_id=company.id,
         filename=file.filename,
         file_data=data,
@@ -73,13 +112,20 @@ async def upload_file(
     db.commit()
     db.refresh(job)
 
-    track("file_uploaded", user_id=company.owner_user_id or "anon", properties={
-        "company_id": company.id,
-        "source_type": source_type,
-        "file_size_bytes": len(data),
-        "pipeline_status": job.current_status,
-        "row_count": job.row_count,
-    })
+    if job.current_status == PhaseStatus.FAILED:
+        # P2 raw storage failed — nothing to run in the background.
+        track("file_uploaded", user_id=company.owner_user_id or "anon", properties={
+            "company_id": company.id,
+            "source_type": source_type,
+            "file_size_bytes": len(data),
+            "pipeline_status": job.current_status,
+            "row_count": job.row_count,
+        })
+    else:
+        # P3–P11 run in the background; the final track() fires there.
+        background_tasks.add_task(
+            _run_pipeline_background, job.id, company.id, file.filename, data
+        )
 
     return {
         "job_id":         job.id,

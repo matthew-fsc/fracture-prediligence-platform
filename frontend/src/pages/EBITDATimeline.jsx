@@ -716,18 +716,27 @@ export default function EBITDATimeline() {
       {noDataAtAll ? (
         <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
           <TrendingUp className="w-10 h-10 text-muted-foreground/30" />
-          <p className="text-sm text-muted-foreground">No analytics data available yet.</p>
+          <p className="text-sm text-muted-foreground">No financial data uploaded yet.</p>
           <p className="text-[11px] text-muted-foreground/60 max-w-md">
-            Upload financial data via Data Sources and complete the scoring pipeline to see live EBITDA & EV analysis.
-            You can also add manual snapshots to start tracking.
+            The EBITDA & EV timeline requires ingested financials. Upload financial data via Data Sources and
+            complete the scoring pipeline to see live EBITDA & EV analysis. You can also add manual snapshots
+            to start tracking.
           </p>
-          <button
-            onClick={() => setShowModal(true)}
-            className="mt-2 flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-semibold"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add First Snapshot
-          </button>
+          <div className="mt-2 flex items-center gap-2">
+            <a
+              href="/Connectors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-xs font-semibold"
+            >
+              Upload Data Sources
+            </a>
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-semibold"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add First Snapshot
+            </button>
+          </div>
         </div>
       ) : (
         <>

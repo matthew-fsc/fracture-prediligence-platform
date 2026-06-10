@@ -70,7 +70,14 @@ export default function CompanySwitcher({ displayName }) {
               <p className="text-[11px] text-destructive px-3 py-2">Could not load clients.</p>
             )}
             {!isLoading && !isError && companies.length === 0 && (
-              <p className="text-[11px] text-muted-foreground px-3 py-2 italic">No clients yet</p>
+              <button
+                type="button"
+                onClick={() => { setOpen(false); setDialogOpen(true) }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs rounded-md text-card-foreground hover:bg-muted/60 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5 flex-shrink-0" />
+                Add your first client
+              </button>
             )}
             {!isLoading &&
               companies.map((c) => (

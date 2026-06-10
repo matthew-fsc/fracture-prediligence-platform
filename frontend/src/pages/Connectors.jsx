@@ -1,12 +1,14 @@
-import { useState, useRef } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Upload, AlertCircle, FileText, RefreshCw, ChevronRight, Trash2, RotateCcw, Info, Plug, CheckCircle2, XCircle } from 'lucide-react'
+import { Upload, AlertCircle, FileText, RefreshCw, ChevronRight, ChevronDown, ChevronUp, Trash2, RotateCcw, Info, Plug, CheckCircle2, XCircle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { useCompanyId } from '../context/CompanyContext'
-import { apiClient } from '../lib/apiClient'
+import { apiClient, ApiError } from '../lib/apiClient'
 import { toast } from '../lib/notify'
+
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024 // mirror backend INGESTION_MAX_UPLOAD_BYTES
 
 function useSiblingPath(segment) {
   const { pathname } = useLocation()
@@ -40,20 +42,103 @@ function phaseLabel(phase, status) {
            P5_MAPPING: 'Mapped', P6_EXTRACTION: 'Extracted — ready for P7+' }[phase] ?? phase
 }
 
+const RUNNING_PHASE_LABELS = {
+  P2_EXTRACTION: 'P2 — Raw storage',
+  P3_VALIDATION: 'P3 — File validation',
+  P4_PROFILING:  'P4 — Schema profiling',
+  P5_MAPPING:    'P5 — Column mapping',
+  P6_EXTRACTION: 'P6 — Row extraction',
+  P7_RULES:      'P7 — Business rules',
+  P8_NORMALIZE:  'P8 — Normalization',
+  P9_ENTITY_RES: 'P9 — Entity resolution',
+  P10_RELATIONS: 'P10 — Relationship mapping',
+  P11_COMMIT:    'P11 — Ontology commit',
+}
+
+function runningPhaseLabel(phase) {
+  return RUNNING_PHASE_LABELS[phase] ?? phase
+}
+
+const TERMINAL_STATUSES = ['COMPLETE', 'FAILED', 'QUARANTINED', 'AWAITING_REVIEW']
+const POLL_INTERVAL_MS = 1500
+const POLL_TIMEOUT_MS = 5 * 60 * 1000
+
+/** Human-readable validation report for FAILED / QUARANTINED jobs. */
+function ValidationDetails({ companyId, jobId }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['ingestion-job', companyId, jobId],
+    queryFn: () => apiClient.get(`/api/ingestion/jobs/${companyId}/${jobId}`),
+    staleTime: 30_000,
+  })
+
+  if (isLoading) {
+    return <p className="mt-3 text-[11px] text-muted-foreground">Loading validation report…</p>
+  }
+
+  const validation = data?.validation
+  const checks = validation?.checks ?? []
+  const resultColor = (result) =>
+    result === 'PASS' ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
+    : result === 'WARNING' ? 'border-amber-500/20 bg-amber-500/10 text-amber-400'
+    : 'border-red-500/20 bg-red-500/10 text-red-400'
+
+  return (
+    <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Validation Report</p>
+      {validation?.error && (
+        <p className="text-xs text-red-400 break-words">{validation.error}</p>
+      )}
+      {checks.length > 0 ? (
+        <div className="space-y-1.5">
+          {checks.map((c, i) => (
+            <div key={`${c.name}-${i}`} className="flex items-start gap-2">
+              <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase flex-shrink-0 mt-0.5', resultColor(c.result))}>
+                {c.result}
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs text-card-foreground">
+                  <span className="font-mono text-[11px] text-muted-foreground mr-1.5">{c.name}</span>
+                  {c.message}
+                </p>
+                {c.detail && <p className="text-[11px] text-muted-foreground">{c.detail}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : !validation?.error ? (
+        <p className="text-xs text-muted-foreground">
+          No detailed validation report is available for this job. Try re-running the pipeline or re-uploading the file.
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
 export default function Connectors() {
   const companyId = useCompanyId()
   const { pathname } = useLocation()
   const isDemo = pathname.startsWith('/demo')
 
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const fieldMappingBase = useSiblingPath('field-mapping')
   const [uploading, setUploading]   = useState(false)
+  const [activeJob, setActiveJob]   = useState(null)   // job being polled after upload
   const [dragOver, setDragOver]     = useState(false)
   const [sourceType, setSourceType] = useState('unknown')
   const [error, setError]           = useState(null)
   const [retryingId, setRetryingId] = useState(null)
+  const [expandedJobId, setExpandedJobId] = useState(null)
   const [qbFetching, setQbFetching] = useState(false)
   const fileRef = useRef()
+  const pollTimerRef = useRef(null)
+  const unmountedRef = useRef(false)
+
+  // Clean up the poller (and stop state updates) when the page unmounts.
+  useEffect(() => () => {
+    unmountedRef.current = true
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
+  }, [])
 
   const companyReady = companyId != null && companyId >= 1
 
@@ -82,12 +167,19 @@ export default function Connectors() {
       const result = await apiClient.post(`/api/qb/fetch/${companyId}`, {})
       await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
       const count = result.jobs_created?.length ?? 0
-      toast.success(`QuickBooks sync complete — ${count} dataset${count !== 1 ? 's' : ''} ingested`)
       if (result.errors?.length) {
+        toast.warning(`QB sync: ${count} dataset${count !== 1 ? 's' : ''} ingested, ${result.errors.length} failed`)
         result.errors.forEach(e => toast.error(`QB fetch error: ${e}`))
+      } else {
+        toast.success(`QuickBooks sync complete — ${count} dataset${count !== 1 ? 's' : ''} ingested`)
       }
     } catch (e) {
-      toast.error(e.message || 'QuickBooks fetch failed')
+      if (e instanceof ApiError && e.status === 404) {
+        toast.error('No active QuickBooks connection found — reconnect via the Connect QuickBooks button.')
+        await qc.invalidateQueries({ queryKey: ['qb-status', companyId] })
+      } else {
+        toast.error(e.message || 'QuickBooks fetch failed')
+      }
     } finally {
       setQbFetching(false)
     }
@@ -117,6 +209,64 @@ export default function Connectors() {
   const demoReadOnly = isDemo
   const demoDeleteDisabled = isDemo
 
+  async function finishPolledJob(job) {
+    setUploading(false)
+    setActiveJob(null)
+    await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
+    qc.invalidateQueries({ queryKey: ['ingestion-job', companyId, job.job_id] })
+
+    if (job.status === 'COMPLETE') {
+      // Committed ontology data changes every analytics output.
+      qc.invalidateQueries({
+        predicate: q =>
+          typeof q.queryKey?.[0] === 'string' &&
+          (q.queryKey[0].startsWith('analytics-') || q.queryKey[0] === 'ebitda-recast'),
+      })
+      toast.success(`Ingestion complete — ${(job.row_count ?? 0).toLocaleString()} rows committed. Analytics now include this data.`)
+    } else if (job.status === 'AWAITING_REVIEW') {
+      toast('Column mapping needs your review before data is committed.', {
+        action: {
+          label: 'Review mappings',
+          onClick: () => navigate(`${fieldMappingBase}?jobId=${job.job_id}`),
+        },
+      })
+    } else if (job.status === 'QUARANTINED') {
+      toast.error('File quarantined during validation — see details below.')
+      setExpandedJobId(job.job_id)
+    } else if (job.status === 'FAILED') {
+      toast.error('Ingestion failed — see details below.')
+      setExpandedJobId(job.job_id)
+    }
+  }
+
+  function pollJob(jobId) {
+    const startedAt = Date.now()
+    const tick = async () => {
+      if (unmountedRef.current) return
+      let job = null
+      try {
+        job = await apiClient.get(`/api/ingestion/jobs/${companyId}/${jobId}`)
+      } catch {
+        // transient poll failure — keep trying until the safety timeout
+      }
+      if (unmountedRef.current) return
+      if (job) setActiveJob(job)
+      if (job && TERMINAL_STATUSES.includes(job.status)) {
+        await finishPolledJob(job)
+        return
+      }
+      if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
+        setUploading(false)
+        setActiveJob(null)
+        toast.error('Ingestion is taking longer than expected — check the jobs list below for its final status.')
+        qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
+        return
+      }
+      pollTimerRef.current = setTimeout(tick, POLL_INTERVAL_MS)
+    }
+    tick()
+  }
+
   async function uploadFile(file) {
     if (!companyReady) {
       toast.error('Select or create a client in the header before uploading.')
@@ -126,20 +276,35 @@ export default function Connectors() {
       toast.error('Uploads are disabled in the demo — data is pre-loaded for ABC Company Inc.')
       return
     }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error('File is larger than the 25 MB limit.')
+      return
+    }
     setUploading(true)
     setError(null)
     const form = new FormData()
     form.append('file', file)
     form.append('source_type', sourceType)
     try {
-      await apiClient.postMultipart(`/api/ingestion/upload/${companyId}`, form)
+      const job = await apiClient.postMultipart(`/api/ingestion/upload/${companyId}`, form)
       await qc.invalidateQueries({ queryKey: ['ingestion-jobs', companyId] })
-      toast.success('File uploaded — pipeline finished')
+      if (job?.job_id != null && !TERMINAL_STATUSES.includes(job.status)) {
+        // Pipeline runs in the background — poll until it reaches a terminal state.
+        setActiveJob(job)
+        pollJob(job.job_id)
+      } else if (job?.job_id != null) {
+        // Pipeline already finished (e.g. P2 storage failure).
+        await finishPolledJob(job)
+      } else {
+        setUploading(false)
+      }
     } catch (e) {
-      const msg = e.message || 'Upload failed'
+      let msg = e.message || 'Upload failed'
+      if (e instanceof ApiError && e.status === 409) {
+        msg = `${e.message} Delete the previous job below if you need to re-ingest this file.`
+      }
       setError(msg)
       toast.error(msg)
-    } finally {
       setUploading(false)
     }
   }
@@ -344,10 +509,18 @@ export default function Connectors() {
                   ? <RefreshCw className="w-8 h-8 text-primary animate-spin mb-3" />
                   : <Upload className="w-8 h-8 text-muted-foreground mb-3" />}
                 <p className="text-sm font-medium text-card-foreground">
-                  {uploading ? 'Running pipeline P2–P11...' : 'Drop file here or click to upload'}
+                  {uploading ? (activeJob ? 'Pipeline running…' : 'Uploading…') : 'Drop file here or click to upload'}
                 </p>
-                <p className="text-[11px] text-muted-foreground mt-1">CSV · Excel (.xlsx / .xls) · TSV</p>
+                <p className="text-[11px] text-muted-foreground mt-1">CSV · Excel (.xlsx / .xls) · TSV · max 25 MB</p>
               </div>
+              {uploading && activeJob && (
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2">
+                  <RefreshCw className="w-3.5 h-3.5 text-primary animate-spin flex-shrink-0" />
+                  <p className="text-xs text-card-foreground truncate">
+                    Running <span className="font-semibold">{runningPhaseLabel(activeJob.phase)}</span>…
+                  </p>
+                </div>
+              )}
               {error && (
                 <div className="mt-2 flex items-center gap-2 text-xs text-red-400">
                   <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
@@ -393,6 +566,19 @@ export default function Connectors() {
                   'border-red-500/20 bg-red-500/10 text-red-400')}>
                   {job.status}
                 </span>
+                {(job.status === 'FAILED' || job.status === 'QUARANTINED') && (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedJobId(expandedJobId === job.job_id ? null : job.job_id)}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold border border-border bg-muted/50 hover:bg-muted text-card-foreground"
+                    title="Show validation report"
+                  >
+                    {expandedJobId === job.job_id
+                      ? <ChevronUp className="w-3 h-3" />
+                      : <ChevronDown className="w-3 h-3" />}
+                    Details
+                  </button>
+                )}
                 {(job.status === 'FAILED' || job.status === 'QUARANTINED') && !demoReadOnly && (
                   <button
                     type="button"
@@ -427,10 +613,13 @@ export default function Connectors() {
               {job.status === 'AWAITING_REVIEW' && (
                 <Link
                   to={`${fieldMappingBase}?jobId=${job.job_id}`}
-                  className="mt-2 inline-flex items-center gap-1 text-[11px] text-primary font-medium"
+                  className="mt-2 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-[11px] text-amber-400 font-semibold hover:bg-amber-500/20 transition-colors"
                 >
                   Review column mappings <ChevronRight className="w-3 h-3" />
                 </Link>
+              )}
+              {(job.status === 'FAILED' || job.status === 'QUARANTINED') && expandedJobId === job.job_id && (
+                <ValidationDetails companyId={companyId} jobId={job.job_id} />
               )}
             </div>
           ))}

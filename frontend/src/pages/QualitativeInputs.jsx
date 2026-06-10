@@ -41,6 +41,7 @@ export default function QualitativeInputs() {
   const [drsDiff, setDrsDiff] = useState(null)  // {baseline, current, advisory_delta, category_scores}
 
   useEffect(() => {
+    if (!companyId) return
     apiClient.get(`/api/analytics/qualitative/${companyId}`)
       .then(d => {
         if (d?.inputs) {

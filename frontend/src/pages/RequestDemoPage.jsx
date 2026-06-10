@@ -82,7 +82,6 @@ function Nav() {
             <Show when="signed-out">
               <SignInButton
                 mode="redirect"
-                forceRedirectUrl="/Home"
                 style={{
                   color: COLORS.offWhite,
                   fontFamily: "'DM Sans', sans-serif",

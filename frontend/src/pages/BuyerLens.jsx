@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { AlertCircle, AlertTriangle, Info, FileText, ChevronDown, ChevronRight, ExternalLink, Sparkles, RefreshCw, MessageSquare, X } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Info, FileText, ChevronDown, ChevronRight, ExternalLink, Sparkles, RefreshCw, MessageSquare, X, HelpCircle } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader'
 import { cn } from '../lib/utils'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -293,6 +293,9 @@ export default function BuyerLens() {
     return q.buyer_type === filterBuyer || q.buyer_type === 'All'
   })
 
+  // Buyer questions are generated from the templated library — without ingested
+  // financials they are generic placeholders, not company-specific analysis.
+  const hasData = scores?.has_data !== false
   const allQs = data?.questions ?? []
   const criticalCount = allQs.filter(q => q.severity === 'CRITICAL').length
   const highCount = allQs.filter(q => q.severity === 'HIGH').length
@@ -367,7 +370,7 @@ export default function BuyerLens() {
         subtitle="Simulated due diligence questions a buyer would raise — prioritized by DRS weakness"
         action={
           <div className="flex items-center gap-2">
-            {data && (
+            {data && hasData && (
               <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-border bg-muted text-muted-foreground">
                 {data.total} questions
               </span>
@@ -402,8 +405,31 @@ export default function BuyerLens() {
         </div>
       )}
 
+      {/* No ingested data — question library is generic templates, not analysis */}
+      {!loading && !error && data && !hasData && (
+        <div className="rounded-xl border border-border bg-card p-12 text-center space-y-4">
+          <div className="w-16 h-16 rounded-full border-2 border-dashed border-border flex items-center justify-center mx-auto">
+            <HelpCircle className="w-7 h-7 text-muted-foreground/40" />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-card-foreground mb-1">No financial data uploaded yet</p>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+              Buyer questions are generic templates until client data is ingested — they are not yet anchored
+              to this company's actual metrics or DRS weaknesses. Upload financial files to generate a
+              company-specific buyer risk profile.
+            </p>
+          </div>
+          <a
+            href="/Connectors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+          >
+            Upload Data Sources
+          </a>
+        </div>
+      )}
+
       {/* AI Buyer Question Simulation */}
-      {data && (
+      {data && hasData && (
         <div className="rounded-xl border border-violet-500/20 bg-card overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 border-b border-violet-500/15 bg-violet-500/5">
             <div className="flex items-center gap-2">
@@ -483,7 +509,7 @@ export default function BuyerLens() {
         </div>
       )}
 
-      {data && (
+      {data && hasData && (
         <>
           {/* Completion progress */}
           {(() => {
