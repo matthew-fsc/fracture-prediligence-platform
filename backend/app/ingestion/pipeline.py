@@ -54,17 +54,30 @@ def _load_dataframe(data: bytes, filename: str, encoding: str, header_row: int) 
     return None
 
 
+def _checkpoint(db: Session, publish: bool) -> None:
+    """
+    Flush phase/status changes to the job row. When publish=True, also commit so
+    a polling request in another session sees live pipeline progress. P3–P10 only
+    mutate the job row (ontology writes happen in P11 + final commit), so
+    mid-pipeline commits are safe.
+    """
+    db.flush()
+    if publish:
+        db.commit()
+
+
 def _run_from_p3_onward(
     job: IngestionJob,
     company_id: int,
     filename: str,
     file_data: bytes,
     db: Session,
+    publish: bool = False,
 ) -> IngestionJob:
     """P3–P11: validation through ontology commit. Mutates job in place."""
     job.current_phase = PipelinePhase.P3_VALIDATION
     job.current_status = PhaseStatus.RUNNING
-    db.flush()
+    _checkpoint(db, publish)
 
     validation = validate_file(file_data, filename, job.ingestion_id)
     job.validation_report = validation.to_dict()
@@ -78,7 +91,7 @@ def _run_from_p3_onward(
 
     job.current_phase = PipelinePhase.P4_PROFILING
     job.current_status = PhaseStatus.RUNNING
-    db.flush()
+    _checkpoint(db, publish)
 
     df = _load_dataframe(file_data, filename, encoding, header_row)
     if df is None:
@@ -93,7 +106,7 @@ def _run_from_p3_onward(
 
     job.current_phase = PipelinePhase.P5_MAPPING
     job.current_status = PhaseStatus.RUNNING
-    db.flush()
+    _checkpoint(db, publish)
 
     mapping_result = classify_columns(
         schema.columns, job.ingestion_id, validation.source_system_hint
@@ -106,7 +119,7 @@ def _run_from_p3_onward(
         job.current_status = PhaseStatus.AWAITING_REVIEW
         return job
 
-    return _run_p6_through_p11(job, company_id, filename, df, mapping_result, db)
+    return _run_p6_through_p11(job, company_id, filename, df, mapping_result, db, publish=publish)
 
 
 def _run_p6_through_p11(
@@ -116,10 +129,11 @@ def _run_p6_through_p11(
     df: pd.DataFrame,
     mapping_result,
     db: Session,
+    publish: bool = False,
 ) -> IngestionJob:
     job.current_phase = PipelinePhase.P6_EXTRACTION
     job.current_status = PhaseStatus.RUNNING
-    db.flush()
+    _checkpoint(db, publish)
 
     extraction = extract_rows(df, mapping_result.mappings, job.ingestion_id)
     job.extraction_errors = {
@@ -132,7 +146,7 @@ def _run_p6_through_p11(
 
     job.current_phase = PipelinePhase.P7_RULES
     job.current_status = PhaseStatus.RUNNING
-    db.flush()
+    _checkpoint(db, publish)
 
     rule_result = apply_business_rules(extraction.records, job.ingestion_id)
     entity_type = rule_result.entity_type
@@ -143,19 +157,19 @@ def _run_p6_through_p11(
 
     job.current_phase = PipelinePhase.P8_NORMALIZE
     job.current_status = PhaseStatus.RUNNING
-    db.flush()
+    _checkpoint(db, publish)
 
     norm_result = normalize_records(rule_result.clean_records, job.ingestion_id, entity_type)
 
     job.current_phase = PipelinePhase.P9_ENTITY_RES
     job.current_status = PhaseStatus.RUNNING
-    db.flush()
+    _checkpoint(db, publish)
 
     res_result = resolve_entities(norm_result.normalized_records, job.ingestion_id, entity_type)
 
     job.current_phase = PipelinePhase.P10_RELATIONS
     job.current_status = PhaseStatus.RUNNING
-    db.flush()
+    _checkpoint(db, publish)
 
     revenue_recs = res_result.resolved_records if entity_type == "revenue" else []
     expense_recs = res_result.resolved_records if entity_type == "expense" else []
@@ -176,7 +190,7 @@ def _run_p6_through_p11(
 
     job.current_phase = PipelinePhase.P11_COMMIT
     job.current_status = PhaseStatus.RUNNING
-    db.flush()
+    _checkpoint(db, publish)
 
     commit_to_ontology(
         records=final_records,
@@ -194,7 +208,7 @@ def _run_p6_through_p11(
     return job
 
 
-def run_pipeline(
+def create_pipeline_job(
     company_id: int,
     filename: str,
     file_data: bytes,
@@ -202,8 +216,9 @@ def run_pipeline(
     db: Session,
 ) -> IngestionJob:
     """
-    Execute P2–P11. Returns the IngestionJob record with all phase outputs.
-    Caller should commit the session after this returns.
+    Create the IngestionJob record and run P2 (raw storage). Returns the job —
+    with current_status=FAILED if raw storage failed, otherwise P2/RUNNING ready
+    for _run_from_p3_onward. Caller should commit the session after this returns.
     """
     job = IngestionJob(
         company_id=company_id,
@@ -226,6 +241,23 @@ def run_pipeline(
         job.current_phase = PipelinePhase.P2_EXTRACTION
         job.current_status = PhaseStatus.FAILED
         job.validation_report = {"error": str(e)}
+
+    return job
+
+
+def run_pipeline(
+    company_id: int,
+    filename: str,
+    file_data: bytes,
+    source_type: str,
+    db: Session,
+) -> IngestionJob:
+    """
+    Execute P2–P11. Returns the IngestionJob record with all phase outputs.
+    Caller should commit the session after this returns.
+    """
+    job = create_pipeline_job(company_id, filename, file_data, source_type, db)
+    if job.current_status == PhaseStatus.FAILED:
         return job
 
     return _run_from_p3_onward(job, company_id, filename, file_data, db)
