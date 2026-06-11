@@ -74,14 +74,14 @@ function ClerkUserSection({ sub }) {
             {initials}
           </div>
         )}
-        <div className="text-left">
+        <div className="text-left hidden sm:block">
           <div className="flex items-center gap-1">
             <p className="text-[11px] font-medium text-card-foreground leading-tight">{displayName}</p>
             {sub?.tier && <PlanBadge tier={sub.tier} />}
           </div>
           <p className="text-[11px] text-muted-foreground leading-tight">CEPA Advisor</p>
         </div>
-        <ChevronDown className={cn('w-3 h-3 text-muted-foreground transition-transform', open && 'rotate-180')} />
+        <ChevronDown className={cn('w-3 h-3 text-muted-foreground transition-transform hidden sm:block', open && 'rotate-180')} />
       </button>
       {open && (
         <div
@@ -119,7 +119,7 @@ function StaticUserSection() {
   return (
     <div className="flex items-center gap-2 pl-2">
       <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[11px] font-bold">U</div>
-      <div>
+      <div className="hidden sm:block">
         <p className="text-[11px] font-medium text-card-foreground leading-tight">Advisor</p>
         <p className="text-[11px] text-muted-foreground leading-tight">CEPA Advisor</p>
       </div>
@@ -192,7 +192,7 @@ export default function Header({
             <Menu className="w-5 h-5" />
           </button>
           <CompanySwitcher displayName={companyName} />
-          <div className="flex items-center gap-1 sm:gap-2 flex-wrap min-w-0 max-w-[min(100%,42rem)]">
+          <div className="hidden sm:flex items-center gap-1 sm:gap-2 flex-wrap min-w-0 max-w-[min(100%,42rem)]">
             {scoresError && (
               <span
                 className="text-xs text-amber-400 max-w-[140px] truncate"

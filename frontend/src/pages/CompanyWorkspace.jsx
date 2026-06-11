@@ -163,7 +163,7 @@ export default function CompanyWorkspace() {
           </div>
         </div>
         {/* Intel cards skeleton */}
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="rounded-xl border border-border bg-card p-3 space-y-2">
               <Skeleton className="h-2 w-16" />
@@ -308,7 +308,7 @@ export default function CompanyWorkspace() {
       <InviteOwnerPanel companyId={companyId} companyData={companyData} />
 
       {/* Intelligence cards */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
         {intelCards.map(c => (
           <div key={c.label} className={cn('rounded-xl border p-3', colorCfg[c.color])}>
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{c.label}</p>
@@ -471,7 +471,7 @@ export default function CompanyWorkspace() {
                 <span className="text-xs font-semibold text-emerald-400 whitespace-nowrap flex-shrink-0">
                   +{fmtM(item.valueMin)}–{fmtM(item.valueMax)}
                 </span>
-                <span className="text-[11px] text-muted-foreground w-16 flex-shrink-0 whitespace-nowrap">{item.timeline}</span>
+                <span className="text-[11px] text-muted-foreground w-16 flex-shrink-0 whitespace-nowrap hidden sm:inline">{item.timeline}</span>
                 <span className={cn('text-[11px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0',
                   item.severity === 'critical' ? 'border-red-500/20 bg-red-500/10 text-red-400' :
                   item.severity === 'high' ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' :
