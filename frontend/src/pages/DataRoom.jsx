@@ -131,7 +131,7 @@ export default function DataRoom() {
       )}
 
       {/* Readiness stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: 'Documents Present', value: presentCount, color: 'emerald' },
           { label: 'Partially Ready',   value: partialCount, color: 'amber'   },

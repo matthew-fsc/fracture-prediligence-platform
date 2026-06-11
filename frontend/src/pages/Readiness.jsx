@@ -111,7 +111,7 @@ function SourceRowsDisclosure({ rows, subKey }) {
         {open ? 'Hide' : 'Show'} source data ({rows.length} rows)
       </button>
       {open && (
-        <div className="mt-1.5 rounded-lg border border-border/60 bg-muted/20 overflow-hidden">
+        <div className="mt-1.5 rounded-lg border border-border/60 bg-muted/20 overflow-x-auto">
           {isCustomers && (
             <table className="w-full text-[11px]">
               <thead>
@@ -1035,9 +1035,9 @@ export default function Readiness() {
                   )}
                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground">{b.score}</span>
                 </div>
-                <div className="w-48 flex-shrink-0">
-                  <p className={cn('text-[11px] font-semibold', isAbove ? colorCls : 'text-muted-foreground')}>{b.label}</p>
-                  <p className="text-[10px] text-muted-foreground leading-tight">{b.note}</p>
+                <div className="w-28 sm:w-48 flex-shrink-0 min-w-0">
+                  <p className={cn('text-[11px] font-semibold truncate', isAbove ? colorCls : 'text-muted-foreground')}>{b.label}</p>
+                  <p className="text-[10px] text-muted-foreground leading-tight hidden sm:block">{b.note}</p>
                 </div>
                 {isAbove && <span className="text-[10px] font-bold text-primary flex-shrink-0">✓</span>}
               </div>
@@ -1049,7 +1049,7 @@ export default function Readiness() {
               <div className="absolute left-0 top-0 h-full rounded bg-primary/50" style={{ width: `${drs}%` }} />
               <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold">{drs.toFixed(1)}</span>
             </div>
-            <div className="w-48 flex-shrink-0">
+            <div className="w-28 sm:w-48 flex-shrink-0">
               <p className="text-[11px] font-bold text-primary">Current Score</p>
             </div>
           </div>
@@ -1161,7 +1161,7 @@ export default function Readiness() {
               </div>
 
               {Object.keys(compareResult.category_deltas ?? {}).length > 0 && (
-                <div className="rounded-lg border border-border overflow-hidden">
+                <div className="rounded-lg border border-border overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-border bg-muted/20">

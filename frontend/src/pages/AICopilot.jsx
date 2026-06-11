@@ -28,7 +28,7 @@ export default function AICopilot() {
 
   if (!companyReady) {
     return (
-      <div className="flex flex-col h-[calc(100vh-120px)]">
+      <div className="flex flex-col h-[calc(100dvh-120px)]">
         <PageHeader
           section="Intelligence"
           title="AI Copilot"
@@ -47,7 +47,7 @@ export default function AICopilot() {
   const badge = scoresQuery.isPending ? 'Loading scores…' : scoresQuery.isError ? 'Scores unavailable' : drsLabel ?? 'No analytics yet'
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)]">
+    <div className="flex flex-col h-[calc(100dvh-120px)]">
       <PageHeader
         section="Intelligence"
         title="AI Copilot"

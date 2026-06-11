@@ -379,7 +379,7 @@ export default function Connectors() {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
           <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Files Uploaded</p>
           <p className="text-xl font-bold text-blue-400">{jobsLoading ? '—' : jobs.length}</p>
@@ -488,8 +488,8 @@ export default function Connectors() {
       ) : (
         <div className="rounded-xl border border-border bg-card p-5">
           <p className="text-sm font-semibold text-card-foreground mb-4">Manual CSV Upload</p>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="sm:col-span-2">
               <div
                 onDragOver={e => { e.preventDefault(); setDragOver(true) }}
                 onDragLeave={() => setDragOver(false)}
