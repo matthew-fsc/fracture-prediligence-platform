@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Annotated, Optional
 from sqlalchemy.orm import Session
 
@@ -182,18 +182,27 @@ class OverrideRequest(BaseModel):
     rationale: str
 
 class QualitativeRequest(BaseModel):
-    owner_hours_per_week: Optional[float] = None
-    sop_pct: Optional[float] = None
-    automation_pct: Optional[float] = None
-    mgmt_qualified: Optional[int] = None
-    mgmt_total_functions: Optional[int] = None
+    owner_hours_per_week: Optional[float] = Field(None, ge=0, le=168,
+        description="Owner hours per week (0–168)")
+    sop_pct: Optional[float] = Field(None, ge=0, le=100,
+        description="% of core processes with documented SOPs (0–100)")
+    automation_pct: Optional[float] = Field(None, ge=0, le=100,
+        description="% of operations automated (0–100)")
+    mgmt_qualified: Optional[int] = Field(None, ge=0, le=200,
+        description="Number of qualified managers")
+    mgmt_total_functions: Optional[int] = Field(None, ge=0, le=200,
+        description="Total management functions")
     mgmt_covered_functions: Optional[str] = None
-    pipeline_value: Optional[float] = None
+    pipeline_value: Optional[float] = Field(None, ge=0,
+        description="Sales pipeline value in dollars (>= 0)")
     market_positioning: Optional[str] = None
-    repeatability_pct: Optional[float] = None
-    contract_pct: Optional[float] = None
+    repeatability_pct: Optional[float] = Field(None, ge=0, le=100,
+        description="% of revenue from repeatable processes (0–100)")
+    contract_pct: Optional[float] = Field(None, ge=0, le=100,
+        description="% of customers under contract (0–100)")
     customer_contract_type: Optional[str] = None
-    key_person_revenue_pct: Optional[float] = None
+    key_person_revenue_pct: Optional[float] = Field(None, ge=0, le=100,
+        description="% of revenue dependent on key person (0–100)")
     # A6 advisory inputs (Task 2 — migration 0014)
     has_crm_pipeline: Optional[bool] = None
     non_compete_pct: Optional[str] = None      # "0"|"1-50"|"51-75"|"76-99"|"100"
@@ -1262,6 +1271,7 @@ async def generate_buyer_question_draft(
 class InitiativeCreate(BaseModel):
     title: str
     category: Optional[str] = None
+    status: Optional[str] = None          # "planned" | "in_progress" | "complete" | "deferred"
     timeline: Optional[str] = None
     cost_estimate: Optional[float] = None
     ev_impact_estimate: Optional[float] = None
@@ -1289,20 +1299,7 @@ def list_initiatives(company: CompanyScoped, db: Session = Depends(get_db)):
     )
     return {
         "company_id": company.id,
-        "initiatives": [
-            {
-                "id": r.id,
-                "title": r.title,
-                "category": r.category,
-                "timeline": r.timeline,
-                "cost_estimate": float(r.cost_estimate) if r.cost_estimate is not None else None,
-                "ev_impact_estimate": float(r.ev_impact_estimate) if r.ev_impact_estimate is not None else None,
-                "advisor_ev_override": float(r.advisor_ev_override) if r.advisor_ev_override is not None else None,
-                "depends_on_initiative_id": r.depends_on_initiative_id,
-                "source": r.source,
-            }
-            for r in rows
-        ],
+        "initiatives": [_initiative_to_dict(r) for r in rows],
     }
 
 
@@ -1316,6 +1313,7 @@ def create_initiative(
         company_id=company.id,
         title=body.title,
         category=body.category,
+        status=body.status or "planned",
         timeline=body.timeline,
         cost_estimate=body.cost_estimate,
         ev_impact_estimate=body.ev_impact_estimate,
@@ -1326,17 +1324,7 @@ def create_initiative(
     db.add(row)
     db.commit()
     db.refresh(row)
-    return {
-        "id": row.id,
-        "title": row.title,
-        "category": row.category,
-        "timeline": row.timeline,
-        "cost_estimate": float(row.cost_estimate) if row.cost_estimate is not None else None,
-        "ev_impact_estimate": float(row.ev_impact_estimate) if row.ev_impact_estimate is not None else None,
-        "advisor_ev_override": float(row.advisor_ev_override) if row.advisor_ev_override is not None else None,
-        "depends_on_initiative_id": row.depends_on_initiative_id,
-        "source": row.source,
-    }
+    return _initiative_to_dict(row)
 
 
 def _initiative_to_dict(row: CompanyInitiative) -> dict:

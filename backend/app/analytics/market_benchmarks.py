@@ -245,6 +245,7 @@ def build_benchmarks_payload(
     segment_label = None
     benchmark_rows: list[dict[str, Any]] = []
     comparison_note = ""
+    ebitda_margin_data_note = None
 
     if seg and rel:
         segment_label = f"{seg.industry_display_name} · {seg.ebitda_band_label}"
@@ -268,8 +269,15 @@ def build_benchmarks_payload(
             rev_yoy = float(((b - a) / a * 100) if a else 0) if a else None
 
         ebitda_margin = None
+        ebitda_margin_data_note = None
         if metrics.total_revenue_ttm and float(metrics.total_revenue_ttm) > 0:
             ebitda_margin = float(ebitda) / float(metrics.total_revenue_ttm) * 100
+            if ebitda_margin > 95:
+                ebitda_margin_data_note = (
+                    "EBITDA margin appears unusually high — this typically means expense "
+                    "data has not been ingested yet. Upload a P&L or expense file to get "
+                    "an accurate margin comparison."
+                )
 
         emps = (
             db.query(Employee)
@@ -283,11 +291,17 @@ def build_benchmarks_payload(
         recurring_pct = float(metrics.recurring_revenue_pct) if metrics.recurring_revenue_pct is not None else None
         top_cust = float(metrics.top_customer_revenue_pct) if metrics.top_customer_revenue_pct is not None else None
 
+        def _m_with_note(key, median, company_val, direction, unit, data_note=None):
+            row = _m(key, median, company_val, direction, unit)
+            if data_note:
+                row["data_note"] = data_note
+            return row
+
         benchmark_rows = [
             _m("Revenue Growth", float(seg.revenue_growth_median_pct) if seg.revenue_growth_median_pct is not None else None,
                rev_yoy, "higher_better", "%"),
-            _m("EBITDA Margin", float(seg.ebitda_margin_median_pct) if seg.ebitda_margin_median_pct is not None else None,
-               ebitda_margin, "higher_better", "%"),
+            _m_with_note("EBITDA Margin", float(seg.ebitda_margin_median_pct) if seg.ebitda_margin_median_pct is not None else None,
+               ebitda_margin, "higher_better", "%", data_note=ebitda_margin_data_note),
             _m("Payroll Ratio", float(seg.payroll_ratio_median_pct) if seg.payroll_ratio_median_pct is not None else None,
                payroll_ratio, "lower_better", "%"),
             _m("Recurring Rev.", float(seg.recurring_rev_median_pct) if seg.recurring_rev_median_pct is not None else None,
@@ -307,6 +321,11 @@ def build_benchmarks_payload(
 
     company = db.query(Company).filter(Company.id == company_id).first()
 
+    # Collect data-quality notes shown alongside benchmarks
+    data_quality_notes: list[str] = []
+    if ebitda_margin_data_note:
+        data_quality_notes.append(ebitda_margin_data_note)
+
     return {
         "company_id": company_id,
         "segment_label": segment_label,
@@ -315,6 +334,13 @@ def build_benchmarks_payload(
         "industry_slug": seg.industry_slug if seg else None,
         "match_note": match_note,
         "comparison_note": comparison_note,
+        "data_quality_notes": data_quality_notes,
+        "ev_methodology_note": (
+            "Two EV figures appear in this platform. "
+            "The Scores page EV uses a DRS-tier-adjusted multiple range (lower multiple for higher-risk companies). "
+            "The Buyer Universe EV uses the industry median market multiple, regardless of DRS tier. "
+            "The Scores EV is the more conservative, defensible number for diligence preparation."
+        ),
         "source_line": source_line,
         "sources": sources,
         "benchmarks": benchmark_rows,

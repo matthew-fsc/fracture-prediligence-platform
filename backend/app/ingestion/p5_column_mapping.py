@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from typing import Optional
@@ -57,8 +58,10 @@ ONTOLOGY_REGISTRY: dict[str, tuple[str, str, list[str]]] = {
     ),
     "REVENUE_CUSTOMER_ID": (
         "revenue_stream", "text",
-        ["customer", "client", "account", "customer name", "client name", "account name",
-         "bill to", "sold to", "customer id", "client id", "account id", "contact",
+        # Keep only invoice-transaction synonyms. Generic names like "customer name"
+        # are deliberately excluded here — they belong to CUSTOMER_NAME below.
+        ["bill to", "sold to", "customer id", "client id", "account id", "contact",
+         "billed to", "invoice to", "ship to",
          # QuickBooks synonyms — CustomerRef.name on invoice rows
          "customerref.name", "customerrefname", "customerref name"],
     ),
@@ -121,8 +124,10 @@ ONTOLOGY_REGISTRY: dict[str, tuple[str, str, list[str]]] = {
     ),
     "EMPLOYEE_STATUS": (
         "employee", "categorical",
-        ["status", "employment status", "active", "is active", "employment type",
-         "worker type", "staff type", "employment status"],
+        # "status" and "active" removed — too generic; conflict with CUSTOMER_IS_ACTIVE.
+        # Retain only employment-specific terms.
+        ["employment status", "employment type", "worker type", "staff type",
+         "employee status", "hr status", "payroll status", "termination status"],
     ),
     "EMPLOYEE_COMP_ANNUAL": (
         "employee", "numeric",
@@ -231,6 +236,19 @@ class ColumnMapping:
         }
 
 
+# Regex for wide-format month/year column headers, e.g. "Jan 2024", "Q1 2024", "2024-Q3"
+_WIDE_FORMAT_RE = re.compile(
+    r"^(?:"
+    r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[\s\-]?\d{4}"    # Jan 2024
+    r"|(?:q[1-4])[\s\-]?\d{4}"                                              # Q1 2024
+    r"|\d{4}[\s\-](?:q[1-4])"                                               # 2024-Q1
+    r"|\d{4}[\s\-](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)"      # 2024-Jan
+    r"|(?:january|february|march|april|may|june|july|august|september|october|november|december)[\s\-]?\d{4}"
+    r")$",
+    re.IGNORECASE,
+)
+
+
 @dataclass
 class ColumnMappingResult:
     ingestion_id: str
@@ -238,6 +256,8 @@ class ColumnMappingResult:
     auto_mapped: int = 0
     review_required: int = 0
     excluded: int = 0
+    wide_format_detected: bool = False   # True when columns look like pivoted period headers
+    wide_format_period_cols: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -246,6 +266,8 @@ class ColumnMappingResult:
             "review_required": self.review_required,
             "excluded": self.excluded,
             "mappings": [m.to_dict() for m in self.mappings],
+            "wide_format_detected": self.wide_format_detected,
+            "wide_format_period_cols": self.wide_format_period_cols,
         }
 
 
@@ -515,5 +537,44 @@ def classify_columns(
                         requires_review=True,
                     ))
                 result.review_required += 1
+
+    # ── Entity-context second pass ────────────────────────────────────────────
+    # Determine the dominant entity type from all mapped columns, then re-score
+    # any column whose top candidate is within 10 points of an alternative from
+    # the dominant entity — prefer the dominant entity to break ties.
+    entity_votes = Counter(
+        m.entity_type for m in result.mappings
+        if m.entity_type and m.match_method != "excluded" and not m.requires_review
+    )
+    if entity_votes:
+        dominant_entity = entity_votes.most_common(1)[0][0]
+        for m in result.mappings:
+            if m.requires_review and m.alternative_fields:
+                # Check if any alternative belongs to the dominant entity
+                for alt_field, alt_score in m.alternative_fields:
+                    alt_entity = ONTOLOGY_REGISTRY.get(alt_field, (None,))[0]
+                    if (
+                        alt_entity == dominant_entity
+                        and m.entity_type != dominant_entity
+                        and alt_score >= m.confidence - 10
+                    ):
+                        # Re-assign to the dominant-entity alternative
+                        m.ontology_field = alt_field
+                        m.entity_type = alt_entity
+                        m.confidence = alt_score
+                        m.match_detail += f" [re-assigned to dominant entity '{dominant_entity}']"
+                        break
+
+    # ── Wide-format (pivot) detection ─────────────────────────────────────────
+    # If ≥3 column headers look like "Jan 2024", "Q1 2024" etc., the file is
+    # almost certainly a pivoted P&L or time-series. Flag it so the pipeline
+    # can reject with a helpful message rather than leaving the job stuck.
+    period_cols = [
+        p.raw_header for p in profiles
+        if _WIDE_FORMAT_RE.match(_normalize(p.raw_header))
+    ]
+    if len(period_cols) >= 3:
+        result.wide_format_detected = True
+        result.wide_format_period_cols = period_cols
 
     return result

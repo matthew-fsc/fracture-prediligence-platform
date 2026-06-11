@@ -114,6 +114,24 @@ def _run_from_p3_onward(
     job.column_mappings = mapping_result.to_dict()
     job.mapped_count = mapping_result.auto_mapped
 
+    # Wide-format (pivoted) files cannot be processed — reject with guidance.
+    if mapping_result.wide_format_detected:
+        period_examples = ", ".join(mapping_result.wide_format_period_cols[:4])
+        if len(mapping_result.wide_format_period_cols) > 4:
+            period_examples += f" … (+{len(mapping_result.wide_format_period_cols) - 4} more)"
+        job.current_status = PhaseStatus.FAILED
+        job.column_mappings = {
+            **mapping_result.to_dict(),
+            "wide_format_error": (
+                f"This file appears to be in wide (pivot) format — period columns detected: "
+                f"{period_examples}. "
+                "Please reformat to narrow (tall) format: one row per transaction with a "
+                "single 'Date' column and an 'Amount' column. "
+                "See the upload guide for a template."
+            ),
+        }
+        return job
+
     total_cols = len(schema.columns)
     if total_cols > 0 and mapping_result.review_required / total_cols > 0.5:
         job.current_status = PhaseStatus.AWAITING_REVIEW
