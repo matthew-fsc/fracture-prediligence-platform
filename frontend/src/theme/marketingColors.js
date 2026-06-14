@@ -46,7 +46,13 @@ export function clerkMarketingAppearance(c = marketingColors, text = clerkEmbedT
       borderRadius: '8px',
     },
     elements: {
-      rootBox: { color: text.secondary },
+      rootBox: {
+        color: text.secondary,
+        width: '100%',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
       card: {
         backgroundColor: c.surface,
         boxShadow: '0 24px 80px rgba(0,0,0,0.5)',

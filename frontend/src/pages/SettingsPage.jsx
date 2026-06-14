@@ -1,93 +1,81 @@
 import { useState, useEffect } from 'react'
-import { useUser, useClerk } from '@clerk/react'
+import { useUser, useClerk, UserProfile } from '@clerk/react'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
-import { Copy, Check, User, Mail, Shield, ExternalLink, LogOut } from 'lucide-react'
+import { Copy, Check, LogOut } from 'lucide-react'
 import PageHeader from '../components/ui/PageHeader'
 
 const HAS_CLERK = Boolean((import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim())
 
+const clerkProfileAppearance = {
+  variables: {
+    colorPrimary: 'hsl(160, 84%, 39%)',
+    colorBackground: 'hsl(220, 20%, 6%)',
+    colorText: 'hsl(220, 10%, 92%)',
+    colorTextSecondary: 'hsl(220, 10%, 70%)',
+    colorInputBackground: 'hsl(220, 18%, 10%)',
+    colorInputText: 'hsl(220, 10%, 92%)',
+    colorNeutral: 'hsl(220, 18%, 16%)',
+    borderRadius: '8px',
+  },
+  elements: {
+    rootBox: { width: '100%' },
+    card: { boxShadow: 'none', border: 'none', backgroundColor: 'transparent' },
+    navbar: { backgroundColor: 'hsl(220, 20%, 8%)', borderColor: 'hsl(220, 18%, 14%)' },
+    pageScrollBox: { paddingTop: 0 },
+  },
+}
+
 // ---------------------------------------------------------------------------
-// Account tab — shows user info and links to Clerk-hosted account management
+// Account tab — embeds Clerk UserProfile with app dark-theme appearance
 // ---------------------------------------------------------------------------
 function AccountSection() {
   const { user } = useUser()
   const { signOut } = useClerk()
 
-  const displayName = user
-    ? [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'Your account'
-    : 'Your account'
-  const email = user?.primaryEmailAddress?.emailAddress ?? null
-  const initials = user
-    ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase() || '?'
-    : '?'
-  const imageUrl = user?.imageUrl
-
-  const fields = [
-    { icon: User,   label: 'Display name',  value: displayName },
-    { icon: Mail,   label: 'Email',          value: email ?? 'Not available' },
-    { icon: Shield, label: 'Account ID',     value: user?.id ? `${user.id.slice(0, 16)}…` : '—' },
-  ]
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-6 space-y-6">
-      {/* Avatar row */}
-      <div className="flex items-center gap-4">
-        {imageUrl ? (
-          <img src={imageUrl} alt="" className="w-16 h-16 rounded-full object-cover border border-border" />
-        ) : (
+  if (!HAS_CLERK) {
+    const displayName = 'Your account'
+    const initials = '?'
+    return (
+      <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+        <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center text-primary text-xl font-bold">
             {initials}
           </div>
-        )}
-        <div>
-          <p className="text-base font-semibold text-card-foreground">{displayName}</p>
-          {email && <p className="text-sm text-muted-foreground">{email}</p>}
-          <p className="text-xs text-muted-foreground/60 mt-0.5">M&A Advisory Platform</p>
-        </div>
-      </div>
-
-      {/* Fields */}
-      <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
-        {fields.map(({ icon: Icon, label, value }) => (
-          <div key={label} className="flex items-center gap-3 px-4 py-3 bg-muted/10">
-            <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-            <span className="text-xs text-muted-foreground w-28 flex-shrink-0">{label}</span>
-            <span className="text-xs font-medium text-card-foreground truncate">{value}</span>
+          <div>
+            <p className="text-base font-semibold text-card-foreground">{displayName}</p>
+            <p className="text-xs text-muted-foreground/60 mt-0.5">M&A Advisory Platform</p>
           </div>
-        ))}
-      </div>
-
-      {/* Actions */}
-      <div className="flex flex-wrap gap-3">
-        {HAS_CLERK && (
-          <a
-            href="https://accounts.clerk.dev/user"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-muted/60 border border-border rounded-lg text-sm font-medium text-card-foreground hover:bg-muted transition-colors"
-          >
-            Edit profile
-            <ExternalLink className="w-3 h-3 text-muted-foreground" />
-          </a>
-        )}
-        {HAS_CLERK && signOut && (
-          <button
-            onClick={() => signOut()}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/20 transition-colors"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            Sign out
-          </button>
-        )}
-      </div>
-
-      {!HAS_CLERK && (
+        </div>
         <p className="text-xs text-muted-foreground/60">
           Clerk authentication is not configured in this environment. User profile management is unavailable.
         </p>
-      )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Embedded Clerk UserProfile — styled via index.css cl-* overrides + appearance prop */}
+      <UserProfile routing="hash" appearance={clerkProfileAppearance} />
+
+      {/* Sign-out row below the embedded panel */}
+      <div className="rounded-xl border border-border bg-card px-5 py-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-card-foreground">Sign out</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {user?.primaryEmailAddress?.emailAddress ?? 'End this session'}
+          </p>
+        </div>
+        <button
+          onClick={() => signOut()}
+          className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          Sign out
+        </button>
+      </div>
     </div>
   )
 }
