@@ -817,3 +817,57 @@ class EngagementPlan(Base):
     updated_at:       Mapped[datetime]        = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     company: Mapped[Company] = relationship("Company")
+
+
+# ---------------------------------------------------------------------------
+# Deal Outcomes — proprietary dataset: actual sale outcomes vs. DRS predictions
+# ---------------------------------------------------------------------------
+
+class DealOutcome(Base):
+    """
+    Captures the actual outcome of a completed (or in-process) business sale.
+    One row per company.  Actual outcomes vs. DRS/EV predictions form the
+    calibration feedback loop that differentiates the platform over time.
+    """
+    __tablename__ = "deal_outcomes"
+
+    id:                    Mapped[int]              = mapped_column(Integer, primary_key=True, autoincrement=True)
+    company_id:            Mapped[int]              = mapped_column(ForeignKey("companies.id"), unique=True, index=True)
+
+    # Deal lifecycle status
+    deal_status:           Mapped[str]              = mapped_column(String(32), nullable=False, default="in_process")
+    # in_process | closed | fallen_through | on_hold
+
+    # Close economics
+    close_date:            Mapped[Optional[date]]   = mapped_column(Date, nullable=True)
+    sale_price:            Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)   # total consideration
+    actual_ev:             Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)   # EV net of assumed debt/cash
+    ebitda_at_close:       Mapped[Optional[Decimal]] = mapped_column(Numeric(16, 2), nullable=True)
+    ev_multiple:           Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 2), nullable=True)    # EV / EBITDA at close
+
+    # Buyer
+    buyer_type:            Mapped[Optional[str]]    = mapped_column(String(32), nullable=True)
+    # pe | strategic | financial | family_office | mbo | esop
+    buyer_name:            Mapped[Optional[str]]    = mapped_column(String(256), nullable=True)
+
+    # Transaction structure
+    deal_structure:        Mapped[Optional[str]]    = mapped_column(String(64), nullable=True)
+    # asset_sale | stock_sale | merger | recapitalization | partial_sale
+
+    # Platform prediction snapshot at close — calibration inputs
+    drs_at_close:          Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 2), nullable=True)
+    predicted_ev_floor:    Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
+    predicted_ev_ceiling:  Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
+
+    # Engagement timeline
+    days_to_close:         Mapped[Optional[int]]    = mapped_column(Integer, nullable=True)
+
+    # Advisor notes and data governance
+    advisor_notes:         Mapped[Optional[str]]    = mapped_column(Text, nullable=True)
+    is_benchmark_eligible: Mapped[bool]             = mapped_column(Boolean, nullable=False, default=True)
+    # False = exclude from aggregate calibration stats (e.g. anomalous deal)
+
+    created_at:            Mapped[datetime]         = mapped_column(DateTime, server_default=func.now())
+    updated_at:            Mapped[datetime]         = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    company: Mapped[Company] = relationship("Company")
