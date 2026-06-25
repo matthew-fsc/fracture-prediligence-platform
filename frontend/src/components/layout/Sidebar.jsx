@@ -4,7 +4,7 @@ import {
   Zap, House, Building, Workflow, Grid3x3, BarChart2,
   Eye, TrendingUp, Target, Activity, Plug, ArrowRightLeft,
   Folder, FileText, Bot, Settings, ChevronLeft,
-  LineChart, GitCompare, NotebookPen, BookOpen, UserPlus, X,
+  LineChart, GitCompare, NotebookPen, BookOpen, UserPlus, X, Handshake,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useCompanyId } from '../../context/CompanyContext'
@@ -20,6 +20,7 @@ const groups = [
       { label: 'Company Workspace',  href: '/CompanyWorkspace', icon: Building },
       { label: 'Client Profile',      href: '/EngagementIntake', icon: NotebookPen },
       { label: 'Advisory Workflow',  href: '/AdvisoryWorkflow', icon: Workflow },
+      { label: 'Deal Outcome',       href: '/DealOutcome',      icon: Handshake },
     ],
   },
   {

@@ -71,6 +71,7 @@ import MarketComps from './pages/MarketComps'
 import EngagementIntake from './pages/EngagementIntake'
 import AdvisoryLibrary from './pages/AdvisoryLibrary'
 import EngagementView from './pages/EngagementView'
+import DealOutcome from './pages/DealOutcome'
 
 // Owner onboarding
 import OwnerOnboardingWizard from './pages/owner/OwnerOnboardingWizard'
@@ -318,6 +319,7 @@ export default function App() {
               <Route path="/EngagementIntake"  element={<EngagementIntake />} />
               <Route path="/AdvisoryLibrary"   element={<AdvisoryLibrary />} />
               <Route path="/EngagementView"    element={<EngagementView />} />
+              <Route path="/DealOutcome"       element={<DealOutcome />} />
             </Route>
 
             {/* ---------------------------------------------------------------- */}
