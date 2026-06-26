@@ -89,7 +89,7 @@ export default function ROICalculatorPage() {
             <div style={{ background: COLORS.gold, borderRadius: 6, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ color: COLORS.bg, fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 15 }}>F</span>
             </div>
-            <span style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 15 }}>Fracture Systems</span>
+            <span style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 15 }}>Exit Blueprint</span>
           </Link>
           <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
             <Link to="/pricing" style={{ color: COLORS.gold, fontFamily: "'DM Sans', sans-serif", fontSize: 14, textDecoration: 'none' }}>View pricing →</Link>

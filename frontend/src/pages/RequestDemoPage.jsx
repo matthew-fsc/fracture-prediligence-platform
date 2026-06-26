@@ -14,7 +14,7 @@ const HAS_CLERK = Boolean((import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').tri
 
 const CONTACT_EMAIL = 'matthew@fracturesystems.com'
 const MAILTO_HREF = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(
-  'Request: Fracture Systems live demo',
+  'Request: Exit Blueprint live demo',
 )}&body=${encodeURIComponent(
   "Hi Matthew,\n\nI'd like to request access to the live product demo.\n\n[Your name / firm]\n",
 )}`
@@ -74,7 +74,7 @@ function Nav() {
             <span style={{ color: COLORS.bg, fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 16 }}>F</span>
           </div>
           <span style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 15 }}>
-            Fracture Systems
+            Exit Blueprint
           </span>
         </div>
         <div className="flex items-center gap-4">

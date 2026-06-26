@@ -809,7 +809,7 @@ export default function OnboardingPage() {
             <span style={{ color: COLORS.bg, fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 15 }}>F</span>
           </div>
           <span style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 15 }}>
-            Fracture Systems
+            Exit Blueprint
           </span>
         </div>
         <span

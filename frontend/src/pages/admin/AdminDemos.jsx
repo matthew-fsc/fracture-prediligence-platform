@@ -121,7 +121,7 @@ function CopyLink({ url }) {
 // Email reminder helper
 // ---------------------------------------------------------------------------
 function EmailReminder({ link }) {
-  const href = `mailto:${link.recipient_email}?subject=Following up — Your Fracture Systems Demo&body=Hi ${link.recipient_name},%0A%0AI wanted to follow up on the Fracture Systems demo I shared with you.%0A%0AYou can access it here: ${window.location.origin}/demo/${link.slug}%0A%0AWe have a limited number of Founding Advisor spots at $179/mo. Happy to answer any questions.%0A%0ABest,%0AMatthew`
+  const href = `mailto:${link.recipient_email}?subject=Following up — Your Exit Blueprint Demo&body=Hi ${link.recipient_name},%0A%0AI wanted to follow up on the Exit Blueprint demo I shared with you.%0A%0AYou can access it here: ${window.location.origin}/demo/${link.slug}%0A%0AWe have a limited number of Founding Advisor spots at $179/mo. Happy to answer any questions.%0A%0ABest,%0AMatthew`
   return (
     <a href={href} title="Send reminder" style={{ color: COLORS.muted, display: 'flex', alignItems: 'center', gap: 4, fontFamily: "'DM Sans', sans-serif", fontSize: 12, textDecoration: 'none' }}>
       <Mail size={13} /> Remind
@@ -171,7 +171,7 @@ export default function AdminDemos() {
               <div style={{ background: COLORS.gold, borderRadius: 5, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ color: COLORS.bg, fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 14 }}>F</span>
               </div>
-              <span style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Fracture Systems</span>
+              <span style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Exit Blueprint</span>
             </div>
             <h1 style={{ color: COLORS.offWhite, fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 28, fontWeight: 700, margin: 0 }}>Demo Links</h1>
           </div>

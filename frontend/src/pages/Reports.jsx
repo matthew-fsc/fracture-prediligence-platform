@@ -280,7 +280,7 @@ export default function Reports() {
         <div className="rounded-xl border border-border bg-card p-5 space-y-3">
           <h3 className="text-sm font-semibold text-card-foreground">PDF branding</h3>
           <p className="text-xs text-muted-foreground">
-            Firm name appears in the PDF header (defaults to Fracture Systems). Upload your firm logo for the report header (PNG, JPEG, WebP, or GIF, up to 2&nbsp;MB). Cover blurb is used on the company profile teaser.
+            Firm name appears in the PDF header (defaults to Exit Blueprint). Upload your firm logo for the report header (PNG, JPEG, WebP, or GIF, up to 2&nbsp;MB). Cover blurb is used on the company profile teaser.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
