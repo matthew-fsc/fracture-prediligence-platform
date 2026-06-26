@@ -23,7 +23,7 @@ function Nav() {
             <span style={{ color: COLORS.bg, fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 16 }}>F</span>
           </div>
           <span style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 15 }}>
-            Fracture Systems
+            Exit Blueprint
           </span>
         </div>
 
@@ -178,7 +178,7 @@ function Hero() {
             marginRight: 'auto',
           }}
         >
-          Fracture Systems gives CEPA advisors the structure, scoring, and reporting to prepare
+          Exit Blueprint gives CEPA advisors the structure, scoring, and reporting to prepare
           SMB clients for diligence—before buyers find the gaps.
         </p>
 
@@ -338,7 +338,7 @@ function Features() {
             margin: '0 0 60px 0',
           }}
         >
-          What Fracture Systems gives you
+          What Exit Blueprint gives you
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -410,7 +410,7 @@ function SocialProof() {
             margin: '0 0 60px 0',
           }}
         >
-          Advisors trust Fracture Systems
+          Advisors trust Exit Blueprint
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -664,7 +664,7 @@ function Footer() {
             <span style={{ color: COLORS.bg, fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 14 }}>F</span>
           </div>
           <span style={{ color: COLORS.offWhite, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 14 }}>
-            Fracture Systems
+            Exit Blueprint
           </span>
         </div>
         <p
@@ -709,7 +709,7 @@ function Footer() {
             margin: 0,
           }}
         >
-          matthew@fracturesystems.com — © 2026 Fracture Systems. All rights reserved.
+          matthew@fracturesystems.com — © 2026 Exit Blueprint. All rights reserved.
         </p>
       </div>
     </footer>

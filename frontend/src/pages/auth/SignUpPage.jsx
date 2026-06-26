@@ -34,7 +34,7 @@ export default function SignUpPage() {
         <div style={{ background: C.gold, borderRadius: 6, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span style={{ color: C.bg, fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 16 }}>F</span>
         </div>
-        <span style={{ color: clerkEmbedText.primary, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 15 }}>Fracture Systems</span>
+        <span style={{ color: clerkEmbedText.primary, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 15 }}>Exit Blueprint</span>
       </div>
 
       <SignUp

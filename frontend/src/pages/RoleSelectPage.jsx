@@ -45,7 +45,7 @@ export default function RoleSelectPage() {
         </div>
         <div>
           <p className="text-sm font-semibold text-foreground">Pre-Diligence Platform</p>
-          <p className="text-[11px] tracking-[0.12em] uppercase text-muted-foreground">Fracture Systems</p>
+          <p className="text-[11px] tracking-[0.12em] uppercase text-muted-foreground">Exit Blueprint</p>
         </div>
       </div>
 

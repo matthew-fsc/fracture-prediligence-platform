@@ -25,7 +25,7 @@ export default function PartnerLandingPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  usePageTitle(partner ? `${partner.name} × Fracture Systems` : 'Member Pricing')
+  usePageTitle(partner ? `${partner.name} × Exit Blueprint` : 'Member Pricing')
 
   useEffect(() => {
     if (!slug) return
@@ -85,7 +85,7 @@ export default function PartnerLandingPage() {
           </p>
         )}
         <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 15, lineHeight: 1.7, marginBottom: 40 }}>
-          Fracture Systems is the pre-diligence operating intelligence platform trusted by exit advisors to prepare clients before buyers arrive. Turn 40 hours of manual prep into a structured, buyer-ready package.
+          Exit Blueprint is the pre-diligence operating intelligence platform trusted by exit advisors to prepare clients before buyers arrive. Turn 40 hours of manual prep into a structured, buyer-ready package.
         </p>
         <Link
           to={pricingUrl}
