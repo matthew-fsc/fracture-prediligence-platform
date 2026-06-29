@@ -44,17 +44,17 @@ function AccountSection() {
         <div>
           <p className="text-base font-semibold text-card-foreground">{displayName}</p>
           {email && <p className="text-sm text-muted-foreground">{email}</p>}
-          <p className="text-xs text-muted-foreground/60 mt-0.5">M&A Advisory Platform</p>
+          <p className="text-xs text-muted-foreground/80 mt-0.5">M&A Advisory Platform</p>
         </div>
       </div>
 
       {/* Fields */}
       <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
         {fields.map(({ icon: Icon, label, value }) => (
-          <div key={label} className="flex items-center gap-3 px-4 py-3 bg-muted/10">
-            <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-            <span className="text-xs text-muted-foreground w-28 flex-shrink-0">{label}</span>
-            <span className="text-xs font-medium text-card-foreground truncate">{value}</span>
+          <div key={label} className="flex items-center gap-3 px-4 py-3.5 bg-muted/10">
+            <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            <span className="text-sm text-muted-foreground w-32 flex-shrink-0">{label}</span>
+            <span className="text-sm font-medium text-card-foreground truncate">{value}</span>
           </div>
         ))}
       </div>
@@ -84,7 +84,7 @@ function AccountSection() {
       </div>
 
       {!HAS_CLERK && (
-        <p className="text-xs text-muted-foreground/60">
+        <p className="text-sm text-muted-foreground/80">
           Clerk authentication is not configured in this environment. User profile management is unavailable.
         </p>
       )}
@@ -149,7 +149,7 @@ function ReferralSection() {
               { label: 'Credits earned', value: data.credit_balance_display },
             ].map(({ label, value }) => (
               <div key={label} className="rounded-lg border border-border bg-muted/20 p-3 text-center">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
                 <p className="text-xl font-bold text-primary">{value}</p>
               </div>
             ))}

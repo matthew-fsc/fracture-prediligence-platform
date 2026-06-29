@@ -340,10 +340,32 @@
 }
 
 /* OTP / verification inputs */
+.cl-otpCodeField {
+  width: 100% !important;
+}
+.cl-otpCodeFieldInputs {
+  display: flex !important;
+  gap: 10px !important;
+  justify-content: center !important;
+}
 .cl-otpCodeFieldInput {
-  background-color: #12151A !important;
-  color: #E8ECF2 !important;
-  border-color: #1E2A3A !important;
+  background-color: #1C2128 !important;
+  color: #F2F4F7 !important;
+  -webkit-text-fill-color: #F2F4F7 !important;
+  border: 2px solid #C9973A !important;
+  border-radius: 8px !important;
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  text-align: center !important;
+  letter-spacing: 0.05em !important;
+  min-width: 46px !important;
+  height: 54px !important;
+  caret-color: #C9973A !important;
+}
+.cl-otpCodeFieldInput:focus {
+  border-color: #E8B96A !important;
+  box-shadow: 0 0 0 3px rgba(201, 151, 58, 0.25) !important;
+  outline: none !important;
 }
 
 /* Active device list */
@@ -418,6 +440,47 @@
 }
 .cl-navbarMobileMenuButtonIcon {
   color: #A0AEBE !important;
+}
+
+/* Verification step text — ensure readable during email/phone code entry */
+.cl-verificationCodeTitle,
+.cl-alternativeMethodsTitle,
+.cl-formHeaderTitle {
+  color: #F2F4F7 !important;
+  font-size: 18px !important;
+}
+.cl-formHeaderSubtitle,
+.cl-verificationCodeSubtitle,
+.cl-alternativeMethodsSubtitle {
+  color: #E0E4EC !important;
+  font-size: 14px !important;
+}
+
+/* Identity preview (shows email/phone being verified) */
+.cl-identityPreviewText,
+.cl-identityPreviewEditButton {
+  color: #F2F4F7 !important;
+  font-size: 14px !important;
+}
+
+/* Clerk modal overlay backdrop — ensure it's centered and covers the screen */
+.cl-modalBackdrop {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Make form field inputs slightly larger for legibility */
+.cl-formFieldInput {
+  font-size: 15px !important;
+  line-height: 1.5 !important;
+}
+
+/* Ensure body/paragraph text inside Clerk is large enough to read */
+.cl-paragraph {
+  color: #E0E4EC !important;
+  font-size: 14px !important;
 }
 
 
