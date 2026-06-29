@@ -5,7 +5,7 @@ import { usePageTitle } from '../hooks/usePageTitle'
 import { Skeleton } from '../components/ui/Skeleton'
 
 const COLORS = {
-  bg: '#0A1628', gold: '#C9973A', offWhite: '#F0EDE8',
+  bg: '#0A1628', gold: '#17a773', offWhite: '#F0EDE8',
   muted: '#8A9BB0', card: '#0F2040', border: '#1E3A5F',
 }
 

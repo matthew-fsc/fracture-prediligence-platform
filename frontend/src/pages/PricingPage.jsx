@@ -4,7 +4,7 @@ import { usePageTitle } from '../hooks/usePageTitle'
 import { apiRequest } from '../lib/apiClient'
 
 const COLORS = {
-  bg: '#0A1628', gold: '#C9973A', lightGold: '#E8B96A', offWhite: '#F0EDE8',
+  bg: '#0A1628', gold: '#17a773', lightGold: '#4ABEA4', offWhite: '#F0EDE8',
   muted: '#8A9BB0', card: '#0F2040', border: '#1E3A5F',
 }
 
@@ -69,7 +69,7 @@ const TIERS = [
       'API access',
     ],
     cta: 'Contact Us →',
-    mailto: 'matthew@fracturesystems.com',
+    mailto: 'hello@exitblueprint.net',
   },
 ]
 
@@ -298,7 +298,7 @@ export default function PricingPage() {
       </section>
 
       {/* ROI teaser strip */}
-      <section style={{ background: 'rgba(201,151,58,0.07)', borderTop: `1px solid ${COLORS.border}`, borderBottom: `1px solid ${COLORS.border}`, padding: '36px 24px', textAlign: 'center' }}>
+      <section style={{ background: 'rgba(23,167,115,0.07)', borderTop: `1px solid ${COLORS.border}`, borderBottom: `1px solid ${COLORS.border}`, padding: '36px 24px', textAlign: 'center' }}>
         <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, margin: '0 0 10px 0' }}>
           One additional engagement per year pays for a full year of the Pro plan — often many times over.
         </p>
@@ -326,7 +326,7 @@ export default function PricingPage() {
           </div>
           <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, marginTop: 28 }}>
             Still have questions?{' '}
-            <a href="mailto:matthew@fracturesystems.com" style={{ color: COLORS.gold, textDecoration: 'none' }}>Email us →</a>
+            <a href="mailto:hello@exitblueprint.net" style={{ color: COLORS.gold, textDecoration: 'none' }}>Email us →</a>
           </p>
         </div>
       </section>

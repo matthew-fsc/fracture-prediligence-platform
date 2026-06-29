@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --font-inter: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-inter: "Inter", "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
     --background: 220 14% 96%;
     --foreground: 220 20% 10%;
     --card: 0 0% 100%;
@@ -97,6 +97,15 @@
   body {
     @apply bg-background text-foreground font-sans;
     overscroll-behavior: none;
+  }
+
+  /* Blueprint grid — subtle Palantir-style depth layer on the main canvas */
+  #root {
+    background-image:
+      linear-gradient(hsl(220 18% 16% / 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(220 18% 16% / 0.35) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-attachment: fixed;
   }
 
   /*
@@ -252,7 +261,7 @@
   color: #ffffff !important;
 }
 .cl-formButtonPrimary:hover {
-  background-color: #13956a !important;
+  background-color: #14906b !important;
 }
 .cl-formButtonReset,
 .cl-formResendCodeLink {
@@ -352,7 +361,7 @@
   background-color: #1C2128 !important;
   color: #F2F4F7 !important;
   -webkit-text-fill-color: #F2F4F7 !important;
-  border: 2px solid #C9973A !important;
+  border: 2px solid #17a773 !important;
   border-radius: 8px !important;
   font-size: 24px !important;
   font-weight: 700 !important;
@@ -360,10 +369,10 @@
   letter-spacing: 0.05em !important;
   min-width: 46px !important;
   height: 54px !important;
-  caret-color: #C9973A !important;
+  caret-color: #17a773 !important;
 }
 .cl-otpCodeFieldInput:focus {
-  border-color: #E8B96A !important;
+  border-color: #4ABEA4 !important;
   box-shadow: 0 0 0 3px rgba(201, 151, 58, 0.25) !important;
   outline: none !important;
 }
@@ -483,4 +492,36 @@
   font-size: 14px !important;
 }
 
+/* ============================================================
+ * Blueprint UI depth system
+ * Cards sit elevated above the grid background.
+ * Header and sidebar occlude the grid cleanly.
+ * ============================================================ */
 
+/* Cards lift off the grid with a solid fill + subtle top border highlight */
+.card-surface,
+[class*="rounded-xl"][class*="border"],
+[class*="rounded-lg"][class*="border-border"] {
+  position: relative;
+}
+
+/* Sidebar and header fully opaque — grid doesn't bleed through */
+aside {
+  background-image: none !important;
+  isolation: isolate;
+}
+header {
+  isolation: isolate;
+}
+
+/* Dot accent on the grid intersections at wider breakpoints — adds depth */
+@media (min-width: 768px) {
+  #root {
+    background-image:
+      radial-gradient(circle, hsl(160 84% 39% / 0.06) 1px, transparent 1px),
+      linear-gradient(hsl(220 18% 16% / 0.30) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(220 18% 16% / 0.30) 1px, transparent 1px);
+    background-size: 32px 32px, 32px 32px, 32px 32px;
+    background-attachment: fixed;
+  }
+}

@@ -18,7 +18,7 @@ function ensureAdminKey() {
   return entered
 }
 
-const COLORS = { bg: '#0A1628', gold: '#C9973A', muted: '#8A9BB0', offWhite: '#F0EDE8', card: '#0F2040', border: '#1E3A5F', green: '#4ade80', red: '#f87171' }
+const COLORS = { bg: '#0A1628', gold: '#17a773', muted: '#8A9BB0', offWhite: '#F0EDE8', card: '#0F2040', border: '#1E3A5F', green: '#4ade80', red: '#f87171' }
 
 const INPUT_STYLE = {
   width: '100%', background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 6,

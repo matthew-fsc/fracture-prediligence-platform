@@ -4,7 +4,7 @@ import { apiClient } from '../../lib/apiClient'
 
 const COLORS = {
   bg: '#0C0E12',
-  gold: '#C9973A',
+  gold: '#17a773',
   offWhite: '#E8EAED',
   muted: '#6C7585',
   card: '#15181E',
@@ -31,10 +31,10 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '', sl
   if (!isOpen) return null
 
   const mailtoHref =
-    `mailto:matthew@fracturesystems.com` +
+    `mailto:hello@exitblueprint.net` +
     `?subject=${encodeURIComponent('Founding Advisor License Request')}` +
     `&body=${encodeURIComponent(
-      'Hi Matthew,\n\nI\'d like to request a Founding Advisor license for the Pre-Diligence Platform.\n\nFirm: \nName: \nAny questions: \n'
+      'Hi,\n\nI\'d like to request a Founding Advisor license for Exit Blueprint.\n\nFirm: \nName: \nAny questions: \n'
     )}`
 
   async function handleRequestClick(e) {
@@ -92,7 +92,7 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '', sl
         <div
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
-            background: 'rgba(201,151,58,0.15)', border: `1px solid ${COLORS.gold}`,
+            background: 'rgba(23,167,115,0.15)', border: `1px solid ${COLORS.gold}`,
             borderRadius: 20, padding: '5px 14px', marginBottom: 22,
           }}
         >
@@ -162,7 +162,7 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '', sl
           }}
         >
           <Mail size={16} />
-          Email matthew@fracturesystems.com
+          Email hello@exitblueprint.net
         </a>
 
         {/* Secondary */}

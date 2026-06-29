@@ -12,7 +12,7 @@ import {
 
 const HAS_CLERK = Boolean((import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim())
 
-const CONTACT_EMAIL = 'matthew@fracturesystems.com'
+const CONTACT_EMAIL = 'hello@exitblueprint.net'
 const MAILTO_HREF = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(
   'Request: Exit Blueprint live demo',
 )}&body=${encodeURIComponent(

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-const DEFAULT_TITLE = 'Exit Blueprint — Pre-Diligence Platform for CEPA Advisors'
+const DEFAULT_TITLE = 'Exit Blueprint — M&A Exit Intelligence for Advisors'
 
 /**
  * Set the document title for a page.
@@ -9,7 +9,7 @@ const DEFAULT_TITLE = 'Exit Blueprint — Pre-Diligence Platform for CEPA Adviso
  *
  * Usage:
  *   usePageTitle('Dashboard')          → "Dashboard — Exit Blueprint"
- *   usePageTitle(null)                 → "Exit Blueprint — Pre-Diligence Platform for CEPA Advisors"
+ *   usePageTitle(null)                 → "Exit Blueprint — M&A Exit Intelligence for Advisors"
  *   usePageTitle('Live Demo')          → "Live Demo — Exit Blueprint"
  */
 export function usePageTitle(title) {

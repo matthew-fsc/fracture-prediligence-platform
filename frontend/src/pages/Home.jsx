@@ -168,7 +168,7 @@ export default function Home() {
               <Building2 className="w-7 h-7 text-primary" />
             </div>
             <div className="space-y-2 max-w-sm">
-              <h2 className="text-xl font-semibold text-foreground">Welcome to Pre-Diligence</h2>
+              <h2 className="text-xl font-semibold text-foreground">Welcome to Exit Blueprint</h2>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Add your first client to start building their exit readiness profile.
               </p>

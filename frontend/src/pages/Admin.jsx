@@ -109,7 +109,7 @@ export default function Admin() {
     <div className="space-y-6 max-w-5xl">
       <PageHeader
         title="Platform Admin"
-        subtitle="Unit economics and subscriber metrics for the Fracture platform."
+        subtitle="Unit economics and subscriber metrics for the Exit Blueprint platform."
       />
 
       {!submittedKey ? (

@@ -9,8 +9,8 @@ export const marketingColors = {
   card: '#15181E',
   surfaceElevated: '#1C2128',
   inputBg: '#12151A',
-  gold: '#C9973A',
-  lightGold: '#E8B96A',
+  gold: '#17a773',
+  lightGold: '#4ABEA4',
   offWhite: '#E8EAED',
   /** Secondary body — lighter gray for stronger contrast on #0C0E12 */
   muted: '#C8CED6',

@@ -1,5 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="6" fill="#0A1628"/>
-  <text x="16" y="22" font-family="Georgia, serif" font-size="18" font-weight="700"
-        fill="#C9973A" text-anchor="middle">F</text>
+  <text x="16" y="15" font-family="'Inter', 'DM Sans', sans-serif" font-size="9" font-weight="700"
+        fill="#17a773" text-anchor="middle" letter-spacing="0.5">EXIT</text>
+  <text x="16" y="24" font-family="'Inter', 'DM Sans', sans-serif" font-size="8" font-weight="600"
+        fill="#4ABEA4" text-anchor="middle" letter-spacing="1.5">BLUEPRINT</text>
 </svg>

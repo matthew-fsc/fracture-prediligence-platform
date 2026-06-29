@@ -40,12 +40,10 @@ export default function RoleSelectPage() {
   return (
     <div className="min-h-screen bg-background dark flex flex-col items-center justify-center p-6">
       <div className="flex items-center gap-3 mb-10">
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: marketingColors.gold }}>
-          <span className="font-bold text-lg" style={{ color: marketingColors.bg }}>F</span>
-        </div>
+        <img src="/logo.svg" alt="Exit Blueprint" className="w-10 h-10 rounded-lg object-contain" />
         <div>
-          <p className="text-sm font-semibold text-foreground">Pre-Diligence Platform</p>
-          <p className="text-[11px] tracking-[0.12em] uppercase text-muted-foreground">Exit Blueprint</p>
+          <p className="text-sm font-semibold text-foreground tracking-tight">Exit Blueprint</p>
+          <p className="text-[11px] tracking-[0.12em] uppercase text-muted-foreground">Advisor Platform</p>
         </div>
       </div>
 

@@ -21,7 +21,7 @@ const HAS_CLERK = Boolean((import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').tri
 
 const C = {
   bg:   '#0A1628',
-  gold: '#C9973A',
+  gold: '#17a773',
   muted: '#8A9BB0',
   text:  '#F0EDE8',
   card:  '#0F1E35',
@@ -95,21 +95,9 @@ export default function ClientInvitePage() {
     >
       {/* Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 48 }}>
-        <div
-          style={{
-            background: C.gold,
-            borderRadius: 6,
-            width: 36,
-            height: 36,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <span style={{ color: C.bg, fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 18 }}>F</span>
-        </div>
-        <span style={{ color: C.text, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 15 }}>
-          Pre-Diligence Platform
+        <img src="/logo.svg" alt="Exit Blueprint" style={{ width: 36, height: 36, borderRadius: 6 }} />
+        <span style={{ color: C.text, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 15, letterSpacing: '-0.01em' }}>
+          Exit Blueprint
         </span>
       </div>
 

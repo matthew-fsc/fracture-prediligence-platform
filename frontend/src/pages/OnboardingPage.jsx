@@ -207,7 +207,7 @@ function Step1({ onNext, saving, error }) {
         Add your first client
       </h2>
       <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, margin: '0 0 32px 0' }}>
-        This creates your first client engagement and pre-diligence workspace.
+        This creates your first client engagement and exit readiness workspace.
       </p>
 
       <ErrorBanner message={error} />
@@ -325,7 +325,7 @@ function Step2({ onNext, onSkip, uploading, error }) {
           padding: '48px 24px',
           textAlign: 'center',
           cursor: uploading ? 'not-allowed' : 'pointer',
-          background: dragging ? 'rgba(201,151,58,0.05)' : COLORS.inputBg,
+          background: dragging ? 'rgba(23,167,115,0.05)' : COLORS.inputBg,
           transition: 'all 0.2s ease',
           marginBottom: 20,
         }}
@@ -534,7 +534,7 @@ function Step3({ onNext, onSkip, companyId }) {
               <button key={opt.value} type="button"
                 onClick={() => set('customer_contract_type', opt.value)}
                 style={{
-                  background: form.customer_contract_type === opt.value ? 'rgba(201,151,58,0.12)' : COLORS.inputBg,
+                  background: form.customer_contract_type === opt.value ? 'rgba(23,167,115,0.12)' : COLORS.inputBg,
                   border: `1px solid ${form.customer_contract_type === opt.value ? COLORS.gold : COLORS.border}`,
                   borderRadius: 8, padding: '10px 12px', cursor: 'pointer', textAlign: 'left',
                   display: 'flex', alignItems: 'center', gap: 8,
@@ -571,7 +571,7 @@ function Step3({ onNext, onSkip, companyId }) {
               <button key={opt.value} type="button"
                 onClick={() => set('market_positioning', opt.value)}
                 style={{
-                  background: form.market_positioning === opt.value ? 'rgba(201,151,58,0.12)' : COLORS.inputBg,
+                  background: form.market_positioning === opt.value ? 'rgba(23,167,115,0.12)' : COLORS.inputBg,
                   border: `1px solid ${form.market_positioning === opt.value ? COLORS.gold : COLORS.border}`,
                   borderRadius: 8, padding: '10px 14px', cursor: 'pointer', textAlign: 'left',
                   display: 'flex', alignItems: 'center', gap: 10,

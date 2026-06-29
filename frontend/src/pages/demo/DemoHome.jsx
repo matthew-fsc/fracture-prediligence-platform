@@ -341,7 +341,7 @@ function CustomTooltip({ active, payload, label }) {
       }}
     >
       <p style={{ color: '#8A9BB0', fontFamily: "'DM Sans', sans-serif", fontSize: 11, margin: '0 0 4px 0' }}>{label}</p>
-      <p style={{ color: '#C9973A', fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600, margin: 0 }}>
+      <p style={{ color: '#17a773', fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600, margin: 0 }}>
         {fmtDollar(payload[0].value)}
       </p>
     </div>
@@ -464,7 +464,7 @@ export default function DemoHome() {
           label="Enterprise Value"
           value={fmtDollar(liveEV)}
           sub={`${fmtDollar(enterprise_value.floor)} — ${fmtDollar(enterprise_value.ceiling)} range`}
-          accent="#C9973A"
+          accent="#17a773"
         />
         <StatCard
           label="Open Blockers"
@@ -585,7 +585,7 @@ export default function DemoHome() {
         return (
           <div style={{ ...CARD_STYLE, marginBottom: 28 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <TrendingUp style={{ width: 14, height: 14, color: '#C9973A' }} />
+              <TrendingUp style={{ width: 14, height: 14, color: '#17a773' }} />
               <span style={{ color: '#F0EDE8', fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 }}>DRS Score Trend</span>
               <span style={{ color: deltaColor, fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, marginLeft: 4 }}>
                 {delta >= 0 ? '+' : ''}{delta.toFixed(1)} pts
@@ -604,7 +604,7 @@ export default function DemoHome() {
                   formatter={(v) => [v, 'DRS']}
                 />
                 <ReferenceLine y={70} stroke="#4ade80" strokeDasharray="3 3" strokeOpacity={0.4} />
-                <Line type="monotone" dataKey="drs" stroke="#C9973A" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
+                <Line type="monotone" dataKey="drs" stroke="#17a773" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -638,8 +638,8 @@ export default function DemoHome() {
             <AreaChart data={monthly_revenue} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#C9973A" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#C9973A" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#17a773" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#17a773" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#1E3A5F" />
@@ -659,7 +659,7 @@ export default function DemoHome() {
               <Area
                 type="monotone"
                 dataKey="revenue"
-                stroke="#C9973A"
+                stroke="#17a773"
                 strokeWidth={2}
                 fill="url(#revenueGrad)"
               />
@@ -730,7 +730,7 @@ export default function DemoHome() {
         {/* Checklist */}
         <div style={CARD_STYLE}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <h2 style={{ ...SECTION_HEADING, margin: 0 }}>Pre-Diligence Checklist</h2>
+            <h2 style={{ ...SECTION_HEADING, margin: 0 }}>Exit Readiness Checklist</h2>
             <span
               style={{
                 color: '#60a5fa',
@@ -784,7 +784,7 @@ export default function DemoHome() {
           { label: 'EBITDA', value: fmtDollar(company.ebitda), color: '#4ade80' },
           { label: 'EBITDA Margin', value: `${company.ebitda_margin}%`, color: '#4ade80' },
           { label: 'EV Floor', value: fmtDollar(enterprise_value.floor), color: '#8A9BB0' },
-          { label: 'EV Midpoint', value: fmtDollar(enterprise_value.midpoint), color: '#C9973A' },
+          { label: 'EV Midpoint', value: fmtDollar(enterprise_value.midpoint), color: '#17a773' },
           { label: 'EV Ceiling', value: fmtDollar(enterprise_value.ceiling), color: '#8A9BB0' },
           { label: 'Multiple Range', value: `${enterprise_value.multiple_used}x`, color: '#60a5fa' },
         ].map((item, i, arr) => (
