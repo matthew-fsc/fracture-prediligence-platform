@@ -179,8 +179,6 @@ export default function App() {
             <Route caseSensitive path="/aicopilot" element={<Navigate to="/AICopilot" replace />} />
             <Route caseSensitive path="/advisorylibrary" element={<Navigate to="/AdvisoryLibrary" replace />} />
             <Route caseSensitive path="/advisory-library" element={<Navigate to="/AdvisoryLibrary" replace />} />
-            <Route caseSensitive path="/QualitativeInputs" element={<Navigate to="/EngagementIntake" replace />} />
-            <Route caseSensitive path="/qualitativeinputs" element={<Navigate to="/EngagementIntake" replace />} />
 
             {/* ---------------------------------------------------------------- */}
             {/* Post-payment onboarding (auth required, no role check)            */}

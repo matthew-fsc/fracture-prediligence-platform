@@ -3,15 +3,66 @@ import { useUser, useClerk } from '@clerk/react'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { apiClient } from '../lib/apiClient'
 import { toast } from '../lib/notify'
-import { Copy, Check, User, Mail, Shield, ExternalLink, LogOut } from 'lucide-react'
-import PageHeader from '../components/ui/PageHeader'
+import {
+  Copy, Check, User, Mail, Shield, ExternalLink, LogOut,
+  Users, Link2, Building2, ChevronRight,
+} from 'lucide-react'
 
 const HAS_CLERK = Boolean((import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim())
 
+function Section({ title, description, children }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-sm font-semibold text-card-foreground">{title}</h2>
+        {description && <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function FieldRow({ icon: Icon, label, value, mono }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <Icon className="w-4 h-4 text-muted-foreground/60 flex-shrink-0" />
+      <span className="text-xs text-muted-foreground w-28 flex-shrink-0">{label}</span>
+      <span className={`text-sm text-card-foreground truncate ${mono ? 'font-mono text-xs' : 'font-medium'}`}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
+function Input({ value, onChange, placeholder, type = 'text', ...props }) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      className="w-full bg-muted/30 border border-border rounded-lg px-3 py-2.5 text-sm text-card-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/40 transition-shadow"
+      {...props}
+    />
+  )
+}
+
+function PrimaryButton({ onClick, disabled, children }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      {children}
+    </button>
+  )
+}
+
 // ---------------------------------------------------------------------------
-// Account tab — shows user info and links to Clerk-hosted account management
+// Profile card
 // ---------------------------------------------------------------------------
-function AccountSection() {
+function ProfileSection() {
   const { user } = useUser()
   const { signOut } = useClerk()
 
@@ -22,70 +73,67 @@ function AccountSection() {
   const initials = user
     ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase() || '?'
     : '?'
-  const imageUrl = user?.imageUrl
-
-  const fields = [
-    { icon: User,   label: 'Display name',  value: displayName },
-    { icon: Mail,   label: 'Email',          value: email ?? 'Not available' },
-    { icon: Shield, label: 'Account ID',     value: user?.id ? `${user.id.slice(0, 16)}…` : '—' },
-  ]
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 space-y-6">
-      {/* Avatar row */}
-      <div className="flex items-center gap-4">
-        {imageUrl ? (
-          <img src={imageUrl} alt="" className="w-16 h-16 rounded-full object-cover border border-border" />
-        ) : (
-          <div className="w-16 h-16 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center text-primary text-xl font-bold">
-            {initials}
+    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      {/* Header band */}
+      <div className="h-16 bg-gradient-to-br from-primary/20 to-primary/5" />
+
+      {/* Avatar + identity */}
+      <div className="px-5 pb-5 -mt-8">
+        <div className="flex items-end justify-between gap-3">
+          <div className="relative">
+            {user?.imageUrl ? (
+              <img
+                src={user.imageUrl}
+                alt=""
+                className="w-16 h-16 rounded-2xl object-cover border-2 border-card ring-2 ring-primary/20 shadow-lg"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/60 border-2 border-card ring-2 ring-primary/20 flex items-center justify-center text-xl font-bold text-primary-foreground shadow-lg">
+                {initials}
+              </div>
+            )}
           </div>
-        )}
-        <div>
+          <div className="flex gap-2 pb-1">
+            {HAS_CLERK && (
+              <a
+                href="https://accounts.clerk.dev/user"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border bg-muted/40 rounded-lg text-xs font-medium text-card-foreground hover:bg-muted transition-colors"
+              >
+                Edit profile <ExternalLink className="w-3 h-3 text-muted-foreground" />
+              </a>
+            )}
+            {HAS_CLERK && signOut && (
+              <button
+                onClick={() => signOut()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-500/20 bg-red-500/10 rounded-lg text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+              >
+                <LogOut className="w-3 h-3" /> Sign out
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-3">
           <p className="text-base font-semibold text-card-foreground">{displayName}</p>
           {email && <p className="text-sm text-muted-foreground">{email}</p>}
-          <p className="text-xs text-muted-foreground/80 mt-0.5">M&A Advisory Platform</p>
+          <p className="text-xs text-muted-foreground/60 mt-0.5">Exit Blueprint · M&A Advisory</p>
         </div>
       </div>
 
       {/* Fields */}
-      <div className="divide-y divide-border rounded-xl border border-border overflow-hidden">
-        {fields.map(({ icon: Icon, label, value }) => (
-          <div key={label} className="flex items-center gap-3 px-4 py-3.5 bg-muted/10">
-            <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-            <span className="text-sm text-muted-foreground w-32 flex-shrink-0">{label}</span>
-            <span className="text-sm font-medium text-card-foreground truncate">{value}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Actions */}
-      <div className="flex flex-wrap gap-3">
-        {HAS_CLERK && (
-          <a
-            href="https://accounts.clerk.dev/user"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-muted/60 border border-border rounded-lg text-sm font-medium text-card-foreground hover:bg-muted transition-colors"
-          >
-            Edit profile
-            <ExternalLink className="w-3 h-3 text-muted-foreground" />
-          </a>
-        )}
-        {HAS_CLERK && signOut && (
-          <button
-            onClick={() => signOut()}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/20 transition-colors"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            Sign out
-          </button>
-        )}
+      <div className="border-t border-border divide-y divide-border/60">
+        <FieldRow icon={User}   label="Display name" value={displayName} />
+        <FieldRow icon={Mail}   label="Email"         value={email ?? '—'} />
+        <FieldRow icon={Shield} label="Account ID"    value={user?.id ? `${user.id.slice(0, 20)}…` : '—'} mono />
       </div>
 
       {!HAS_CLERK && (
-        <p className="text-sm text-muted-foreground/80">
-          Clerk authentication is not configured in this environment. User profile management is unavailable.
+        <p className="px-5 py-3 text-xs text-muted-foreground/70 border-t border-border">
+          Clerk authentication is not configured. Profile management unavailable in this environment.
         </p>
       )}
     </div>
@@ -93,7 +141,7 @@ function AccountSection() {
 }
 
 // ---------------------------------------------------------------------------
-// Referral section
+// Referral
 // ---------------------------------------------------------------------------
 function ReferralSection() {
   const [data, setData] = useState(null)
@@ -115,53 +163,51 @@ function ReferralSection() {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-      <div>
-        <h2 className="text-base font-semibold text-card-foreground">Refer an advisor</h2>
-        <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-          Share your referral link. When an advisor subscribes using your link, you receive a credit on your next invoice.
-        </p>
+    <Section
+      title="Refer an advisor"
+      description="When an advisor subscribes using your link, you receive a credit on your next invoice."
+    >
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+        {loading && <p className="text-sm text-muted-foreground">Loading referral data…</p>}
+
+        {data && (
+          <>
+            <div className="flex gap-2">
+              <input
+                readOnly
+                value={data.referral_url}
+                className="flex-1 bg-muted/30 border border-border rounded-lg px-3 py-2.5 text-sm text-card-foreground focus:outline-none font-mono text-xs"
+              />
+              <button
+                onClick={copy}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg border border-border bg-muted/40 text-sm font-medium text-card-foreground hover:bg-muted transition-colors whitespace-nowrap"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Clicks',         value: data.total_clicks },
+                { label: 'Conversions',    value: data.total_conversions },
+                { label: 'Credits earned', value: data.credit_balance_display },
+              ].map(({ label, value }) => (
+                <div key={label} className="rounded-xl border border-border bg-muted/20 p-3 text-center">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
+                  <p className="text-xl font-bold text-primary">{value}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
-
-      {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
-
-      {data && (
-        <div className="space-y-4">
-          <div className="flex gap-2">
-            <input
-              readOnly
-              value={data.referral_url}
-              className="flex-1 bg-muted/40 border border-border rounded-lg px-3 py-2 text-sm text-card-foreground focus:outline-none"
-            />
-            <button
-              onClick={copy}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-muted/40 text-sm font-medium text-card-foreground hover:bg-muted transition-colors whitespace-nowrap"
-            >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              {copied ? 'Copied' : 'Copy link'}
-            </button>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: 'Clicks',        value: data.total_clicks },
-              { label: 'Conversions',   value: data.total_conversions },
-              { label: 'Credits earned', value: data.credit_balance_display },
-            ].map(({ label, value }) => (
-              <div key={label} className="rounded-lg border border-border bg-muted/20 p-3 text-center">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
-                <p className="text-xl font-bold text-primary">{value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    </Section>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Firm management section
+// Firm management
 // ---------------------------------------------------------------------------
 function FirmSection() {
   const [firm, setFirm] = useState(null)
@@ -180,7 +226,7 @@ function FirmSection() {
     setInviting(true)
     try {
       await apiClient.post('/api/firms/invite-member', { member_user_id: inviteId.trim() })
-      toast.success('Member invited successfully')
+      toast.success('Member invited')
       setInviteId('')
     } catch (e) {
       toast.error(e.message || 'Invite failed')
@@ -190,39 +236,51 @@ function FirmSection() {
 
   if (loading || !firm) return null
 
-  return (
-    <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-      <div>
-        <h2 className="text-base font-semibold text-card-foreground">Firm — {firm.name}</h2>
-        <p className="text-sm text-muted-foreground mt-1">{firm.seats_used} of {firm.max_seats} seats used</p>
-      </div>
+  const seatPct = Math.round((firm.seats_used / Math.max(firm.max_seats, 1)) * 100)
 
-      {firm.is_owner && (
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">Invite an associate (enter their Clerk user ID):</p>
-          <div className="flex gap-2">
-            <input
-              value={inviteId}
-              onChange={e => setInviteId(e.target.value)}
-              placeholder="user_2abc..."
-              className="flex-1 bg-muted/40 border border-border rounded-lg px-3 py-2 text-sm text-card-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary/50"
-            />
-            <button
-              onClick={inviteMember}
-              disabled={inviting || !inviteId.trim()}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              {inviting ? 'Inviting...' : 'Invite'}
-            </button>
+  return (
+    <Section title="Firm" description="Manage your advisory firm and team seats.">
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <Building2 className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-card-foreground">{firm.name}</p>
+            <p className="text-xs text-muted-foreground">{firm.seats_used} of {firm.max_seats} seats used</p>
+          </div>
+          <div className="ml-auto w-24">
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className={`h-1.5 rounded-full ${seatPct >= 90 ? 'bg-red-500' : 'bg-primary'}`}
+                style={{ width: `${seatPct}%` }}
+              />
+            </div>
           </div>
         </div>
-      )}
-    </div>
+
+        {firm.is_owner && (
+          <div className="border-t border-border pt-4 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Invite a team member</p>
+            <div className="flex gap-2">
+              <Input
+                value={inviteId}
+                onChange={e => setInviteId(e.target.value)}
+                placeholder="Clerk user ID  (user_2abc…)"
+              />
+              <PrimaryButton onClick={inviteMember} disabled={inviting || !inviteId.trim()}>
+                {inviting ? 'Inviting…' : 'Invite'}
+              </PrimaryButton>
+            </div>
+          </div>
+        )}
+      </div>
+    </Section>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Client portal invite section
+// Client portal
 // ---------------------------------------------------------------------------
 function ClientInviteSection() {
   const [companyId, setCompanyId] = useState('')
@@ -247,36 +305,27 @@ function ClientInviteSection() {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-      <div>
-        <h2 className="text-base font-semibold text-card-foreground">Client portal access</h2>
-        <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-          Give an SMB owner read-only access to their engagement summary. They'll see their DRS score, EV range, and top initiatives.
-        </p>
-      </div>
-      <div className="space-y-2">
-        <input
+    <Section
+      title="Client portal access"
+      description="Give a business owner read-only access to their engagement summary — DRS score, EV range, and top initiatives."
+    >
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+        <Input
           type="number"
           value={companyId}
           onChange={e => setCompanyId(e.target.value)}
           placeholder="Company ID"
-          className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2 text-sm text-card-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary/50"
         />
-        <input
+        <Input
           value={clientUserId}
           onChange={e => setClientUserId(e.target.value)}
-          placeholder="Client Clerk user ID (user_2abc...)"
-          className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2 text-sm text-card-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary/50"
+          placeholder="Client Clerk user ID  (user_2abc…)"
         />
-        <button
-          onClick={invite}
-          disabled={submitting || !companyId || !clientUserId}
-          className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-        >
-          {submitting ? 'Granting access...' : 'Grant client access'}
-        </button>
+        <PrimaryButton onClick={invite} disabled={submitting || !companyId || !clientUserId}>
+          {submitting ? 'Granting access…' : 'Grant client access'}
+        </PrimaryButton>
       </div>
-    </div>
+    </Section>
   )
 }
 
@@ -284,45 +333,21 @@ function ClientInviteSection() {
 // Main settings page
 // ---------------------------------------------------------------------------
 export default function SettingsPage() {
-  usePageTitle('Account settings')
-  const [tab, setTab] = useState('account')
-
-  const tabs = [
-    { id: 'account',  label: 'Account' },
-    { id: 'referral', label: 'Referral' },
-    { id: 'portal',   label: 'Client portal' },
-    { id: 'firm',     label: 'Firm' },
-  ]
+  usePageTitle('Settings')
 
   return (
-    <div className="space-y-5 max-w-2xl">
-      <PageHeader
-        section="Settings"
-        title="Account settings"
-        subtitle="Manage your profile, referrals, client access, and firm"
-      />
-
-      {/* Tab bar */}
-      <div className="flex gap-1 p-1 bg-muted/30 border border-border rounded-xl w-fit">
-        {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              tab === t.id
-                ? 'bg-card border border-border text-card-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-card-foreground'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+    <div className="max-w-xl space-y-8">
+      {/* Header */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Settings</p>
+        <h1 className="text-xl font-bold text-card-foreground">Account & preferences</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Manage your profile, firm, referrals, and client access.</p>
       </div>
 
-      {tab === 'account'  && <AccountSection />}
-      {tab === 'referral' && <ReferralSection />}
-      {tab === 'portal'   && <ClientInviteSection />}
-      {tab === 'firm'     && <FirmSection />}
+      <ProfileSection />
+      <ReferralSection />
+      <FirmSection />
+      <ClientInviteSection />
     </div>
   )
 }

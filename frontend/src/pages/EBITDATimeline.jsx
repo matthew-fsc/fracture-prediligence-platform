@@ -18,7 +18,7 @@ import { usePageTitle } from '../hooks/usePageTitle'
 
 const TIER_STYLE = {
   HIGH_RISK:     { label: 'High Risk',     cls: 'bg-red-500/10    text-red-400    border-red-500/20'     },
-  PRE_DILIGENCE: { label: 'Pre-Diligence', cls: 'bg-red-500/10    text-red-400    border-red-500/20'     },
+  PRE_DILIGENCE: { label: 'Foundation',    cls: 'bg-red-500/10    text-red-400    border-red-500/20'     },
   CONDITIONAL:   { label: 'Conditional',   cls: 'bg-amber-500/10  text-amber-400  border-amber-500/20'   },
   INVESTMENT:    { label: 'Investment',    cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
   INSTITUTIONAL: { label: 'Institutional', cls: 'bg-blue-500/10   text-blue-400   border-blue-500/20'    },
@@ -954,7 +954,7 @@ export default function EBITDATimeline() {
               <h3 className="text-sm font-semibold text-foreground mb-1">Deal Readiness Score (DRS) Progression</h3>
               <p className="text-[11px] text-muted-foreground mb-4">
                 Composite 0–100 score across 6 categories.
-                Tier thresholds: Pre-Diligence (&lt;40) · High Risk (40–54) · Conditional (55–69) · <span className="text-emerald-400">Investment Grade (70+)</span> · Institutional (85+)
+                Tier thresholds: Foundation (&lt;40) · High Risk (40–54) · Conditional (55–69) · <span className="text-emerald-400">Investment Grade (70+)</span> · Institutional (85+)
               </p>
               <ResponsiveContainer width="100%" height={150}>
                 <ComposedChart data={drsChartData} margin={{ top: 10, right: 40, bottom: 0, left: 10 }}>

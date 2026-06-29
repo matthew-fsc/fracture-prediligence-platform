@@ -21,7 +21,7 @@ _INVITE_BODY_TEXT = """\
 Hi,
 
 {advisor_name_or_firm} has invited you to access your business exit-readiness report \
-on the Fracture Pre-Diligence Platform.
+on the Exit Blueprint.
 
 Click the link below to get started. You'll be guided through a short onboarding \
 to share your goals and key company details.
@@ -31,7 +31,7 @@ to share your goals and key company details.
 This link is unique to you. If you have questions, reply to this email or contact \
 your advisor directly.
 
-— The Fracture Team
+— Exit Blueprint
 """
 
 _INVITE_BODY_HTML = """\
@@ -41,7 +41,7 @@ _INVITE_BODY_HTML = """\
   <h2 style="color:#6366f1;margin-bottom:4px">Your Exit Readiness Report is Ready</h2>
   <p style="color:#555;margin-top:0">
     <strong>{advisor_name_or_firm}</strong> has invited you to the
-    <strong>Fracture Pre-Diligence Platform</strong>.
+    <strong>Exit Blueprint</strong>.
   </p>
   <p>
     You'll be guided through a short onboarding to share your goals and key company details.
@@ -58,7 +58,7 @@ _INVITE_BODY_HTML = """\
   </p>
   <hr style="border:none;border-top:1px solid #eee;margin:24px 0" />
   <p style="color:#aaa;font-size:11px">
-    This invitation was sent by your M&amp;A advisor via the Fracture Pre-Diligence Platform.
+    This invitation was sent by your M&amp;A advisor via the Exit Blueprint.
     If you received this in error, you can safely ignore it.
   </p>
 </body>
@@ -76,7 +76,7 @@ async def send_invite_email(
     """Send a client onboarding invite email. Returns True if sent, False on failure."""
     api_key = getattr(settings, "SENDGRID_API_KEY", None)
     from_email = getattr(settings, "EMAIL_FROM_ADDRESS", "noreply@fracture.io")
-    from_name = getattr(settings, "EMAIL_FROM_NAME", "Fracture Platform")
+    from_name = getattr(settings, "EMAIL_FROM_NAME", "Exit Blueprint")
 
     subject = _INVITE_SUBJECT
     body_text = _INVITE_BODY_TEXT.format(

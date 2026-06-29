@@ -9,7 +9,7 @@ export const company = {
   employees: 13,
   founded: 2009,
   status: 'Active Engagement',
-  stage: 'Pre-Diligence',
+  stage: 'Foundation Stage',
 }
 
 // Baseline fallback values — overridden by live API data where available
