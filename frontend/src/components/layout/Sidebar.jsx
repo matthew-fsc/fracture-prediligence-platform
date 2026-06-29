@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
-  Zap, House, Building, Workflow, Grid3x3, BarChart2,
-  Eye, TrendingUp, Target, Activity, Plug, ArrowRightLeft,
+  House, Building, Workflow, Grid3x3,
+  Eye, TrendingUp, Target, Activity, Plug,
   Folder, FileText, Bot, Settings, ChevronLeft,
-  LineChart, GitCompare, NotebookPen, BookOpen, UserPlus, X, Handshake,
+  GitCompare, NotebookPen, UserPlus, X, Handshake,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useCompanyId } from '../../context/CompanyContext'
@@ -14,11 +14,18 @@ import { toast } from '../../lib/notify'
 
 const groups = [
   {
+    label: 'Assessment',
+    items: [
+      { label: 'Assessment Intake',  href: '/EngagementIntake', icon: NotebookPen },
+      { label: 'Readiness Score',    href: '/Readiness',        icon: Grid3x3 },
+      { label: 'Reports',            href: '/Reports',          icon: FileText },
+    ],
+  },
+  {
     label: 'Workspace',
     items: [
       { label: 'Home',               href: '/Home',             icon: House },
       { label: 'Company Workspace',  href: '/CompanyWorkspace', icon: Building },
-      { label: 'Client Profile',      href: '/EngagementIntake', icon: NotebookPen },
       { label: 'Advisory Workflow',  href: '/AdvisoryWorkflow', icon: Workflow },
       { label: 'Deal Outcome',       href: '/DealOutcome',      icon: Handshake },
     ],
@@ -26,36 +33,18 @@ const groups = [
   {
     label: 'Intelligence',
     items: [
-      { label: 'Readiness Score',    href: '/Readiness',           icon: Grid3x3 },
-      { label: 'Business Quality',   href: '/BusinessQuality',     icon: BarChart2 },
       { label: 'Buyer Risk Profile', href: '/BuyerLens',        icon: Eye },
       { label: 'Valuation',          href: '/Valuation',        icon: TrendingUp },
       { label: 'Market Comps',       href: '/MarketComps',      icon: GitCompare },
-    ],
-  },
-  {
-    label: 'Value Creation',
-    items: [
       { label: 'Value Gap',          href: '/ValueGap',         icon: Target },
-      { label: 'EBITDA & EV Timeline', href: '/EBITDATimeline', icon: LineChart },
-      { label: 'Initiative Impact',  href: '/InitiativeImpact', icon: Zap },
       { label: 'Scenario Simulator', href: '/ScenarioSimulator',icon: Activity },
     ],
   },
   {
-    label: 'Data Pipeline',
+    label: 'Data & Tools',
     items: [
       { label: 'Data Sources',       href: '/Connectors',       icon: Plug },
-      { label: 'Field Mapping',      href: '/DataMapping',      icon: ArrowRightLeft },
-      { label: 'Data Quality',       href: '/DataQuality',      icon: Folder },
       { label: 'Data Room (VDR)',    href: '/DataRoom',         icon: Folder },
-    ],
-  },
-  {
-    label: 'Output',
-    items: [
-      { label: 'Reports',            href: '/Reports',          icon: FileText },
-      { label: 'Advisory Library',   href: '/AdvisoryLibrary',  icon: BookOpen },
       { label: 'AI Copilot',         href: '/AICopilot',        icon: Bot },
       { label: 'Admin',              href: '/Admin',            icon: Settings },
     ],

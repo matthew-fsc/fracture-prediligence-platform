@@ -10,18 +10,11 @@ const REPORT_TEMPLATES = [
   {
     id: 'drs_summary',
     title: 'Diligence Readiness Summary',
-    description: '2-page executive-ready format with DRS score, category breakdown, and top risks.',
+    description: '2-page executive-ready assessment with DRS score, category breakdown, and top risks.',
     sections: ['DRS Score & Tier', 'Category Scores', 'Top 5 Risks', 'Immediate Action Items'],
     status: 'ready',
     color: 'primary',
-  },
-  {
-    id: 'value_gap',
-    title: 'Value Gap Report',
-    description: 'Current vs. potential enterprise value with ranked value-creation initiatives.',
-    sections: ['EV Range', 'Gap Analysis by Category', 'Initiative Roadmap', 'DRS Sensitivity'],
-    status: 'ready',
-    color: 'emerald',
+    requiresFinancialData: false,
   },
   {
     id: 'buyer_prep',
@@ -30,6 +23,16 @@ const REPORT_TEMPLATES = [
     sections: ['Critical Questions', 'Financial Data Checklist', 'Operational Documentation', 'Management Bios'],
     status: 'ready',
     color: 'blue',
+    requiresFinancialData: false,
+  },
+  {
+    id: 'value_gap',
+    title: 'Value Gap Report',
+    description: 'Current vs. potential enterprise value with ranked value-creation initiatives.',
+    sections: ['EV Range', 'Gap Analysis by Category', 'Initiative Roadmap', 'DRS Sensitivity'],
+    status: 'ready',
+    color: 'emerald',
+    requiresFinancialData: true,
   },
   {
     id: 'ebitda_recast',
@@ -38,6 +41,7 @@ const REPORT_TEMPLATES = [
     sections: ['KPI Summary', 'Data Notes', 'Addback Schedule'],
     status: 'ready',
     color: 'amber',
+    requiresFinancialData: true,
   },
   {
     id: 'company_profile',
@@ -46,6 +50,7 @@ const REPORT_TEMPLATES = [
     sections: ['Cover Blurb', 'Financial Highlights', 'DRS & EV', 'Disclaimer'],
     status: 'ready',
     color: 'purple',
+    requiresFinancialData: true,
   },
 ]
 
@@ -237,14 +242,13 @@ export default function Reports() {
   }
 
   const readyReports = REPORT_TEMPLATES.filter(t => t.status === 'ready')
-  // false only when the backend explicitly returns has_data: false (no completed ingestion)
-  const hasData = scoreData?.has_data !== false
+  const hasFinancialData = scoreData?.has_data === true
 
   return (
     <div className="space-y-5 max-w-[1400px]">
       <SectionHeader
         title="Reports"
-        subtitle="Generate and export advisory deliverables in advisor-ready format"
+        subtitle="Generate assessment reports and advisory deliverables from qualitative and financial inputs"
         action={scoreData ? (
           <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">
             DRS {scoreData.drs?.base}/100
@@ -357,15 +361,15 @@ export default function Reports() {
 
       <div>
         <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Available Reports</p>
-        {!hasData && (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 mb-4 flex items-start gap-3">
-            <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+        {!hasFinancialData && (
+          <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 mb-4 flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-amber-400">No financial data uploaded yet</p>
-              <p className="text-xs text-amber-300/70 mt-0.5">
-                Reports require ingested client financials —{' '}
-                <a href="/Connectors" className="underline hover:text-amber-300">upload data sources</a>{' '}
-                before generating a report.
+              <p className="text-sm font-semibold text-blue-400">Assessment reports are ready to generate</p>
+              <p className="text-xs text-blue-300/70 mt-0.5">
+                The Readiness Summary and Buyer Prep reports run from qualitative inputs alone.
+                Financial reports (Value Gap, EBITDA Recast, Teaser) additionally require{' '}
+                <a href="/Connectors" className="underline hover:text-blue-300">uploaded data sources</a>.
               </p>
             </div>
           </div>
@@ -395,7 +399,7 @@ export default function Reports() {
                 <button
                   type="button"
                   onClick={() => generateReport(t.id)}
-                  disabled={generating === t.id || !hasData}
+                  disabled={generating === t.id || (t.requiresFinancialData && !hasFinancialData)}
                   className={cn(
                     'w-full flex items-center justify-center gap-2 text-xs font-semibold py-2 rounded-lg transition-colors disabled:opacity-50 disabled:shadow-none',
                     cl.cta,

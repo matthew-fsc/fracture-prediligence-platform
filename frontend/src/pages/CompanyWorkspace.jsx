@@ -132,12 +132,10 @@ export default function CompanyWorkspace() {
   const levers = buildLevers(gapData)
 
   const intelCards = [
-    { label: 'EBITDA',           value: fmtM(kpis.ebitda),          sub: 'Defensible (base)',         color: 'blue'    },
-    { label: 'EBITDA Multiple',  value: `${kpis.ebitdaMultiple}×`,   sub: 'DRS-adjusted',              color: 'purple'  },
-    { label: 'Current EV',       value: fmtM(kpis.currentEV),        sub: 'Midpoint valuation',        color: 'emerald' },
-    { label: 'Value Gap',        value: `+${fmtM(kpis.valueGap)}`,   sub: 'Addressable upside',        color: 'amber'   },
-    { label: 'Potential EV',     value: fmtM(kpis.potentialEV),      sub: 'At target DRS',             color: 'emerald' },
-    { label: 'Readiness Score',  value: `${kpis.drs}/100`,           sub: kpis.tier.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), color: 'primary' },
+    { label: 'EBITDA',           value: fmtM(kpis.ebitda),        sub: `${kpis.ebitdaMultiple}× DRS-adjusted`,  color: 'blue'    },
+    { label: 'Current EV',       value: fmtM(kpis.currentEV),     sub: 'Midpoint valuation',                    color: 'emerald' },
+    { label: 'Value Gap',        value: `+${fmtM(kpis.valueGap)}`, sub: 'Addressable upside',                   color: 'amber'   },
+    { label: 'Readiness Score',  value: `${kpis.drs}/100`,         sub: kpis.tier.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), color: 'primary' },
   ]
 
   const colorCfg = {
@@ -163,8 +161,8 @@ export default function CompanyWorkspace() {
           </div>
         </div>
         {/* Intel cards skeleton */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="rounded-xl border border-border bg-card p-3 space-y-2">
               <Skeleton className="h-2 w-16" />
               <Skeleton className="h-6 w-20" />
@@ -308,7 +306,7 @@ export default function CompanyWorkspace() {
       <InviteOwnerPanel companyId={companyId} companyData={companyData} />
 
       {/* Intelligence cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {intelCards.map(c => (
           <div key={c.label} className={cn('rounded-xl border p-3', colorCfg[c.color])}>
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{c.label}</p>
