@@ -99,7 +99,7 @@ export default function SignInPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+    <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px', boxSizing: 'border-box' }}>
       {/* Logo — match Clerk embed primary text */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 36 }}>
         <div style={{ background: C.gold, borderRadius: 6, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
