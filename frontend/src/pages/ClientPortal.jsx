@@ -14,7 +14,7 @@ const TIER_LABELS = {
   'Investment Grade':    { color: '#2563eb', bg: 'rgba(37,99,235,0.1)' },
   'Conditional':         { color: '#d97706', bg: 'rgba(217,119,6,0.1)' },
   'High Risk':           { color: '#dc2626', bg: 'rgba(220,38,38,0.1)' },
-  'Pre-Diligence Required': { color: '#6b7280', bg: 'rgba(107,114,128,0.1)' },
+  'Foundation Stage Required': { color: '#6b7280', bg: 'rgba(107,114,128,0.1)' },
 }
 
 function TierBadge({ tier }) {

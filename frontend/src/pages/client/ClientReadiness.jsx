@@ -39,7 +39,7 @@ function drsTierInfo(score) {
   if (score >= 70) return { label: 'Investment Grade',    desc: 'Suitable for most acquirers with prep', color: 'text-emerald-400', border: 'border-emerald-500/30', bg: 'bg-emerald-500/10' }
   if (score >= 55) return { label: 'Conditional',         desc: 'Requires targeted improvements first',  color: 'text-amber-400',   border: 'border-amber-500/30',   bg: 'bg-amber-500/10' }
   if (score >= 40) return { label: 'High Risk',           desc: 'Significant issues need resolution',    color: 'text-red-400',     border: 'border-red-500/30',     bg: 'bg-red-500/10' }
-  return                  { label: 'Pre-Diligence',       desc: 'Foundational work required',            color: 'text-red-500',     border: 'border-red-500/30',     bg: 'bg-red-500/10' }
+  return                  { label: 'Foundation Stage',     desc: 'Foundational work required',            color: 'text-red-500',     border: 'border-red-500/30',     bg: 'bg-red-500/10' }
 }
 
 export default function ClientReadiness() {

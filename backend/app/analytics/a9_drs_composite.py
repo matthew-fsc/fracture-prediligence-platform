@@ -24,7 +24,7 @@ class DRSTier(str, Enum):
     INVESTMENT     = "Investment Grade"       # 70–84
     CONDITIONAL    = "Conditional"            # 55–69
     HIGH_RISK      = "High Risk"              # 40–54
-    PRE_DILIGENCE  = "Pre-Diligence Required" # <40
+    PRE_DILIGENCE  = "Foundation Stage"        # <40
 
 
 @dataclass

@@ -89,7 +89,7 @@ function tierLabel(s) {
   if (s >= 70) return { label: 'Investment Grade',         color: 'emerald' }
   if (s >= 55) return { label: 'Conditional',               color: 'amber' }
   if (s >= 40) return { label: 'High Risk',                 color: 'amber' }
-  return       { label: 'Pre-Diligence Required',        color: 'red' }
+  return       { label: 'Foundation Stage Required',      color: 'red' }
 }
 
 // ── Source rows drill-down ───────────────────────────────────────────────────
@@ -586,7 +586,7 @@ export default function Readiness() {
         <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-5 py-4 flex items-start gap-3" role="alert">
           <Shield className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-bold text-red-400">Pre-Diligence Required — Company Not Market-Ready</p>
+            <p className="text-sm font-bold text-red-400">Foundation Stage Required — Company Not Market-Ready</p>
             <p className="text-xs text-red-300/80 mt-1">
               A DRS below 40 indicates fundamental gaps that a buyer's diligence team will identify immediately.
               Do not proceed to market outreach. Prioritize the Value Gap initiatives to reach a minimum of 55 (Conditional) before engaging any buyers.
@@ -787,7 +787,7 @@ export default function Readiness() {
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="font-mono text-red-400 w-12 flex-shrink-0 text-right">&lt; 40</span>
-                  <span><span className="font-semibold text-red-400">Pre-Diligence Required</span> — Not ready for institutional marketing. Prioritize data quality, documentation, and operating fixes before expecting credible bids.</span>
+                  <span><span className="font-semibold text-red-400">Foundation Stage Required</span> — Not ready for institutional marketing. Prioritize data quality, documentation, and operating fixes before expecting credible bids.</span>
                 </div>
               </div>
             </div>
@@ -993,7 +993,7 @@ export default function Readiness() {
             { label: 'P75 — Investment Grade',  score: 73, pct: '75th',  note: 'Standard diligence, limited friction',           color: 'emerald' },
             { label: 'P50 — Median Engagement', score: 58, pct: '50th',  note: 'Conditional tier — meaningful prep before process', color: 'amber'   },
             { label: 'P25 — High Risk',         score: 44, pct: '25th',  note: 'High Risk tier — discounts or structure likely',    color: 'amber'   },
-            { label: 'P10 — Pre-Diligence',     score: 31, pct: '10th',  note: 'Pre-Diligence Required — heavy value creation first', color: 'red'     },
+            { label: 'P10 — Foundation',         score: 31, pct: '10th',  note: 'Foundation Stage — heavy value creation first', color: 'red'     },
           ].map(b => {
             const isAbove = drs >= b.score
             const colorCls = b.color === 'emerald' ? 'text-emerald-400' : b.color === 'amber' ? 'text-amber-400' : 'text-red-400'

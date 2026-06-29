@@ -222,7 +222,7 @@ export default function CompanyWorkspace() {
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <h1 className="text-xl font-bold text-card-foreground">{companyData?.name ?? 'Loading…'}</h1>
               <span className="text-[11px] font-bold px-1.5 py-0.5 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">Active Engagement</span>
-              <span className="text-[11px] font-bold px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground">Pre-Diligence</span>
+              <span className="text-[11px] font-bold px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground">Foundation</span>
               <button
                 type="button"
                 onClick={() => go('/EngagementIntake')}

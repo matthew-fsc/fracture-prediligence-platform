@@ -83,8 +83,8 @@ class _BasePDF(FPDF):
     _company_name = "ABC Company Inc"
     _report_title = "Advisory Report"
     _report_date  = ""
-    _brand_primary = "FRACTURE SYSTEMS"
-    _brand_sub = "Pre-Diligence Platform"
+    _brand_primary = "EXIT BLUEPRINT"
+    _brand_sub = "Exit Blueprint"
     _logo_path: Optional[str] = None
 
     def header(self):
@@ -117,7 +117,7 @@ class _BasePDF(FPDF):
         self.set_y(-10)
         self.set_font("Helvetica", "", 7)
         self.set_text_color(*_MUTED)
-        self.cell(0, 5, f"CONFIDENTIAL - Pre-Diligence Advisory  |  Page {self.page_no()}", align="C")
+        self.cell(0, 5, f"CONFIDENTIAL - Exit Blueprint Advisory  |  Page {self.page_no()}", align="C")
 
     def section_title(self, text: str):
         self.set_font("Helvetica", "B", 11)

@@ -1,7 +1,9 @@
 """
-CEPA-style advisory workflow — stage metadata plus per-company progress heuristics.
+Exit Blueprint advisory workflow — 5-phase deal process derived from live company data.
 
-Progress is derived from ontology + analytics signals (not stored workflow state).
+Phases follow the NewCo/wealth-manager deal flow:
+  P1 Preparation & Exit Readiness → P2 Positioning & Marketing Prep →
+  P3 Go to Market → P4 Bids & Negotiation → P5 Due Diligence & Close
 """
 
 from __future__ import annotations
@@ -12,7 +14,6 @@ from sqlalchemy.orm import Session
 from app.analytics.a1_metric_computation import compute_metrics
 from app.analytics.a9_drs_composite import CategoryScores, compute_drs
 from app.analytics.a11_value_gap import compute_value_gap
-from app.analytics.a13_buyer_questions import generate_buyer_questions
 from app.analytics.ebitda_basis import ebitda_basis_for_company
 from app.ontology.ingestion_models import IngestionJob, PhaseStatus
 from app.ontology.models import (
@@ -24,82 +25,7 @@ from app.ontology.models import (
     QualitativeInputs,
 )
 from app.services.analytics_service import compute_category_scores
-
-# Static methodology (matches product UI). Routes are app paths for deep links.
-WORKFLOW_STAGES: list[dict] = [
-    {
-        "stage": 1,
-        "label": "Company Workspace",
-        "desc": "Entity profile, industry classification, ownership structure",
-        "cepaRef": "Stage 1 · Profile",
-        "deliverable": "Completed org profile",
-        "iconName": "Building2",
-        "route": "/CompanyWorkspace",
-    },
-    {
-        "stage": 2,
-        "label": "Data Ingestion",
-        "desc": "Connect accounting, CRM, payroll, and banking sources",
-        "cepaRef": "Stage 2 · Ingestion",
-        "deliverable": "Clean ontology",
-        "iconName": "Plug",
-        "route": "/Connectors",
-    },
-    {
-        "stage": 3,
-        "label": "Valuation Baseline",
-        "desc": "EBITDA normalization, multiple benchmarking, EV range",
-        "cepaRef": "Stage 3 · Valuation",
-        "deliverable": "EV range model",
-        "iconName": "BarChart2",
-        "route": "/Valuation",
-    },
-    {
-        "stage": 4,
-        "label": "Diligence Readiness",
-        "desc": "DRS scoring across 6 dimensions with benchmark comparison",
-        "cepaRef": "Stage 4 · DRS",
-        "deliverable": "DRS scorecard",
-        "iconName": "ShieldCheck",
-        "route": "/Readiness",
-    },
-    {
-        "stage": 5,
-        "label": "Value Gap Analysis",
-        "desc": "Current EV vs achievable EV — initiative impact modeling",
-        "cepaRef": "Stage 5 · Value Gap",
-        "deliverable": "Value gap report",
-        "iconName": "Target",
-        "route": "/ValueGap",
-    },
-    {
-        "stage": 6,
-        "label": "Buyer Risk Analysis",
-        "desc": "Identify and quantify diligence flags a buyer will surface",
-        "cepaRef": "Stage 6 · Risk",
-        "deliverable": "Risk heatmap",
-        "iconName": "AlertTriangle",
-        "route": "/BuyerLens",
-    },
-    {
-        "stage": 7,
-        "label": "Report Generation",
-        "desc": "Produce advisor-grade exit readiness deliverable package",
-        "cepaRef": "Stage 7 · Reports",
-        "deliverable": "Full report package",
-        "iconName": "TrendingUp",
-        "route": "/Reports",
-    },
-    {
-        "stage": 8,
-        "label": "Exit Execution",
-        "desc": "Process preparation, buyer targeting, go-to-market readiness",
-        "cepaRef": "Stage 8 · Exit",
-        "deliverable": "Exit execution plan",
-        "iconName": "Shield",
-        "route": "/EngagementIntake",
-    },
-]
+from app.analytics.a13_buyer_questions import generate_buyer_questions
 
 
 def _job_status_value(job: IngestionJob) -> str:
@@ -107,7 +33,7 @@ def _job_status_value(job: IngestionJob) -> str:
     return st.value if hasattr(st, "value") else str(st)
 
 
-def _stage_status(pct: int) -> str:
+def _pct_to_status(pct: int) -> str:
     if pct >= 85:
         return "completed"
     if pct > 0:
@@ -117,6 +43,8 @@ def _stage_status(pct: int) -> str:
 
 def build_advisory_workflow(company: Company, db: Session) -> dict:
     cid = company.id
+
+    # --- Compute analytics signals ---
     cat_scores = compute_category_scores(cid, db)
     cs = CategoryScores(
         revenue_quality=cat_scores["revenue_quality"],
@@ -164,139 +92,282 @@ def build_advisory_workflow(company: Company, db: Session) -> dict:
     }
     resolved_statuses = frozenset({"answered", "mitigated", "waived"})
     n_q = len(questions)
-    resolved = 0
-    critical_open = 0
-    for q in questions:
-        st = states.get(q.id)
-        status = (st.status if st else "open") or "open"
-        if status in resolved_statuses:
-            resolved += 1
-        elif status == "open" and q.severity == "CRITICAL":
-            critical_open += 1
-
-    vg = compute_value_gap(cid, cat_scores, ebitda) if ebitda > 0 else None
-    n_gaps = len(vg.gaps) if vg else 0
-
-    # --- Per-stage pct (0–100) and notes ---
-    notes: dict[int, str | None] = {}
-
-    # 1 — Company profile
-    filled = sum(
-        1
-        for v in (company.name, company.industry, company.founded, company.state, company.entity_type)
-        if v is not None and str(v).strip() != ""
-    )
-    pct1 = min(100, filled * 20)
-    notes[1] = (
-        f"{company.name}"
-        + (f" · {company.industry}" if company.industry else "")
-        + (f" · est. {company.founded}" if company.founded else "")
+    resolved = sum(
+        1 for q in questions
+        if ((states.get(q.id).status if states.get(q.id) else "open") or "open") in resolved_statuses
     )
 
-    # 2 — Data ingestion (was stage 3)
-    if complete_jobs:
-        pct2 = min(100, 40 + min(60, len(complete_jobs) * 20))
-        notes[2] = f"{len(complete_jobs)} file(s) committed · {total_rows:,} rows in ontology"
-    elif jobs:
-        pct2 = 25
-        notes[2] = f"{len(jobs)} pipeline job(s) — complete mapping/review where needed"
-    else:
-        pct2 = 0
-        notes[2] = "Upload QuickBooks / CRM exports under Data Sources"
-
-    # 3 — Valuation baseline (was stage 2)
-    if ebitda > 0 and ttm_rev > 0:
-        pct3 = 100
-        ev_mid = ebitda * 4.5  # rough mid if full EV not computed here
-        notes[3] = f"Defensible EBITDA {ebitda:,.0f} · illustrative ~{ev_mid:,.0f} EV (see Valuation for range)"
-    elif ebitda > 0:
-        pct3 = 70
-        notes[3] = f"EBITDA basis {ebitda:,.0f} — add revenue history for tighter benchmarking"
-    else:
-        pct3 = 15 if ttm_rev > 0 else 0
-        notes[3] = "Enter financial normalization on Valuation" if pct3 == 0 else "Partial financials — complete EBITDA bridge"
-
-    # 4 — DRS
-    pct4 = min(100, int(round(drs_base)))
-    qual_complete = qual is not None and (
-        qual.owner_hours_per_week is not None or qual.pipeline_value is not None
+    # -------------------------------------------------------------------------
+    # Phase 1 — Preparation & Exit Readiness
+    # -------------------------------------------------------------------------
+    profile_filled = sum(
+        1 for v in (company.name, company.industry, company.founded, company.state, company.entity_type)
+        if v is not None and str(v).strip()
     )
-    notes[4] = f"DRS {drs_base:.1f}/100 — {tier} tier"
-    if qual_complete:
-        notes[4] += " · qualitative inputs on file"
+    step_eng = min(100, profile_filled * 20)
 
-    # 5 — Value gap (was stage 6)
-    if vg is None or ebitda <= 0:
-        pct5 = 20 if drs_base > 0 else 0
-        notes[5] = "Need EBITDA basis and scores to quantify value gap" if pct5 == 0 else "Partial — open Value Gap when EBITDA is set"
-    else:
-        if n_gaps == 0:
-            pct5 = 100
-            notes[5] = "Categories at or above target — no ranked drivers"
-        else:
-            pct5 = min(100, 35 + min(65, initiative_count * 12 + (25 if initiative_count else 0)))
-            notes[5] = f"{n_gaps} driver(s) · {initiative_count} initiative(s) tracked · +{vg.total_value_gap:,.0f} upside at target DRS"
-    pct5 = min(100, pct5)
-
-    # 6 — Buyer risk (was stage 5)
-    if n_q == 0:
-        pct6 = 100 if drs_base >= 65 else 25
-        notes[6] = (
-            "No questions fired in current simulation — scores above common diligence triggers"
-            if drs_base >= 65
-            else "Limited data — buyer simulation may expand as scores and ingestion improve"
-        )
-    else:
-        pct6 = int(round(100 * resolved / n_q))
-        crit = sum(1 for q in questions if q.severity == "CRITICAL")
-        notes[6] = f"{n_q} questions · {resolved} resolved · {crit} critical in library · {critical_open} critical still open"
-
-    # 7 — Reports (was stage 8)
-    pct7 = min(100, report_count * 34)
-    notes[7] = f"{report_count} PDF export(s) in history" if report_count else "Generate DRS summary or buyer package under Reports"
-
-    # 8 — Exit execution (engagement intake; was stage 9)
     if profile:
-        bits = []
-        if profile.exit_timeline:
-            bits.append(f"Horizon: {profile.exit_timeline}")
-        if profile.target_valuation is not None:
-            bits.append(f"Target EV: {float(profile.target_valuation):,.0f}")
-        if profile.owner_goals_narrative:
-            bits.append("Owner goals captured")
-        pct8 = min(100, 25 + (40 if profile.exit_timeline else 0) + (35 if profile.target_valuation else 0))
-        pct8 = min(100, pct8)
-        notes[8] = " · ".join(bits) if bits else "Engagement profile started — add exit horizon and targets"
+        fp_bits = [bool(profile.exit_timeline), bool(profile.target_valuation), bool(profile.owner_goals_narrative)]
+        step_fp = min(100, 25 + sum(37 if b else 0 for b in fp_bits))
     else:
-        pct8 = 0
-        notes[8] = "Capture exit timeline and valuation targets under Engagement Intake"
+        step_fp = 0
 
-    pcts = {1: pct1, 2: pct2, 3: pct3, 4: pct4, 5: pct5, 6: pct6, 7: pct7, 8: pct8}
+    if ebitda > 0 and ttm_rev > 0:
+        step_fmv = 100
+    elif ebitda > 0 or ttm_rev > 0:
+        step_fmv = 60
+    else:
+        step_fmv = 15 if complete_jobs else 0
 
-    stages_out: list[dict] = []
-    for meta in WORKFLOW_STAGES:
-        sid = meta["stage"]
-        pct = int(pcts[sid])
-        stages_out.append(
-            {
-                **meta,
-                "status": _stage_status(pct),
-                "pct": pct,
-                "note": notes.get(sid),
-            }
-        )
+    step_qoe = min(100, int(ebitda > 0) * 60 + (len(complete_jobs) > 0) * 40) if complete_jobs else 0
+    step_drs = min(100, int(round(drs_base)))
+    if initiative_count > 0 and ebitda > 0:
+        step_vcp = min(100, 30 + min(70, initiative_count * 14))
+    elif drs_base > 0:
+        step_vcp = 20
+    else:
+        step_vcp = 0
 
-    overall = int(round(sum(pcts.values()) / len(pcts)))
-    completed_count = sum(1 for s in stages_out if s["status"] == "completed")
-    active_stages = [s["stage"] for s in stages_out if s["status"] == "in_progress"]
-    current_stage = active_stages[0] if active_stages else None
+    p1_steps = [
+        {
+            "id": "ENG",
+            "label": "Engagement & discovery",
+            "pct": step_eng,
+            "note": f"{company.name}" + (f" · {company.industry}" if company.industry else ""),
+            "route": "/CompanyWorkspace",
+        },
+        {
+            "id": "FP",
+            "label": "Financial plan: post-transaction wealth need",
+            "pct": step_fp,
+            "note": (
+                f"Horizon: {profile.exit_timeline}" if profile and profile.exit_timeline else
+                "Add exit horizon and targets under Engagement Intake"
+            ),
+            "route": "/EngagementIntake",
+        },
+        {
+            "id": "FMV",
+            "label": "Valuation / FMV: current business value",
+            "pct": step_fmv,
+            "note": (
+                f"Defensible EBITDA {ebitda:,.0f}" if ebitda > 0 else
+                "Upload financials to establish valuation baseline"
+            ),
+            "route": "/Valuation",
+        },
+        {
+            "id": "QOE",
+            "label": "EBITDA normalization & quality of earnings",
+            "pct": step_qoe,
+            "note": (
+                f"{len(complete_jobs)} source file(s) · {total_rows:,} rows ingested" if complete_jobs else
+                "Connect QuickBooks or upload financial exports"
+            ),
+            "route": "/Connectors",
+        },
+        {
+            "id": "DRS",
+            "label": "Diligence Readiness Score",
+            "pct": step_drs,
+            "note": f"DRS {drs_base:.1f}/100 — {tier} tier" + (" · qualitative inputs on file" if qual else ""),
+            "route": "/Readiness",
+            "ip_badge": True,
+        },
+        {
+            "id": "VCP",
+            "label": "Value-creation plan: levers, actions, goals",
+            "pct": step_vcp,
+            "note": (
+                f"{initiative_count} initiative(s) tracked · +{_vg_upside(cid, cat_scores, ebitda):,.0f} upside potential"
+                if initiative_count > 0 else
+                "Open Value Gap to model improvement initiatives"
+            ),
+            "route": "/ValueGap",
+        },
+    ]
+    p1_pct = int(round(sum(s["pct"] for s in p1_steps) / len(p1_steps)))
+
+    # -------------------------------------------------------------------------
+    # Phase 2 — Positioning & Marketing Prep
+    # -------------------------------------------------------------------------
+    qual_has_mgmt = qual and (qual.owner_hours_per_week is not None)
+    step_tax = 30 if (profile and profile.exit_timeline) else 0
+    step_team = min(100, int(round(cat_scores.get("management_team", 0)))) if qual_has_mgmt else 15
+    step_cim = min(100, report_count * 34)
+
+    p2_steps = [
+        {
+            "id": "TAX",
+            "label": "Tax & estate structuring",
+            "pct": step_tax,
+            "note": "Coordinate with estate attorney and CPA once exit timeline is set",
+            "route": "/EngagementIntake",
+        },
+        {
+            "id": "TEAM",
+            "label": "Management team & key positions",
+            "pct": step_team,
+            "note": (
+                f"Management score {cat_scores.get('management_team', 0):.0f}/100" if qual_has_mgmt else
+                "Complete qualitative inputs to score management depth"
+            ),
+            "route": "/Readiness",
+        },
+        {
+            "id": "CIM",
+            "label": "Marketing materials: teaser & CIM",
+            "pct": step_cim,
+            "note": f"{report_count} report(s) generated" if report_count else "Generate DRS summary under Reports",
+            "route": "/Reports",
+        },
+    ]
+    p2_pct = int(round(sum(s["pct"] for s in p2_steps) / len(p2_steps)))
+
+    # -------------------------------------------------------------------------
+    # Phase 3 — Go to Market
+    # -------------------------------------------------------------------------
+    buyer_pct = int(round(100 * resolved / n_q)) if n_q > 0 else (80 if drs_base >= 65 else 20)
+    step_buy = buyer_pct
+    step_out = 0  # outreach/NDA tracking not yet in platform
+
+    p3_steps = [
+        {
+            "id": "BUY",
+            "label": "Buyer targeting & screening",
+            "pct": step_buy,
+            "note": (
+                f"{n_q} buyer questions · {resolved} resolved" if n_q > 0 else
+                "Run buyer risk simulation under Buyer Analysis"
+            ),
+            "route": "/BuyerLens",
+            "ip_badge": True,
+        },
+        {
+            "id": "OUT",
+            "label": "Outreach, NDA & CIM distribution",
+            "pct": step_out,
+            "note": "Outreach tracking coming in next release",
+            "route": None,
+        },
+    ]
+    p3_pct = int(round(sum(s["pct"] for s in p3_steps) / len(p3_steps)))
+
+    # -------------------------------------------------------------------------
+    # Phase 4 — Bids & Negotiation
+    # -------------------------------------------------------------------------
+    p4_steps = [
+        {
+            "id": "IOI",
+            "label": "IOIs & management meetings",
+            "pct": 0,
+            "note": "Bid tracking coming in next release",
+            "route": None,
+        },
+        {
+            "id": "LOI",
+            "label": "LOI & buyer selection",
+            "pct": 0,
+            "note": "LOI management coming in next release",
+            "route": None,
+        },
+    ]
+    p4_pct = 0
+
+    # -------------------------------------------------------------------------
+    # Phase 5 — Due Diligence & Close
+    # -------------------------------------------------------------------------
+    p5_steps = [
+        {
+            "id": "DD",
+            "label": "Confirmatory due diligence",
+            "pct": 0,
+            "note": "Virtual data room integration planned",
+            "route": None,
+        },
+        {
+            "id": "DEF",
+            "label": "Definitive agreement",
+            "pct": 0,
+            "note": "Agreement tracking coming in next release",
+            "route": None,
+        },
+        {
+            "id": "CLOSE",
+            "label": "Close",
+            "pct": 0,
+            "note": "Post-close AUM retained by wealth manager",
+            "route": None,
+        },
+    ]
+    p5_pct = 0
+
+    # -------------------------------------------------------------------------
+    # Assemble phases
+    # -------------------------------------------------------------------------
+    phases = [
+        {
+            "phase": 1,
+            "label": "Preparation & Exit Readiness",
+            "pct": p1_pct,
+            "status": _pct_to_status(p1_pct),
+            "steps": p1_steps,
+            "has_dashboard": True,
+            "dashboard_note": "Exit Readiness Dashboard: DRS, EV range, wealth gap, exit checklist",
+        },
+        {
+            "phase": 2,
+            "label": "Positioning & Marketing Prep",
+            "pct": p2_pct,
+            "status": _pct_to_status(p2_pct),
+            "steps": p2_steps,
+        },
+        {
+            "phase": 3,
+            "label": "Go to Market",
+            "pct": p3_pct,
+            "status": _pct_to_status(p3_pct),
+            "steps": p3_steps,
+        },
+        {
+            "phase": 4,
+            "label": "Bids & Negotiation",
+            "pct": p4_pct,
+            "status": _pct_to_status(p4_pct),
+            "steps": p4_steps,
+        },
+        {
+            "phase": 5,
+            "label": "Due Diligence & Close",
+            "pct": p5_pct,
+            "status": _pct_to_status(p5_pct),
+            "steps": p5_steps,
+        },
+    ]
+
+    phase_pcts = [p1_pct, p2_pct, p3_pct, p4_pct, p5_pct]
+    overall = int(round(sum(phase_pcts) / len(phase_pcts)))
+    completed_count = sum(1 for p in phases if p["status"] == "completed")
+    active_phase = next((p["phase"] for p in phases if p["status"] == "in_progress"), None)
 
     return {
         "company_id": cid,
         "overall_pct": overall,
         "completed_count": completed_count,
-        "total_stages": len(stages_out),
-        "current_stage": current_stage,
-        "active_stages": active_stages,
-        "stages": stages_out,
+        "total_phases": len(phases),
+        "current_phase": active_phase,
+        "phases": phases,
+        # Legacy fields for any existing consumers
+        "stages": [],
+        "total_stages": 0,
+        "current_stage": None,
+        "active_stages": [],
     }
+
+
+def _vg_upside(cid: int, cat_scores: dict, ebitda: float) -> float:
+    try:
+        vg = compute_value_gap(cid, cat_scores, ebitda) if ebitda > 0 else None
+        return float(vg.total_value_gap) if vg else 0.0
+    except Exception:
+        return 0.0

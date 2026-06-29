@@ -33,7 +33,7 @@ function drsTier(score) {
   if (score >= 70) return { label: 'Investment Grade',    color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' }
   if (score >= 55) return { label: 'Conditional',         color: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-500/20' }
   if (score >= 40) return { label: 'High Risk',           color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/20' }
-  return                    { label: 'Pre-Diligence',      color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/20' }
+  return                    { label: 'Foundation Stage',    color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/20' }
 }
 
 function categoryScore(score) {
