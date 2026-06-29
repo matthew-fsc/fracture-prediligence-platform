@@ -177,7 +177,7 @@ export default function CopilotChat({
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: "Hello! I'm your Pre-Diligence AI Copilot. I have access to this company's DRS scores, enterprise value, EBITDA breakdown, and diligence gaps. What would you like to understand?",
+      content: "Hello! I'm your Exit Blueprint AI Copilot. I have access to this company's DRS scores, enterprise value, EBITDA breakdown, and diligence gaps. What would you like to understand?",
     },
   ])
   const [input, setInput]           = useState('')

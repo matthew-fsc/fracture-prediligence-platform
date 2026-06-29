@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --font-inter: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-inter: "Inter", "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
     --background: 220 14% 96%;
     --foreground: 220 20% 10%;
     --card: 0 0% 100%;

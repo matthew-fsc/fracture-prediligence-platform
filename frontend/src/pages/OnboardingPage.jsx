@@ -207,7 +207,7 @@ function Step1({ onNext, saving, error }) {
         Add your first client
       </h2>
       <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, margin: '0 0 32px 0' }}>
-        This creates your first client engagement and pre-diligence workspace.
+        This creates your first client engagement and exit readiness workspace.
       </p>
 
       <ErrorBanner message={error} />

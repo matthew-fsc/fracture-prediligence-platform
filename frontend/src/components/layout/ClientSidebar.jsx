@@ -46,13 +46,13 @@ export default function ClientSidebar({ mobileOpen = false, onNavigate }) {
       {/* Brand */}
       <div className="h-14 flex items-center px-3 border-b border-sidebar-border flex-shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
-          <img src="/logo.png" alt="Exit Blueprint" className="w-10 h-10 flex-shrink-0 object-contain rounded-md" />
+          <img src="/logo.svg" alt="Exit Blueprint" className="w-9 h-9 flex-shrink-0 object-contain rounded-lg" />
           <div className="min-w-0">
-            <h1 className="text-[12px] font-semibold text-sidebar-accent-foreground truncate leading-tight">
-              Owner Portal
-            </h1>
-            <p className="text-[11px] text-sidebar-foreground tracking-widest uppercase leading-tight">
+            <h1 className="text-[13px] font-semibold text-sidebar-accent-foreground truncate leading-tight tracking-tight">
               Exit Blueprint
+            </h1>
+            <p className="text-[10px] text-sidebar-foreground/50 tracking-[0.14em] uppercase leading-tight font-medium">
+              Owner Portal
             </p>
           </div>
         </div>

@@ -6,6 +6,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        display: ['"DM Sans"', 'Inter', '-apple-system', 'sans-serif'],
       },
       borderRadius: {
         DEFAULT: '0.625rem',

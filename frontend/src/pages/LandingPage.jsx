@@ -503,7 +503,7 @@ function Pricing() {
       highlight: false,
       features: ['Up to 5 advisors', 'Shared client workspace', 'Team reporting', 'API access'],
       cta: 'Contact Us',
-      ctaLink: 'mailto:matthew@fracturesystems.com',
+      ctaLink: 'mailto:hello@exitblueprint.net',
     },
   ]
 
@@ -683,7 +683,7 @@ function Footer() {
           {[
             { label: 'Log in', to: '/sign-in' },
             { label: 'Request demo', to: '/request-demo' },
-            { label: 'Contact', to: 'mailto:matthew@fracturesystems.com' },
+            { label: 'Contact', to: 'mailto:hello@exitblueprint.net' },
           ].map(({ label, to }) => (
             <Link
               key={label}
@@ -709,7 +709,7 @@ function Footer() {
             margin: 0,
           }}
         >
-          matthew@fracturesystems.com — © 2026 Exit Blueprint. All rights reserved.
+          hello@exitblueprint.net — © 2026 Exit Blueprint. All rights reserved.
         </p>
       </div>
     </footer>

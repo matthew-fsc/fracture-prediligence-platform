@@ -31,10 +31,10 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '', sl
   if (!isOpen) return null
 
   const mailtoHref =
-    `mailto:matthew@fracturesystems.com` +
+    `mailto:hello@exitblueprint.net` +
     `?subject=${encodeURIComponent('Founding Advisor License Request')}` +
     `&body=${encodeURIComponent(
-      'Hi Matthew,\n\nI\'d like to request a Founding Advisor license for the Pre-Diligence Platform.\n\nFirm: \nName: \nAny questions: \n'
+      'Hi,\n\nI\'d like to request a Founding Advisor license for Exit Blueprint.\n\nFirm: \nName: \nAny questions: \n'
     )}`
 
   async function handleRequestClick(e) {
@@ -162,7 +162,7 @@ export default function ConversionModal({ isOpen, onClose, prefillEmail = '', sl
           }}
         >
           <Mail size={16} />
-          Email matthew@fracturesystems.com
+          Email hello@exitblueprint.net
         </a>
 
         {/* Secondary */}

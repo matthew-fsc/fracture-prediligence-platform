@@ -69,7 +69,7 @@ const TIERS = [
       'API access',
     ],
     cta: 'Contact Us →',
-    mailto: 'matthew@fracturesystems.com',
+    mailto: 'hello@exitblueprint.net',
   },
 ]
 
@@ -326,7 +326,7 @@ export default function PricingPage() {
           </div>
           <p style={{ color: COLORS.muted, fontFamily: "'DM Sans', sans-serif", fontSize: 14, marginTop: 28 }}>
             Still have questions?{' '}
-            <a href="mailto:matthew@fracturesystems.com" style={{ color: COLORS.gold, textDecoration: 'none' }}>Email us →</a>
+            <a href="mailto:hello@exitblueprint.net" style={{ color: COLORS.gold, textDecoration: 'none' }}>Email us →</a>
           </p>
         </div>
       </section>

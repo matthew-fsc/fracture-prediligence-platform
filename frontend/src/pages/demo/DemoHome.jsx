@@ -730,7 +730,7 @@ export default function DemoHome() {
         {/* Checklist */}
         <div style={CARD_STYLE}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <h2 style={{ ...SECTION_HEADING, margin: 0 }}>Pre-Diligence Checklist</h2>
+            <h2 style={{ ...SECTION_HEADING, margin: 0 }}>Exit Readiness Checklist</h2>
             <span
               style={{
                 color: '#60a5fa',
