@@ -1039,27 +1039,6 @@ export default function Valuation() {
             )
           })()}
 
-          {/* Three EV scenarios */}
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: 'Floor', value: floor, mult: floorMultiple, color: 'red', desc: 'Conservative' },
-              { label: 'Midpoint', value: midpoint, mult: midMultiple, color: 'emerald', desc: 'Base case' },
-              { label: 'Ceiling', value: ceiling, mult: ceilMultiple, color: 'emerald', desc: 'Optimistic' },
-            ].map(s => {
-              const isGreen = s.color === 'emerald'
-              return (
-                <div key={s.label} className={cn(
-                  'rounded-lg border p-3 text-center',
-                  isGreen ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-red-500/20 bg-red-500/5',
-                )}>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">{s.desc}</p>
-                  <p className={cn('text-xl font-bold', isGreen ? 'text-emerald-400' : 'text-red-400')}>{fmtM(s.value)}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{s.mult.toFixed(1)}× EBITDA</p>
-                </div>
-              )
-            })}
-          </div>
-
           {/* Source citation */}
           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 group/cite relative">
             <ExternalLink className="w-3 h-3 flex-shrink-0" />

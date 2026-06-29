@@ -939,33 +939,6 @@ export default function Readiness() {
         </div>
       </div>
 
-      {/* DRS Tier reference */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-4">DRS Tier Classification</p>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {[
-            { range: '85–100',   tier: 'Institutional Grade',      color: 'emerald', note: 'Competitive process, minimal friction' },
-            { range: '70–84',    tier: 'Investment Grade',          color: 'emerald', note: 'Standard diligence, closes on schedule' },
-            { range: '55–69',    tier: 'Conditional',               color: 'amber',   note: 'Material weaknesses, focused value work needed' },
-            { range: '40–54',    tier: 'High Risk',                 color: 'amber',   note: 'Structural gaps — extended preparation typical' },
-            { range: 'Below 40', tier: 'Pre-Diligence Required',    color: 'red',     note: 'Not marketable to institutional buyers until fixed' },
-          ].map(t => {
-            const isActive = (t.range === '70–84' && drs >= 70 && drs < 85) || (t.range === '85–100' && drs >= 85) ||
-              (t.range === '55–69' && drs >= 55 && drs < 70) || (t.range === '40–54' && drs >= 40 && drs < 55) || (t.range === 'Below 40' && drs < 40)
-            const c = t.color === 'emerald' ? 'border-emerald-500/20 bg-emerald-500/5' : t.color === 'amber' ? 'border-amber-500/20 bg-amber-500/5' : 'border-red-500/20 bg-red-500/5'
-            const tc = t.color === 'emerald' ? 'text-emerald-400' : t.color === 'amber' ? 'text-amber-400' : 'text-red-400'
-            return (
-              <div key={t.range} className={cn('rounded-lg border p-3 space-y-1 transition-all', isActive ? `${c} ring-1 ring-offset-0` : 'border-border bg-muted/20')}>
-                <p className="text-[11px] font-mono text-muted-foreground">{t.range}</p>
-                <p className={cn('text-xs font-bold', isActive ? tc : 'text-muted-foreground')}>{t.tier}</p>
-                <p className="text-[11px] text-muted-foreground leading-tight">{t.note}</p>
-                {isActive && <span className="text-[11px] font-bold text-primary">← Current</span>}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
       {/* Owner PRE Score */}
       {data?.owner_readiness && (() => {
         const pre = data.owner_readiness
