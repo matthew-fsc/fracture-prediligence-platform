@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { usePageTitle } from '../hooks/usePageTitle'
 
 const COLORS = {
-  bg: '#0A1628', gold: '#C9973A', offWhite: '#F0EDE8',
+  bg: '#0A1628', gold: '#17a773', offWhite: '#F0EDE8',
   muted: '#8A9BB0', card: '#0F2040', border: '#1E3A5F', green: '#16a34a',
 }
 
@@ -39,7 +39,7 @@ function Slider({ label, value, onChange, min, max, step = 1, format = v => v })
 function ResultCard({ label, value, sub, highlight }) {
   return (
     <div style={{
-      background: highlight ? 'rgba(201,151,58,0.1)' : COLORS.card,
+      background: highlight ? 'rgba(23,167,115,0.1)' : COLORS.card,
       border: `1px solid ${highlight ? COLORS.gold : COLORS.border}`,
       borderRadius: 12, padding: '20px 24px',
     }}>

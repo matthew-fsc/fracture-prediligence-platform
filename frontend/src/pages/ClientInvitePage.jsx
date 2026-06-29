@@ -21,7 +21,7 @@ const HAS_CLERK = Boolean((import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').tri
 
 const C = {
   bg:   '#0A1628',
-  gold: '#C9973A',
+  gold: '#17a773',
   muted: '#8A9BB0',
   text:  '#F0EDE8',
   card:  '#0F1E35',

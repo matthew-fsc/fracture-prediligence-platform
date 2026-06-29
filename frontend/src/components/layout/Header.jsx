@@ -14,7 +14,7 @@ const PUBLISHABLE_KEY = (import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '').trim(
 // Plan badge
 // ---------------------------------------------------------------------------
 const PLAN_BADGE = {
-  founding: { label: 'FOUNDING', bg: '#C9973A', color: '#0A1628' },
+  founding: { label: 'FOUNDING', bg: '#17a773', color: '#fff' },
   pro:      { label: 'PRO',      bg: '#4ABEA4', color: '#0A1628' },
   team:     { label: 'TEAM',     bg: '#3B82F6', color: '#fff' },
 }

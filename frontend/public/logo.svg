@@ -9,5 +9,5 @@
   <line x1="27" y1="8" x2="27" y2="32" stroke="#1B2E4A" stroke-width="0.8"/>
   <!-- EB monogram -->
   <text x="20" y="26" font-family="'Inter', 'DM Sans', sans-serif" font-size="15" font-weight="800"
-        fill="#C9973A" text-anchor="middle" letter-spacing="-0.5">EB</text>
+        fill="#17a773" text-anchor="middle" letter-spacing="-0.5">EB</text>
 </svg>
