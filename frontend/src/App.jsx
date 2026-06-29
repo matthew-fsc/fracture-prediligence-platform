@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import AppShell from './components/layout/AppShell'
-import ClientShell from './components/layout/ClientShell'
 import DemoShell from './components/layout/DemoShell'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import { CompanyProvider } from './context/CompanyContext'
@@ -78,9 +77,6 @@ import OwnerOnboardingWizard from './pages/owner/OwnerOnboardingWizard'
 
 // Client portal pages
 import ClientDashboard from './pages/client/ClientDashboard'
-import ClientReadiness from './pages/client/ClientReadiness'
-import ClientValuation from './pages/client/ClientValuation'
-import ClientValueGap from './pages/client/ClientValueGap'
 import ClientEngagementProfile from './pages/client/ClientEngagementProfile'
 import ClientDataRoom from './pages/client/ClientDataRoom'
 
@@ -103,11 +99,11 @@ function ProtectedAdvisorShell() {
   )
 }
 
-// Protected client ClientShell (requires CLIENT role)
+// Protected client shell (requires CLIENT role, reuses AppShell)
 function ProtectedClientShell() {
   return (
     <ProtectedRoute requireClient>
-      <ClientShell />
+      <AppShell />
     </ProtectedRoute>
   )
 }
@@ -281,9 +277,9 @@ export default function App() {
             {/* ---------------------------------------------------------------- */}
             <Route element={<ProtectedClientShell />}>
               <Route path="/client/dashboard"  element={<ClientDashboard />} />
-              <Route path="/client/readiness"  element={<ClientReadiness />} />
-              <Route path="/client/valuation"  element={<ClientValuation />} />
-              <Route path="/client/value-gap"  element={<ClientValueGap />} />
+              <Route path="/client/readiness"  element={<Readiness />} />
+              <Route path="/client/valuation"  element={<Valuation />} />
+              <Route path="/client/value-gap"  element={<ValueGap />} />
               <Route path="/client/profile"    element={<ClientEngagementProfile />} />
               <Route path="/client/data-room"  element={<ClientDataRoom />} />
               {/* Fallback: /client → /client/dashboard */}

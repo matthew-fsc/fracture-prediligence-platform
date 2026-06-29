@@ -18,21 +18,11 @@ from app.api.routes.companies import company_to_dict
 from app.core.analytics_events import track
 from app.core.database import get_db
 from app.middleware.auth import CurrentUser, get_current_user, get_current_user_optional
-from app.analytics.a1_metric_computation import compute_metrics
-from app.analytics.a2_ebitda_recast import compute_ebitda_recast, ChallengeLikelihood
-from app.analytics.a3_revenue_quality import compute_revenue_quality
-from app.analytics.a4_operational_independence import compute_operational_independence
-from app.analytics.a5_customer_risk import compute_customer_risk
-from app.analytics.a6_management_team import compute_management_team
-from app.analytics.a7_growth_drivers import compute_growth_drivers
-from app.analytics.a8_financial_integrity import compute_financial_integrity
-from app.analytics.a9_drs_composite import CategoryScores, DRSTier, compute_drs
-from app.analytics.a10_enterprise_value import compute_enterprise_value, format_ev_valuation_summary
+from app.analytics.financial_analytics import compute_metrics, compute_ebitda_recast, ChallengeLikelihood, compute_revenue_quality
+from app.analytics.operational_analytics import compute_operational_independence, compute_customer_risk, compute_management_team, compute_growth_drivers, compute_financial_integrity
+from app.analytics.composite_analytics import CategoryScores, DRSTier, compute_drs, compute_enterprise_value, format_ev_valuation_summary, compute_value_gap, ebitda_basis_for_company, compute_owner_readiness
 from app.analytics.market_benchmarks import build_benchmarks_payload, get_market_multiple_context
-from app.analytics.a11_value_gap import compute_value_gap
-from app.analytics.ebitda_basis import ebitda_basis_for_company
-from app.analytics.a13_buyer_questions import generate_buyer_questions
-from app.analytics.owner_readiness import compute_owner_readiness
+from app.analytics.a13_buyer_questions import generate_buyer_questions  # noqa: F811
 from app.core.config import settings
 from app.core.scoring_rules import SCORING_RULES, SCORING_RULES_VERSION
 from app.core.confidence import band_multiplier, build_confidence_summary
@@ -778,9 +768,9 @@ def get_score_history(company: CompanyScoped, db: Session = Depends(get_db)):
 @router.post("/scores/{company_id}/snapshot")
 def capture_score_snapshot(company: CompanyScoped, db: Session = Depends(get_db)):
     """Manually trigger a DRS + EV snapshot."""
-    from app.analytics.ebitda_basis import ebitda_basis_for_company
+    from app.analytics.composite_analytics import ebitda_basis_for_company
     from app.services.analytics_service import compute_category_scores
-    from app.analytics.a9_drs_composite import CategoryScores as _CS, compute_drs as _drs
+    from app.analytics.composite_analytics import CategoryScores as _CS, compute_drs as _drs
     try:
         cat = compute_category_scores(company.id, db)
         cs = _CS(**{k: cat[k] for k in cat})
@@ -1217,7 +1207,7 @@ async def generate_buyer_question_draft(
     token budget as the main Copilot (reads from AICopilotUsage).
     """
     from datetime import datetime, timezone
-    from app.analytics.a13_buyer_questions import generate_buyer_questions
+    from app.analytics.a13_buyer_questions import generate_buyer_questions  # noqa: F811
     from app.api.routes.copilot import _build_context, _current_month, _get_tier_limit, _get_usage, _record_usage
     from app.core.config import settings as _cfg
     from app.ontology.models import AICopilotUsage, UserSubscription
@@ -1691,8 +1681,8 @@ def upsert_override(
     # Capture a score snapshot after each override change
     try:
         from app.services.analytics_service import compute_category_scores as _cat_scores
-        from app.analytics.a9_drs_composite import CategoryScores as _CS, compute_drs as _drs
-        from app.analytics.ebitda_basis import ebitda_basis_for_company as _ev_basis
+        from app.analytics.composite_analytics import CategoryScores as _CS, compute_drs as _drs
+        from app.analytics.composite_analytics import ebitda_basis_for_company as _ev_basis
         cat_s = _cat_scores(company.id, db)
         cs_s = _CS(**{k: cat_s[k] for k in cat_s})
         drs_s = round(float(_drs(cs_s).base_drs), 2)

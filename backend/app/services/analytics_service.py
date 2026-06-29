@@ -1,12 +1,7 @@
 from sqlalchemy.orm import Session
 
-from app.analytics.a1_metric_computation import compute_metrics
-from app.analytics.a3_revenue_quality import compute_revenue_quality
-from app.analytics.a4_operational_independence import compute_operational_independence
-from app.analytics.a5_customer_risk import compute_customer_risk
-from app.analytics.a6_management_team import compute_management_team
-from app.analytics.a7_growth_drivers import compute_growth_drivers
-from app.analytics.a8_financial_integrity import compute_financial_integrity
+from app.analytics.financial_analytics import compute_metrics, compute_revenue_quality
+from app.analytics.operational_analytics import compute_operational_independence, compute_customer_risk, compute_management_team, compute_growth_drivers, compute_financial_integrity
 
 
 def compute_category_modules(company_id: int, db: Session) -> dict:
