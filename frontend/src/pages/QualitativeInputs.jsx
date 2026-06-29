@@ -78,7 +78,7 @@ export default function QualitativeInputs() {
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setSaved(false) }
 
   // A section is complete only when all required fields are explicitly set (not null/empty defaults)
-  const a4Complete = form.owner_hours_per_week !== '' && form.sop_pct !== null && form.automation_pct !== null
+  const a4Complete = form.owner_hours_per_week !== '' && form.sop_pct !== null && form.automation_pct !== null && form.mgmt_qualified !== ''
   const a3Complete = form.customer_contract_type !== '' && form.contract_pct !== null && form.key_person_revenue_pct !== null
   const a7Complete = form.pipeline_value !== '' && form.market_positioning !== '' && form.repeatability_pct !== null
   const a6Complete = form.non_compete_pct !== '' && form.voluntary_turnover !== '' && form.comp_vs_market !== ''

@@ -844,9 +844,10 @@ def get_value_gap(company: CompanyScoped, db: Session = Depends(get_db)):
         fin = modules["financial_integrity"]
         basis = _ebitda_basis(company.id, db)
 
-        ops_raw = ops.composite
-        rev_raw = rev.composite
+        ops_raw  = ops.composite
+        rev_raw  = rev.composite
         growth_raw = growth.composite
+        mgmt_raw = mgmt.composite
         qual_sub_overrides: dict[str, dict] = {}
 
         # --- P2: Apply qualitative inputs (must mirror get_all_scores logic) ---
@@ -908,12 +909,30 @@ def get_value_gap(company: CompanyScoped, db: Session = Depends(get_db)):
                     }
                 rev_raw = rev_qual_composite
 
+            a6_fields = [qual.non_compete_pct, qual.voluntary_turnover, qual.comp_vs_market]
+            if all(v is not None for v in a6_fields):
+                s_noncompete = _qual_non_compete_score(qual.non_compete_pct)
+                s_turnover   = _qual_voluntary_turnover_score(qual.voluntary_turnover)
+                s_comp_mkt   = _qual_comp_vs_market_score(qual.comp_vs_market)
+                mgmt_raw = round(
+                    mgmt.composite * 0.60
+                    + s_noncompete  * 0.15
+                    + s_turnover    * 0.15
+                    + s_comp_mkt    * 0.10,
+                    1,
+                )
+                qual_sub_overrides["management_team"] = {
+                    "non_compete_coverage": {"score": s_noncompete, "label": f"{qual.non_compete_pct}% staff with non-competes"},
+                    "retention_history":    {"score": s_turnover,   "label": f"{qual.voluntary_turnover}% voluntary turnover"},
+                    "comp_vs_market":       {"score": s_comp_mkt,   "label": qual.comp_vs_market.replace("_", " ") + " market comp"},
+                }
+
         raw_scores = {
             "revenue_quality":          round(rev_raw, 1),
             "financial_integrity":      round(fin.composite, 1),
             "operational_independence": round(ops_raw, 1),
             "customer_risk":            round(cust.composite, 1),
-            "management_team":          round(mgmt.composite, 1),
+            "management_team":          round(mgmt_raw, 1),
             "growth_drivers":           round(growth_raw, 1),
         }
 
@@ -1040,9 +1059,10 @@ def get_buyer_questions(company: CompanyScoped, db: Session = Depends(get_db)):
         growth = modules["growth_drivers"]
         fin = modules["financial_integrity"]
 
-        ops_raw = ops.composite
-        rev_raw = rev.composite
+        ops_raw    = ops.composite
+        rev_raw    = rev.composite
         growth_raw = growth.composite
+        mgmt_raw   = mgmt.composite
 
         # --- P2: Apply qualitative inputs (must mirror get_all_scores logic) ---
         qual = db.query(QualitativeInputs).filter(
@@ -1057,6 +1077,19 @@ def get_buyer_questions(company: CompanyScoped, db: Session = Depends(get_db)):
                 s_auto  = _qual_automation_score(float(qual.automation_pct))
                 s_mgmt  = _qual_mgmt_depth_score(int(qual.mgmt_qualified), int(qual.mgmt_total_functions))
                 ops_raw = round(s_hours * 0.35 + s_sop * 0.30 + s_auto * 0.15 + s_mgmt * 0.20, 1)
+
+            a6_fields = [qual.non_compete_pct, qual.voluntary_turnover, qual.comp_vs_market]
+            if all(v is not None for v in a6_fields):
+                s_noncompete = _qual_non_compete_score(qual.non_compete_pct)
+                s_turnover   = _qual_voluntary_turnover_score(qual.voluntary_turnover)
+                s_comp_mkt   = _qual_comp_vs_market_score(qual.comp_vs_market)
+                mgmt_raw = round(
+                    mgmt.composite * 0.60
+                    + s_noncompete  * 0.15
+                    + s_turnover    * 0.15
+                    + s_comp_mkt    * 0.10,
+                    1,
+                )
 
             a7_fields = [qual.pipeline_value, qual.market_positioning, qual.repeatability_pct]
             if all(v is not None for v in a7_fields):
@@ -1088,7 +1121,7 @@ def get_buyer_questions(company: CompanyScoped, db: Session = Depends(get_db)):
             "financial_integrity":      round(fin.composite, 1),
             "operational_independence": round(ops_raw, 1),
             "customer_risk":            round(cust.composite, 1),
-            "management_team":          round(mgmt.composite, 1),
+            "management_team":          round(mgmt_raw, 1),
             "growth_drivers":           round(growth_raw, 1),
         }
 
