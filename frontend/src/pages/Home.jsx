@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Network, Building2, Shield, Target, BarChart2,
-  ArrowRight, Activity, ListChecks, ChevronRight,
-  Zap, Clock, Loader2, NotebookPen, TrendingUp, Plus,
+  Building2, Shield, Target,
+  ArrowRight, Activity, ListChecks, ChevronRight, Grid3x3,
+  Zap, Clock, Loader2, NotebookPen, TrendingUp, Plus, FileText,
 } from 'lucide-react'
 import NewClientDialog from '../components/layout/NewClientDialog'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts'
@@ -24,22 +24,22 @@ const colorCfg = {
 }
 
 const MODULES = [
-  { label: 'Client Profile',       path: '/EngagementIntake',  icon: NotebookPen, color: 'primary', desc: 'Owner goals, exit timeline, buyer fit' },
-  { label: 'Company Workspace',   path: '/CompanyWorkspace',  icon: Building2,  color: 'blue',    desc: 'Entity-centric intelligence hub' },
+  { label: 'Assessment Intake',   path: '/EngagementIntake',  icon: NotebookPen, color: 'primary', desc: 'Owner goals, qualitative inputs, exit timeline' },
+  { label: 'Readiness Score',     path: '/Readiness',         icon: Grid3x3,    color: 'primary', desc: 'DRS score, category breakdown, risk flags' },
+  { label: 'Reports',             path: '/Reports',           icon: FileText,   color: 'primary', desc: 'Generate assessment & deliverable PDFs' },
   { label: 'Buyer Risk Profile',  path: '/BuyerLens',         icon: Shield,     color: 'red',     desc: null },
   { label: 'Value Gap Analysis',  path: '/ValueGap',          icon: Target,     color: 'emerald', desc: 'Addressable value creation opportunity' },
-  { label: 'Business Quality',    path: '/BusinessQuality',   icon: BarChart2,  color: 'blue',    desc: 'Operating metrics vs benchmarks' },
   { label: 'Scenario Simulator',  path: '/ScenarioSimulator', icon: Activity,   color: 'amber',   desc: 'Model adverse events in real time' },
-  { label: 'Advisory Workflow',   path: '/AdvisoryWorkflow',  icon: ListChecks, color: 'primary', desc: 'CEPA engagement progress tracker' },
-  { label: 'Systems Intelligence',path: '/Connectors',        icon: Network,    color: 'purple',  desc: 'Operational graph & dependencies' },
+  { label: 'Advisory Workflow',   path: '/AdvisoryWorkflow',  icon: ListChecks, color: 'blue',    desc: 'CEPA engagement progress tracker' },
+  { label: 'Company Workspace',   path: '/CompanyWorkspace',  icon: Building2,  color: 'blue',    desc: 'Entity-centric intelligence hub' },
 ]
 
 const quickActions = [
-  { label: 'Capture client profile', path: '/EngagementIntake', color: 'text-primary' },
-  { label: 'Generate Readiness Report', path: '/Reports',          color: 'text-primary' },
-  { label: 'Review Buyer Risk Flags',   path: '/BuyerLens',        color: 'text-red-400' },
-  { label: 'Run Scenario Simulation',   path: '/ScenarioSimulator', color: 'text-amber-400' },
-  { label: 'Check Data Quality',        path: '/DataQuality',      color: 'text-blue-400' },
+  { label: 'Start assessment intake',   path: '/EngagementIntake',  color: 'text-primary' },
+  { label: 'Generate readiness report', path: '/Reports',           color: 'text-primary' },
+  { label: 'Review buyer risk flags',   path: '/BuyerLens',         color: 'text-red-400' },
+  { label: 'Run scenario simulation',   path: '/ScenarioSimulator', color: 'text-amber-400' },
+  { label: 'View advisory workflow',    path: '/AdvisoryWorkflow',  color: 'text-blue-400' },
 ]
 
 function buildActivity(jobs, liveData, bqData, gapData) {
@@ -210,7 +210,7 @@ export default function Home() {
       <div>
         <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">{dateStr}</p>
         <h1 className="text-2xl font-bold text-foreground">{greeting}, Advisor</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Here&apos;s your advisory intelligence briefing</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Exit assessment workspace</p>
       </div>
 
       {/* Status strip */}
@@ -409,7 +409,7 @@ export default function Home() {
 
       {/* Module grid */}
       <div>
-        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Advisory Modules</p>
+        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">Assessment Modules</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {MODULES.map(m => {
             const Icon = m.icon

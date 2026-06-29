@@ -14,11 +14,18 @@ import { toast } from '../../lib/notify'
 
 const groups = [
   {
+    label: 'Assessment',
+    items: [
+      { label: 'Assessment Intake',  href: '/EngagementIntake', icon: NotebookPen },
+      { label: 'Readiness Score',    href: '/Readiness',        icon: Grid3x3 },
+      { label: 'Reports',            href: '/Reports',          icon: FileText },
+    ],
+  },
+  {
     label: 'Workspace',
     items: [
       { label: 'Home',               href: '/Home',             icon: House },
       { label: 'Company Workspace',  href: '/CompanyWorkspace', icon: Building },
-      { label: 'Client Profile',     href: '/EngagementIntake', icon: NotebookPen },
       { label: 'Advisory Workflow',  href: '/AdvisoryWorkflow', icon: Workflow },
       { label: 'Deal Outcome',       href: '/DealOutcome',      icon: Handshake },
     ],
@@ -26,30 +33,18 @@ const groups = [
   {
     label: 'Intelligence',
     items: [
-      { label: 'Readiness Score',    href: '/Readiness',        icon: Grid3x3 },
       { label: 'Buyer Risk Profile', href: '/BuyerLens',        icon: Eye },
       { label: 'Valuation',          href: '/Valuation',        icon: TrendingUp },
       { label: 'Market Comps',       href: '/MarketComps',      icon: GitCompare },
-    ],
-  },
-  {
-    label: 'Value Creation',
-    items: [
       { label: 'Value Gap',          href: '/ValueGap',         icon: Target },
       { label: 'Scenario Simulator', href: '/ScenarioSimulator',icon: Activity },
     ],
   },
   {
-    label: 'Data Pipeline',
+    label: 'Data & Tools',
     items: [
       { label: 'Data Sources',       href: '/Connectors',       icon: Plug },
       { label: 'Data Room (VDR)',    href: '/DataRoom',         icon: Folder },
-    ],
-  },
-  {
-    label: 'Output',
-    items: [
-      { label: 'Reports',            href: '/Reports',          icon: FileText },
       { label: 'AI Copilot',         href: '/AICopilot',        icon: Bot },
       { label: 'Admin',              href: '/Admin',            icon: Settings },
     ],
