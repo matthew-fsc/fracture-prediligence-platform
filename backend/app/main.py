@@ -16,7 +16,8 @@ from app.api.routes import ingestion, analytics, companies, reports, demo, libra
 from app.api.routes import payments, webhooks
 from app.api.routes import copilot
 from app.api.routes import user_profiles
-from app.api.routes import admin_metrics, client_portal, firms, partners, referrals
+from app.api.routes import admin_metrics, client_portal, firms, partners
+from app.api.routes.partners import referrals_router
 from app.api.routes import quickbooks, engagement, owner_onboarding
 from app.api.routes import insights
 from app.api.routes import deal_outcomes
@@ -214,7 +215,7 @@ app.include_router(webhooks.router,   prefix="/api",            tags=["webhooks"
 app.include_router(copilot.router,       prefix="/api/copilot",       tags=["copilot"])
 app.include_router(user_profiles.router, prefix="/api",               tags=["user-profiles"])
 app.include_router(client_portal.router, prefix="/api/portal",        tags=["portal"])
-app.include_router(referrals.router,     prefix="/api/referrals",     tags=["referrals"])
+app.include_router(referrals_router,     prefix="/api/referrals",     tags=["referrals"])
 app.include_router(firms.router,         prefix="/api/firms",         tags=["firms"])
 app.include_router(partners.router,      prefix="/api/partners",      tags=["partners"])
 app.include_router(admin_metrics.router, prefix="/api/admin",         tags=["admin"])

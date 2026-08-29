@@ -11,8 +11,9 @@ import { useCompanyId } from '../../context/CompanyContext'
 import { withCompanyQuery } from '../../lib/navLinks'
 import { apiClient } from '../../lib/apiClient'
 import { toast } from '../../lib/notify'
+import { useUserRole } from '../../context/UserRoleContext'
 
-const groups = [
+const advisorGroups = [
   {
     label: 'Assessment',
     items: [
@@ -47,6 +48,25 @@ const groups = [
       { label: 'Data Room (VDR)',    href: '/DataRoom',         icon: Folder },
       { label: 'AI Copilot',         href: '/AICopilot',        icon: Bot },
       { label: 'Admin',              href: '/Admin',            icon: Settings },
+    ],
+  },
+]
+
+const clientGroups = [
+  {
+    label: 'My Company',
+    items: [
+      { label: 'Dashboard',          href: '/client/dashboard',   icon: House },
+      { label: 'My Readiness Score', href: '/client/readiness',   icon: Grid3x3 },
+      { label: 'My Valuation',       href: '/client/valuation',   icon: TrendingUp },
+      { label: 'Value Roadmap',      href: '/client/value-gap',   icon: Target },
+    ],
+  },
+  {
+    label: 'My Profile',
+    items: [
+      { label: 'Goals & Exit Prefs', href: '/client/profile',    icon: NotebookPen },
+      { label: 'Documents',          href: '/client/data-room',  icon: Folder },
     ],
   },
 ]
@@ -174,11 +194,21 @@ function InviteClientModal({ companyId, onClose }) {
 }
 
 // ---------------------------------------------------------------------------
-// Sidebar
+// Sidebar — renders advisor nav or client nav based on role
 // ---------------------------------------------------------------------------
 export default function Sidebar({ mobileOpen = false, onNavigate }) {
   const companyId = useCompanyId()
   const [inviteOpen, setInviteOpen] = useState(false)
+  const { isClient, clientCompany } = useUserRole()
+
+  const groups = isClient ? clientGroups : advisorGroups
+  const subtitle = isClient ? 'Owner Portal' : 'Advisor Platform'
+
+  // Client nav uses plain hrefs; advisor nav uses company-scoped query params
+  function buildHref(href) {
+    if (isClient) return href
+    return withCompanyQuery(href, companyId)
+  }
 
   return (
     <>
@@ -198,23 +228,37 @@ export default function Sidebar({ mobileOpen = false, onNavigate }) {
                 Exit Blueprint
               </h1>
               <p className="text-[10px] text-sidebar-foreground/50 tracking-[0.14em] uppercase leading-tight font-medium">
-                Advisor Platform
+                {subtitle}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Invite client shortcut */}
-        <div className="px-3 pt-2 pb-1 border-b border-sidebar-border flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setInviteOpen(true)}
-            className="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md text-[11px] font-medium text-primary hover:bg-sidebar-accent/40 transition-colors"
-          >
-            <UserPlus className="w-3.5 h-3.5 flex-shrink-0" />
-            Invite client to portal
-          </button>
-        </div>
+        {/* Client company name badge */}
+        {isClient && clientCompany && (
+          <div className="px-3 py-2 border-b border-sidebar-border flex-shrink-0">
+            <p className="text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-widest mb-0.5">
+              Company
+            </p>
+            <p className="text-[12px] font-medium text-sidebar-accent-foreground truncate">
+              {clientCompany.name}
+            </p>
+          </div>
+        )}
+
+        {/* Advisor: invite client shortcut */}
+        {!isClient && (
+          <div className="px-3 pt-2 pb-1 border-b border-sidebar-border flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setInviteOpen(true)}
+              className="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md text-[11px] font-medium text-primary hover:bg-sidebar-accent/40 transition-colors"
+            >
+              <UserPlus className="w-3.5 h-3.5 flex-shrink-0" />
+              Invite client to portal
+            </button>
+          </div>
+        )}
 
         {/* Nav */}
         <nav className="flex-1 py-2 overflow-y-auto">
@@ -227,7 +271,7 @@ export default function Sidebar({ mobileOpen = false, onNavigate }) {
                 {group.items.map(({ label, href, icon: Icon }) => (
                   <NavLink
                     key={href}
-                    to={withCompanyQuery(href, companyId)}
+                    to={buildHref(href)}
                     onClick={() => onNavigate?.()}
                     className={({ isActive }) =>
                       cn(
@@ -268,8 +312,8 @@ export default function Sidebar({ mobileOpen = false, onNavigate }) {
         </div>
       </aside>
 
-      {/* Invite client modal */}
-      {inviteOpen && (
+      {/* Invite client modal (advisor only) */}
+      {!isClient && inviteOpen && (
         <InviteClientModal
           companyId={companyId}
           onClose={() => setInviteOpen(false)}
